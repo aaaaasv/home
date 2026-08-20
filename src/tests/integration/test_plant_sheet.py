@@ -86,3 +86,11 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик", can_act=True)
 
         self.assertIn("Записати полив", page)
+
+    async def test_render_a_plant_that_has_photos_shows_the_specimen_and_the_strip(self):
+        photo_id = await self.seed_plant_photo(self.plant_id, telegram_file_id="file-1")
+
+        page = render_plant_sheet(await self.sheet(), lambda pid: f"/photo/{pid}", "Домовик", can_act=False)
+
+        self.assertIn(f'src="/photo/{photo_id}"', page)
+        self.assertIn('class="mount"', page)

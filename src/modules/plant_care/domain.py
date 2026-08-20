@@ -63,13 +63,19 @@ class CareEventDetails(DomainModel):
 
 
 class PlantPhotoDetails(DomainModel):
+    id: int
     telegram_file_id: str
     caption: str | None
     taken_at: datetime
 
     @classmethod
     def from_photo(cls, photo: PlantPhoto) -> "PlantPhotoDetails":
-        return cls(telegram_file_id=photo.telegram_file_id, caption=photo.caption, taken_at=photo.taken_at)
+        return cls(
+            id=photo.id,
+            telegram_file_id=photo.telegram_file_id,
+            caption=photo.caption,
+            taken_at=photo.taken_at,
+        )
 
 
 class PlantSummary(DomainModel):
