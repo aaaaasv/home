@@ -34,6 +34,11 @@ class Plant(Base):
     ideal_temperature_max_celsius = Column(Float, nullable=True)
     ideal_humidity_min_percent = Column(Float, nullable=True)
     ideal_humidity_max_percent = Column(Float, nullable=True)
+    # what a herbarium sheet records beyond the care schedule
+    provenance = Column(Text, nullable=True)
+    native_range = Column(String(160), nullable=True)
+    substrate = Column(String(160), nullable=True)
+    toxicity = Column(String(160), nullable=True)
     added_by_telegram_user_id = Column(BigInteger, nullable=False)
     is_archived = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(UtcDateTime, default=current_time, nullable=False)
@@ -247,7 +252,10 @@ class FamilyMember(Base):
     __tablename__ = "family_members"
 
     telegram_user_id = Column(BigInteger, primary_key=True, autoincrement=False)
+    # what telegram calls them — refreshed on every message, so it cannot hold a chosen name
     display_name = Column(String(128), nullable=False)
+    # what they chose to be called; wins wherever a person is named
+    preferred_name = Column(String(128), nullable=True)
     updated_at = Column(UtcDateTime, default=current_time, onupdate=current_time, nullable=False)
 
 

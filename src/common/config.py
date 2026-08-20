@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     DATABASE_PATH: str = "home.db"
     PHOTO_STORAGE_PATH: str = "photos"
 
+    # what the bot calls itself where it signs something — an annotation on a plant sheet, say.
+    # a name, not a brand: set it to whatever the household actually calls the thing
+    BOT_DISPLAY_NAME: str = "bot"
+
     TIMEZONE: str = "Europe/Kyiv"
     DAILY_DIGEST_TIME: str = "09:00"
     # weekends get a later one — the digest is the same, the hour is not. empty means "same as weekdays"

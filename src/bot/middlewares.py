@@ -56,5 +56,8 @@ class FamilyRosterMiddleware(BaseMiddleware):
     ) -> Any:
         actor: Actor | None = data.get("actor")
         if actor is not None:
-            await RecordFamilyMemberUseCase(uow=self.uow_factory())(actor.telegram_user_id, actor.display_name)
+            member = await RecordFamilyMemberUseCase(uow=self.uow_factory())(actor.telegram_user_id, actor.display_name)
+            # everything downstream denormalises the actor's name onto its records, so resolve the chosen
+            # name here — otherwise history keeps whatever telegram happened to call them that day
+            data["actor"] = Actor(telegram_user_id=actor.telegram_user_id, display_name=member.name)
         return await handler(event, data)
