@@ -11,6 +11,13 @@ class FamilyMemberRepository(SQLAlchemyRepository[FamilyMember]):
         result = await self.session.execute(select(FamilyMember).order_by(FamilyMember.display_name))
         return list(result.scalars().all())
 
+    async def map_current_names(self) -> dict[int, str]:
+        """Every member's name as it stands now, for pages that credit people rather than record history."""
+        result = await self.session.execute(
+            select(FamilyMember.telegram_user_id, FamilyMember.display_name, FamilyMember.preferred_name)
+        )
+        return {user_id: preferred or display for user_id, display, preferred in result.all()}
+
     async def upsert(self, telegram_user_id: int, display_name: str) -> FamilyMember:
         """Records the member and answers with the row, whose preferred_name this never touches."""
         existing = await self.session.get(FamilyMember, telegram_user_id)

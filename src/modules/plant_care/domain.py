@@ -53,11 +53,13 @@ class CareEventDetails(DomainModel):
     note: str | None
 
     @classmethod
-    def from_event(cls, event: CareEvent) -> "CareEventDetails":
+    def from_event(cls, event: CareEvent, current_names: dict[int, str] | None = None) -> "CareEventDetails":
+        """Current_names re-credits the event to whatever its author goes by now, leaving the record untouched."""
+        names = current_names or {}
         return cls(
             task_type=CareTaskType(event.task_type),
             performed_at=event.performed_at,
-            performed_by_display_name=event.performed_by_display_name,
+            performed_by_display_name=names.get(event.performed_by_telegram_user_id, event.performed_by_display_name),
             note=event.note,
         )
 
@@ -349,7 +351,9 @@ class PlantSheet(DomainModel):
         return floor is not None and now is not None and now < floor
 
     @classmethod
-    def from_models(cls, plant, schedules, recent_events, photos, carers, waterings, climate, latest_climate, today):
+    def from_models(
+        cls, plant, schedules, recent_events, photos, carers, waterings, climate, latest_climate, today, current_names
+    ):
         gaps = [round((later - earlier).total_seconds() / 86400, 1) for earlier, later in zip(waterings, waterings[1:])]
         return cls(
             id=plant.id,
@@ -371,9 +375,9 @@ class PlantSheet(DomainModel):
             current_temperature_celsius=latest_climate.temperature_celsius if latest_climate else None,
             current_humidity_percent=latest_climate.relative_humidity_percent if latest_climate else None,
             schedules=[CareScheduleDetails.from_schedule(s, today) for s in schedules],
-            recent_events=[CareEventDetails.from_event(e) for e in recent_events],
+            recent_events=[CareEventDetails.from_event(e, current_names) for e in recent_events],
             photos=[PlantPhotoDetails.from_photo(p) for p in photos],
-            carers=[CarerTally(name=name, count=count) for name, count in carers],
+            carers=[CarerTally(name=current_names.get(user_id, name), count=count) for user_id, name, count in carers],
             watering_gaps_days=gaps,
             climate=[
                 ClimatePoint(hour=hour, temperature_celsius=t, relative_humidity_percent=h) for hour, t, h in climate

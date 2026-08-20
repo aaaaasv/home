@@ -115,3 +115,15 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         self.assertTrue(page.startswith('<!doctype html>\n<html lang="uk">'))
         self.assertIn('<meta charset="utf-8">', page)
         self.assertTrue(page.rstrip().endswith("</html>"))
+
+    async def test_sheet_credits_a_carer_by_the_name_they_chose_not_the_one_on_the_old_event(self):
+        await self.water(OWNER, FROZEN_NOW - timedelta(days=3))
+        async with self.uow as uow:
+            await uow.family_members.upsert(OWNER.telegram_user_id, OWNER.display_name)
+            (await uow.family_members.list_all())[0].preferred_name = "Богданчик"
+            await uow.commit()
+
+        sheet = await self.sheet()
+
+        self.assertEqual([(carer.name, carer.count) for carer in sheet.carers], [("Богданчик", 1)])
+        self.assertEqual([event.performed_by_display_name for event in sheet.recent_events], ["Богданчик"])

@@ -34,15 +34,19 @@ class CareEventRepository(SQLAlchemyRepository[CareEvent]):
         )
         return [(event, plant) for event, plant in result.all()]
 
-    async def count_by_carer(self, plant_id: int, task_type: CareTaskType) -> list[tuple[str, int]]:
-        """Who has done this task for this plant, most diligent first — the sheet credits them by name."""
+    async def count_by_carer(self, plant_id: int, task_type: CareTaskType) -> list[tuple[int, str, int]]:
+        """Who has done this task for this plant, most diligent first, as (person, the name they used, count)."""
         result = await self.session.execute(
-            select(CareEvent.performed_by_display_name, func.count())
+            select(
+                CareEvent.performed_by_telegram_user_id,
+                func.min(CareEvent.performed_by_display_name),
+                func.count(),
+            )
             .where(CareEvent.plant_id == plant_id, CareEvent.task_type == task_type)
-            .group_by(CareEvent.performed_by_display_name)
+            .group_by(CareEvent.performed_by_telegram_user_id)
             .order_by(func.count().desc())
         )
-        return [(name, count) for name, count in result.all()]
+        return [(user_id, name, count) for user_id, name, count in result.all()]
 
     async def list_performed_at(self, plant_id: int, task_type: CareTaskType) -> list[datetime]:
         """Every time this task was done, oldest first, so the gaps between them can be drawn."""

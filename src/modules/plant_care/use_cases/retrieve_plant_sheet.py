@@ -43,6 +43,7 @@ class RetrievePlantSheetUseCase(BaseUseCase):
             waterings = await uow.care_events.list_performed_at(plant_id, CareTaskType.WATERING)
             climate = await uow.room_climate_readings.list_hourly_averages(since)
             latest_climate = await uow.room_climate_readings.retrieve_latest()
+            current_names = await uow.family_members.map_current_names()
 
         return PlantSheet.from_models(
             plant=plant,
@@ -54,4 +55,5 @@ class RetrievePlantSheetUseCase(BaseUseCase):
             climate=climate,
             latest_climate=latest_climate,
             today=today,
+            current_names=current_names,
         )
