@@ -1,0 +1,45 @@
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+venv/
+.venv/
+
+# --- runtime state: never in git, never in an image ---
+.env
+data/
+backups/
+photos/
+*.db
+*.db-shm
+*.db-wal
+
+# --- secrets ---
+# credentials live in home-bot-vault/secrets/, outside this repo entirely.
+# these patterns are a second line of defence, not the primary one
+*.password
+*.key
+!*.example.key
+
+# --- private to this household ---
+# the assistant's knowledge file names the actual address and daily routine.
+# commit home-knowledge.example.md instead
+home-knowledge.md
+
+# --- editor / tooling ---
+.DS_Store
+.idea/
+.vscode/
+.playwright-mcp/
+scratchpad/
+
+# --- nested sibling repositories ---
+# each is its own git repo living in this folder, the way stats-api nests
+# trends-api and stats-infrastructure. plain repos, not submodules: one folder
+# to open, independent histories, and neither can leak into this one
+home-docs/
+home-infrastructure/
+
+# local deploy target — your host, not the repo's
+Makefile.local

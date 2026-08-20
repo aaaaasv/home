@@ -1,0 +1,32 @@
+services:
+  bot:
+    build: .
+    image: home-bot:latest
+    container_name: home-bot
+    # run as the host user so the sqlite file and photos stay writable/backupable from outside the container
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    env_file: .env
+    environment:
+      TZ: ${TIMEZONE:-Europe/Kyiv}
+      DATABASE_PATH: /app/data/home.db
+      PHOTO_STORAGE_PATH: /app/data/photos
+    volumes:
+      - ./data:/app/data
+      # ecoflow delta 2 is reached over local ble via bluez on the host system bus; the container
+      # (uid 1000) talks to it through the shared dbus socket + membership in the host bluetooth
+      # group — no privileged, no host network (inert while ECOFLOW_ENABLED is false)
+      - /var/run/dbus:/var/run/dbus
+    # the sht31 climate sensor lives on the pi's i2c bus; the container runs as uid 1000, so it
+    # needs the device node plus membership in the host's i2c group to open it (inert while
+    # CLIMATE_SENSOR_ENABLED is false)
+    devices:
+      - /dev/i2c-1:/dev/i2c-1
+    group_add:
+      - "${I2C_GROUP_ID:-994}"
+      - "${BLUETOOTH_GROUP_ID:-108}"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,45 @@
+[project]
+license = "MIT"
+name = "home-bot"
+version = "0.1.0"
+description = "Household telegram bot — plant care today, more modules later"
+# eflib (vendored EcoFlow BLE lib in src/vendor/eflib) uses PEP 695 generics + typing.TypeIs → needs 3.13
+requires-python = ">=3.13"
+dependencies = [
+    "aiogram>=3.15.0",
+    "sqlalchemy>=2.0.25",
+    "greenlet>=3.0.0",
+    "aiosqlite>=0.20.0",
+    "alembic>=1.13.1",
+    "pydantic>=2.5.3",
+    "pydantic-settings>=2.1.0",
+    "apscheduler>=3.10.4,<4.0",
+    "smbus2>=0.5.0",
+    "aiohttp>=3.9.0",
+    "greeclimate>=3.0.0",
+    "asusrouter>=1.21.0",
+    "anthropic>=0.69.0",
+    "dukpy>=0.5.0",
+    # ecoflow delta 2 over local ble (vendored eflib)
+    "bleak>=0.22.0",
+    "bleak-retry-connector>=3.5.0",
+    "protobuf>=5.0.0",
+    "pycryptodome>=3.20.0",
+    "ecdsa>=0.19.0",
+    # gtfs-realtime protobuf schema for the kyiv transit vehicle-position feed
+    "gtfs-realtime-bindings>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.0.0",
+    # regenerates requirements.lock: pip-compile --generate-hashes -o requirements.lock pyproject.toml
+    "pip-tools>=7.4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
