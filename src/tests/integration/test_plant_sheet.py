@@ -200,7 +200,9 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
 
         self.assertIn('id="mount-caption">11.vii.2026</figcaption>', page)
-        self.assertNotIn("знімок", page)
+        # the count belongs to the collection heading, never to a caption with nothing to count
+        self.assertNotIn("знімок 1", page)
+        self.assertNotIn("із 1", page)
 
     async def test_render_names_fertilizing_the_way_a_gardener_would(self):
         await self.seed_care_schedule(
@@ -234,8 +236,8 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
 
         page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Система")
 
-        self.assertIn("Tabula I · зібрання таблиць", page)
-        self.assertIn("1 таблиця", page)
+        self.assertIn("Tabula I · зібрання знімків", page)
+        self.assertIn("1 знімок", page)
         self.assertIn('id="expand"', page)
         self.assertIn('<dialog id="lightbox"', page)
 
@@ -261,3 +263,21 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
 
         self.assertIn('<p class="warn">Нижче бажаного мінімуму.</p>', page)
+
+    async def test_render_without_a_packet_gives_the_label_the_full_width(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        # the narrow 200px column exists only for the packet; the label must not inherit it
+        self.assertIn('<div class="lower">', page)
+        self.assertNotIn('<div class="lower with-packet">', page)
+
+    async def test_render_with_a_packet_keeps_the_two_column_lower_block(self):
+        async with self.uow as uow:
+            plant = await uow.plants.retrieve_active(self.plant_id)
+            plant.notes = "Взято живцем від сусідки"
+            await uow.commit()
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertIn('<div class="lower with-packet">', page)
+        self.assertIn("Взято живцем від сусідки", page)

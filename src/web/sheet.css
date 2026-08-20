@@ -88,7 +88,7 @@ body{
 
 /* ── lower half: packet + slips + label ──────────────────── */
 .lower{display:grid; grid-template-columns:1fr; gap:clamp(16px,3vw,26px); align-items:end}
-@media(min-width:700px){.lower{grid-template-columns:200px 1fr}}
+@media(min-width:700px){.lower.with-packet{grid-template-columns:200px 1fr}}
 .packet{position:relative; background:linear-gradient(160deg,#E2D9BF,#D3C7A6); border:1px solid var(--ink-mid); padding:14px 15px 16px; box-shadow:2px 3px 0 rgba(40,32,25,.1); transform:rotate(-.7deg)}
 .packet::before{content:""; position:absolute; top:0; left:0; right:0; height:26px; background:linear-gradient(160deg,#D9CEB0,#CBBE9A); border-bottom:1px solid rgba(106,92,72,.42); clip-path:polygon(0 0,100% 0,100% 42%,50% 100%,0 42%)}
 .packet h3{position:relative; margin:22px 0 7px; font-family:var(--type); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-ghost); font-weight:400}

@@ -338,13 +338,13 @@ def _gauge(
 {verdict}</div>"""
 
 
-def _plate_count(total: int) -> str:
-    """Ukrainian counts in three forms and a herbarium says «таблиця» where a phone would say «фото»."""
+def _photo_count(total: int) -> str:
+    """Ukrainian counts in three forms, and these are photographs rather than engraved plates."""
     if total % 10 == 1 and total % 100 != 11:
-        return f"{total} таблиця"
+        return f"{total} знімок"
     if total % 10 in (2, 3, 4) and total % 100 not in (12, 13, 14):
-        return f"{total} таблиці"
-    return f"{total} таблиць"
+        return f"{total} знімки"
+    return f"{total} знімків"
 
 
 def _plate_caption(taken_at, index: int, total: int) -> str:
@@ -485,8 +485,8 @@ def render_plant_sheet(
     compare = _growth(sheet, photo_url)
     packet = f'<div class="packet"><h3>Fragmenta</h3><p>{escape(sheet.notes)}</p></div>' if sheet.notes else ""
     collection = (
-        f'<section class="plate-block contact"><h3>Tabula I · зібрання таблиць</h3>'
-        f'<p class="sub">{_plate_count(total)} · торкніться, щоб винести на аркуш.</p>'
+        f'<section class="plate-block contact"><h3>Tabula I · зібрання знімків</h3>'
+        f'<p class="sub">{_photo_count(total)}</p>'
         f'<div class="strip">{plates}</div></section>'
         if sheet.photos
         else ""
@@ -552,7 +552,7 @@ def render_plant_sheet(
     {_climate_plate(sheet.climate, sheet.ideal_humidity_min_percent)}
     {_carers(sheet)}
     {_diarium(sheet)}
-    <div class="lower">
+    <div class="lower{' with-packet' if packet else ''}">
       {packet}
       <div><div class="slips">{_slips(sheet)}</div>{_label(sheet)}</div>
     </div>
