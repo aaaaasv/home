@@ -6,6 +6,10 @@ services:
     # run as the host user so the sqlite file and photos stay writable/backupable from outside the container
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     env_file: .env
+    # the specimen sheets, for whoever taps an nfc tag on a pot. lan only — never map this to a public
+    # interface: reading is deliberately unauthenticated, and the action token lives in the tag
+    ports:
+      - "${WEB_PORT:-8080}:${WEB_PORT:-8080}"
     environment:
       TZ: ${TIMEZONE:-Europe/Kyiv}
       DATABASE_PATH: /app/data/home.db
