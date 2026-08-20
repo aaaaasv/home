@@ -34,7 +34,7 @@ body{
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
 /* ── the sheet ───────────────────────────────────────────── */
-.sheet{position:relative; background:var(--sheet); padding:clamp(14px,2.8vw,26px) clamp(14px,3vw,30px) clamp(20px,3.4vw,32px);
+.sheet{position:relative; background:var(--sheet); padding:clamp(24px,4.4vw,34px) clamp(22px,4.2vw,34px) clamp(28px,4.6vw,38px);
   box-shadow:0 4px 14px rgba(0,0,0,.3), 0 0 0 1px rgba(40,32,25,.2);
   background-image:
     radial-gradient(circle at 8% 4%, rgba(138,51,36,.05), transparent 22%),
@@ -265,8 +265,8 @@ body{
 .tabs .tab:focus-visible{outline:2px solid var(--gilt); outline-offset:2px}
 
 /* ── regimen: every kind of care, not only watering ──────── */
-.regimen .rows{list-style:none; margin:0; padding:0}
-.regimen .rows li{display:grid; grid-template-columns:1fr auto; gap:1px 12px; padding:9px 0;
+.regimen .rows{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:minmax(0,1fr) auto}
+.regimen .rows li{grid-column:1/-1; display:grid; grid-template-columns:subgrid; gap:1px 12px; padding:10px 0;
   border-top:1px solid rgba(106,92,72,.3)}
 .regimen .what{font-family:var(--plaque); font-size:11px; letter-spacing:.16em; color:var(--ink)}
 .regimen .every{font-family:var(--type); font-size:10px; color:var(--ink-mid); text-align:right; align-self:center}
@@ -307,8 +307,8 @@ body{
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Cpath d='M5 0 L10 5 L5 10 L0 5 Z' fill='%23B08D4F'/%3E%3C/svg%3E"),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Cpath d='M5 0 L10 5 L5 10 L0 5 Z' fill='%23B08D4F'/%3E%3C/svg%3E"),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Cpath d='M5 0 L10 5 L5 10 L0 5 Z' fill='%23B08D4F'/%3E%3C/svg%3E")}
-.sheet::after{content:"HD"; position:absolute; top:50%; left:50%; z-index:0; pointer-events:none;
-  transform:translate(-50%,-50%) rotate(-8deg); font-family:var(--plaque); font-weight:600;
+.sheet::after{content:"HD"; position:absolute; top:clamp(250px,58vw,430px); left:50%; z-index:0;
+  pointer-events:none; transform:translate(-50%,-50%) rotate(-8deg); font-family:var(--plaque); font-weight:600;
   font-size:min(44vw,300px); line-height:1; letter-spacing:.06em; color:rgba(106,92,72,.05)}
 
 /* ── the binomial as the hero it should be ───────────────── */
@@ -329,16 +329,16 @@ body{
   color:var(--oxblood); font-style:normal}
 
 /* ── regimen rows now carry their own action ─────────────── */
-.regimen .rows li{grid-template-columns:1fr auto;
-  grid-template-areas:"what every" "when state" "deed deed" "note note"}
+.regimen .rows li{grid-template-areas:"what every" "when when" "state state" "deed deed" "note note"}
+.regimen .state{text-align:left; white-space:normal}
 .regimen .what{grid-area:what}
 .regimen .every{grid-area:every}
 .regimen .when{grid-area:when}
 .regimen .state{grid-area:state}
 .regimen .deed{grid-area:deed; margin-top:7px}
 @media(min-width:600px){
-  .regimen .rows li{grid-template-columns:1fr auto;
-    grid-template-areas:"what every" "when state" "deed deed" "note note"}
+  .regimen .rows li{grid-template-areas:"what every" "when state" "deed deed" "note note"}
+  .regimen .state{text-align:right; white-space:nowrap}
 }
 .regimen .do{display:inline-block}
 .regimen .do summary{list-style:none; cursor:pointer; display:inline-block; font-family:var(--plaque);

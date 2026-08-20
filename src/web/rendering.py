@@ -538,7 +538,7 @@ def render_plant_sheet(
     <div class="binomial">
       <p class="fam">{escape((sheet.species or "").split()[0] if sheet.species else "—")}</p>
       <h2>{escape(sheet.species or sheet.name)}</h2>
-      <p class="vern">у домі — <b>{escape(sheet.name)}</b></p>
+      <p class="vern">домашнє ім'я — <b>{escape(sheet.name)}</b></p>
       {f'<p class="range">Природний ареал: <b>{escape(sheet.native_range)}</b></p>' if sheet.native_range else ""}
     </div>
     {collection}
