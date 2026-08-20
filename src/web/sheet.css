@@ -97,13 +97,13 @@ body{
 .slip:nth-child(odd){transform:rotate(.4deg)} .slip:nth-child(even){transform:rotate(-.5deg)}
 .slip b{color:var(--green); letter-spacing:.08em}
 .slip span{color:var(--ink-ghost); float:right}
-.label{position:relative; background:#F7F2E4; border:1px solid var(--ink); padding:15px 18px 52px; margin-top:9px; box-shadow:2px 3px 0 rgba(40,32,25,.11); transform:rotate(-.45deg); font-family:var(--type); font-size:12px; line-height:1.75}
+.label{position:relative; background:#F7F2E4; border:1px solid var(--ink); padding:15px 18px 56px; margin-top:9px; box-shadow:2px 3px 0 rgba(40,32,25,.11); transform:rotate(-.45deg); font-family:var(--type); font-size:12px; line-height:1.75}
 .label::before{content:""; position:absolute; inset:3px; border:1px solid rgba(106,92,72,.3); pointer-events:none}
 .label h3{margin:0 0 8px; font-family:var(--plaque); font-size:10px; letter-spacing:.2em; text-align:center; border-bottom:1px solid var(--ink-mid); padding-bottom:6px; text-indent:.2em}
 .label dl{margin:0; display:grid; grid-template-columns:auto 1fr; gap:1px 12px}
 .label dt{color:var(--ink-ghost); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; align-self:baseline}
 .label dd{margin:0; font-variant-numeric:tabular-nums}
-.stamp{position:absolute; right:-14px; bottom:-18px; width:74px; height:74px; transform:rotate(-11deg); border:3px double var(--oxblood); border-radius:50%; display:grid; place-content:center; text-align:center; color:var(--oxblood); font-family:var(--plaque); font-size:8px; letter-spacing:.1em; line-height:1.5; background:rgba(247,242,228,.6); opacity:.85}
+.stamp{position:absolute; right:-14px; bottom:-30px; width:74px; height:74px; transform:rotate(-11deg); border:3px double var(--oxblood); border-radius:50%; display:grid; place-content:center; text-align:center; color:var(--oxblood); font-family:var(--plaque); font-size:8px; letter-spacing:.1em; line-height:1.5; background:rgba(247,242,228,.6); opacity:.85}
 .stamp b{display:block; font-size:22px; letter-spacing:0}
 
 /* ── contact sheet ───────────────────────────────────────── */
