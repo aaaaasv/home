@@ -4,6 +4,13 @@ from src.common.use_case import BaseUseCase
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.domain import DrawerEntry
 
+UKRAINIAN_ALPHABET = "абвгґдеєжзиіїйклмнопрстуфхцчшщьюя"
+
+
+def by_ukrainian_alphabet(name: str) -> list[int]:
+    """Sort keys in the alphabet's own order — sqlite and python both order by codepoint, which puts і before а."""
+    return [UKRAINIAN_ALPHABET.find(character) for character in name.casefold()]
+
 
 class RetrieveDrawerUseCase(BaseUseCase):
     """
@@ -29,5 +36,5 @@ class RetrieveDrawerUseCase(BaseUseCase):
         watering = {s.plant_id: s for s in schedules if CareTaskType(s.task_type) is CareTaskType.WATERING}
         return [
             DrawerEntry.from_models(plant, watering.get(plant.id), cover_photo_ids.get(plant.id), today)
-            for plant in plants
+            for plant in sorted(plants, key=lambda plant: by_ukrainian_alphabet(plant.name))
         ]

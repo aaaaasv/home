@@ -85,3 +85,13 @@ class DrawerTestCase(BaseIntegrationTestCase):
         previous, following = find_neighbours(entries, last_id)
 
         self.assertEqual((previous.name, following), ("Амазонка", None))
+
+    async def test_drawer_files_a_name_starting_with_i_after_one_starting_with_a(self):
+        await self.seed_plant_due_in("Ізабелла", 1, slug="izabella")
+        await self.seed_plant_due_in("Амазонка", 1, slug="amazonka")
+        await self.seed_plant_due_in("Ялинка", 1, slug="yalynka")
+
+        entries = await self.drawer()
+
+        # codepoint order would put Ізабелла first, because і (U+0406) sits below а (U+0410)
+        self.assertEqual([entry.name for entry in entries], ["Амазонка", "Ізабелла", "Ялинка"])
