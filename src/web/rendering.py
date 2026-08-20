@@ -37,13 +37,24 @@ CALIBRATION_SWATCHES = (
     "#C4BEB2",
     "#F2EEE4",
 )
+# a pressed leaf in gilt on the drawer's own dark — legible at 16px, where a monogram would smear
+FAVICON = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E"
+    "%3Crect width='32' height='32' rx='5' fill='%231F1A14'/%3E"
+    "%3Cpath d='M16 4C8 9 5 16 8 23c2 5 8 6 8 6s6-1 8-6c3-7 0-14-8-19z' fill='none'"
+    " stroke='%23B08D4F' stroke-width='2.2' stroke-linejoin='round'/%3E"
+    "%3Cpath d='M16 8v19M16 14l-4.5 3M16 19l4.5 3' stroke='%23B08D4F' stroke-width='1.5'"
+    " stroke-linecap='round'/%3E%3C/svg%3E"
+)
+
+
 TASK_NAMES = {
     CareTaskType.WATERING: "Полив",
     CareTaskType.FERTILIZING: "Підживлення",
     CareTaskType.REPOTTING: "Пересадка",
     CareTaskType.FLUSH: "Промивання",
     CareTaskType.ROTATING: "Поворот",
-    CareTaskType.PHOTO: "Знімок",
+    CareTaskType.PHOTO: "Фотографування",
 }
 PAST_TASK_NAMES = {
     CareTaskType.WATERING: "Полито",
@@ -321,10 +332,19 @@ def _gauge(
         right = max(0.0, (high - band_high) / span) * 100
         ideal = f'<div class="ideal" style="left:{left:.1f}%;right:{right:.1f}%"></div>'
     position = min(max((value - low) / span, 0.0), 1.0) * 100
-    verdict = "Нижче бажаного мінімуму." if warn else "У межах бажаного."
+    verdict = '<p class="warn">Нижче бажаного мінімуму.</p>' if warn else ""
     return f"""<div class="reading"><h3>{escape(label)} · {low:g}–{high:g} {unit}</h3>
 <div class="bar">{ideal}<div class="now" style="left:{position:.1f}%"><b>{value:.1f} {unit}</b></div></div>
-<p class="{'warn' if warn else ''}">{verdict}</p></div>"""
+{verdict}</div>"""
+
+
+def _plate_count(total: int) -> str:
+    """Ukrainian counts in three forms and a herbarium says «таблиця» where a phone would say «фото»."""
+    if total % 10 == 1 and total % 100 != 11:
+        return f"{total} таблиця"
+    if total % 10 in (2, 3, 4) and total % 100 not in (12, 13, 14):
+        return f"{total} таблиці"
+    return f"{total} таблиць"
 
 
 def _plate_caption(taken_at, index: int, total: int) -> str:
@@ -415,6 +435,7 @@ def render_drawer(entries: list[DrawerEntry], photo_url, bot_name: str) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1F1A14">
+<link rel="icon" href="{FAVICON}">
 <title>Hortus Domesticus</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{GOOGLE_FONTS_URL}">
@@ -444,6 +465,8 @@ def render_plant_sheet(
             f'<i class="strap a"></i><i class="strap b"></i><i class="strap c"></i>'
             f'<button class="loupe-btn" id="loupe" type="button" aria-pressed="false" '
             f'aria-label="Лупа">&#9906;</button>'
+            f'<button class="loupe-btn expand" id="expand" type="button" '
+            f'aria-label="На весь екран">&#9974;</button>'
             f'<figcaption class="mount-cap" id="mount-caption">'
             f"{_plate_caption(latest.taken_at, total, total)}</figcaption></figure>"
         )
@@ -460,6 +483,14 @@ def render_plant_sheet(
             f"<figcaption>{roman_date(photo.taken_at)}</figcaption></figure>"
         )
     compare = _growth(sheet, photo_url)
+    packet = f'<div class="packet"><h3>Fragmenta</h3><p>{escape(sheet.notes)}</p></div>' if sheet.notes else ""
+    collection = (
+        f'<section class="plate-block contact"><h3>Tabula I · зібрання таблиць</h3>'
+        f'<p class="sub">{_plate_count(total)} · торкніться, щоб винести на аркуш.</p>'
+        f'<div class="strip">{plates}</div></section>'
+        if sheet.photos
+        else ""
+    )
     temperature_gauge = _gauge(
         "Температура",
         sheet.current_temperature_celsius,
@@ -488,6 +519,7 @@ def render_plant_sheet(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1F1A14">
+<link rel="icon" href="{FAVICON}">
 <title>{escape(sheet.name)}, HD {sheet.id:03d}</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{GOOGLE_FONTS_URL}">
@@ -509,6 +541,7 @@ def render_plant_sheet(
       <p class="vern">у домі — <b>{escape(sheet.name)}</b></p>
       {f'<p class="range">Природний ареал: <b>{escape(sheet.native_range)}</b></p>' if sheet.native_range else ""}
     </div>
+    {collection}
     <section class="readings">
       {temperature_gauge}
       {humidity_gauge}
@@ -520,15 +553,20 @@ def render_plant_sheet(
     {_carers(sheet)}
     {_diarium(sheet)}
     <div class="lower">
-      <div class="packet"><h3>Fragmenta</h3><p>{escape(sheet.notes) if sheet.notes else "—"}</p></div>
+      {packet}
       <div><div class="slips">{_slips(sheet)}</div>{_label(sheet)}</div>
     </div>
   </article>
 </div>
-<section class="contact"><h2>Зібрання таблиць</h2>
-  <p>{len(sheet.photos)} знімк{"ів" if len(sheet.photos) != 1 else "ок"} · доглядає {bot_name}</p>
-  <div class="strip">{plates}</div></section>
 {_turn(find_neighbours(drawer, sheet.id))}
+<p class="colophon">Зібрання веде {escape(bot_name)}</p>
+<dialog id="lightbox" aria-label="Знімок на весь екран">
+  <button class="close" type="button" aria-label="Закрити">&#10005;</button>
+  <img id="lightbox-img" alt="{escape(sheet.name)}">
+  <p id="lightbox-cap"></p>
+  <nav><button class="step" type="button" data-step="-1" aria-label="Попередній">&#9664;</button>
+    <button class="step" type="button" data-step="1" aria-label="Наступний">&#9654;</button></nav>
+</dialog>
 <script>{SCRIPT}</script>
 </body>
 </html>"""

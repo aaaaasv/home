@@ -96,7 +96,7 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
 
         page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
 
-        self.assertIn("Знімок", page)
+        self.assertIn("Фотографування", page)
         self.assertNotIn('action="care/photo"', page)
 
     async def test_render_tells_the_watering_story_only_inside_the_regimen(self):
@@ -228,3 +228,36 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
 
         self.assertNotIn("Деталі", page)
         self.assertNotIn('class="note"', page)
+
+    async def test_render_puts_the_collection_inside_the_sheet_with_a_way_to_open_it_full_screen(self):
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=2))
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Система")
+
+        self.assertIn("Tabula I · зібрання таблиць", page)
+        self.assertIn("1 таблиця", page)
+        self.assertIn('id="expand"', page)
+        self.assertIn('<dialog id="lightbox"', page)
+
+    async def test_render_a_plant_with_no_photos_shows_no_collection_at_all(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertNotIn("Tabula I", page)
+        self.assertNotIn('class="strip"', page)
+
+    async def test_render_leaves_out_the_fragment_packet_when_nothing_was_noted(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertNotIn("Fragmenta", page)
+
+    async def test_render_says_nothing_about_a_reading_that_sits_inside_its_band(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertNotIn("У межах бажаного", page)
+
+    async def test_render_still_names_the_reading_that_fell_below_its_band(self):
+        await self.seed_room_climate_readings(20.0, FROZEN_NOW - timedelta(hours=3), FROZEN_NOW)
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertIn('<p class="warn">Нижче бажаного мінімуму.</p>', page)

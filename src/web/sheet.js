@@ -71,6 +71,38 @@
     frame.addEventListener("pointerleave", () => lens.classList.remove("on"));
   }
 
+  /* ── the fullscreen plate ──────────────────────────────────────────────
+     <dialog> brings the escape key, focus trapping and the backdrop with
+     it, so the only thing left to write is which plate is showing. */
+  const box = one("#lightbox");
+  const expand = one("#expand");
+  if (box && expand && plates.length) {
+    const image = one("#lightbox-img", box);
+    const caption = one("#lightbox-cap", box);
+    let at = plates.findIndex((plate) => plate.classList.contains("is-mounted"));
+    const show = (index) => {
+      at = (index + plates.length) % plates.length;
+      image.src = plates[at].dataset.photo;
+      caption.textContent = plates[at].dataset.caption;
+    };
+    const open = (index) => {
+      show(index);
+      box.showModal();
+    };
+    expand.addEventListener("click", () => open(at < 0 ? plates.length - 1 : at));
+    plates.forEach((plate, index) => plate.addEventListener("dblclick", () => open(index)));
+    all(".step", box).forEach((button) =>
+      button.addEventListener("click", () => show(at + Number(button.dataset.step))),
+    );
+    one(".close", box).addEventListener("click", () => box.close());
+    box.addEventListener("click", (event) => {
+      if (event.target === box) box.close();
+    });
+    all("nav button", box).forEach((button) => {
+      button.hidden = plates.length < 2;
+    });
+  }
+
   /* ── reading the climate plate ─────────────────────────────────────────
      touch-action stays pan-y in the stylesheet, so a vertical swipe still
      scrolls the page and only sideways movement scrubs the chart. */
