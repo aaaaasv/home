@@ -2,11 +2,10 @@
 
 Plain HTTP on purpose: no public certificate authority will issue for `garden.lan`, and an internal CA
 greets every guest phone with a warning instead. Reading is open to anyone on the network, which is the
-point — the password guards only the one action that spends water.
+point, and the one action that spends water asks for a confirming tap rather than a secret.
 """
 
 import logging
-import secrets
 from pathlib import Path
 
 from aiohttp import web
@@ -21,17 +20,6 @@ from src.modules.plant_care.use_cases.retrieve_plant_sheet import RetrievePlantS
 from src.web.rendering import render_drawer, render_plant_sheet
 
 logger = logging.getLogger(__name__)
-
-
-def find_neighbours(entries, plant_id: int):
-    """The folders either side of this one, so a sheet is a place in a drawer rather than an island."""
-    position = next((index for index, entry in enumerate(entries) if entry.id == plant_id), None)
-    if position is None:
-        return None, None
-    return (
-        entries[position - 1] if position > 0 else None,
-        entries[position + 1] if position + 1 < len(entries) else None,
-    )
 
 
 def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) -> web.Application:
@@ -52,10 +40,7 @@ def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) 
         except DomainError:
             raise web.HTTPNotFound(text="Немає такої рослини")
         entries = await RetrieveDrawerUseCase(uow=uow_factory(), household_calendar=household_calendar)()
-        wrong_password = request.query.get("wrong") == "1"
-        body = render_plant_sheet(
-            sheet, photo_url, settings.BOT_DISPLAY_NAME, wrong_password, find_neighbours(entries, sheet.id)
-        )
+        body = render_plant_sheet(sheet, photo_url, settings.BOT_DISPLAY_NAME, entries)
         return web.Response(text=body, content_type="text/html", charset="utf-8")
 
     async def plant_photo(request: web.Request) -> web.FileResponse:
@@ -71,10 +56,6 @@ def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) 
 
     async def record_watering(request: web.Request) -> web.Response:
         reference = request.match_info["reference"]
-        form = await request.post()
-        # a doorbell latch, not a lock: it keeps a curious guest from tapping the button by accident
-        if not secrets.compare_digest(str(form.get("password", "")), settings.WEB_ACTION_PASSWORD):
-            raise web.HTTPFound(f"/p/{reference}?wrong=1")
         async with uow_factory() as uow:
             plant = await uow.plants.retrieve_active_by_slug(reference)
         if plant is None:

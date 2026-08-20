@@ -49,6 +49,15 @@ PAST_TASK_NAMES = {
     CareTaskType.WATERING: "Полито",
     CareTaskType.FERTILIZING: "Підживлено",
 }
+# the order a person thinks about care in, not the order the enum happens to declare
+REGIMEN_ORDER = (
+    CareTaskType.WATERING,
+    CareTaskType.FERTILIZING,
+    CareTaskType.FLUSH,
+    CareTaskType.ROTATING,
+    CareTaskType.REPOTTING,
+    CareTaskType.PHOTO,
+)
 
 
 def roman_date(moment) -> str:
@@ -159,12 +168,7 @@ def _label(sheet: PlantSheet) -> str:
         ("Субстрат", _blank(sheet.substrate)),
     ]
     if watering is not None:
-        rows.append(
-            (
-                "Полив",
-                f"кожні {watering.interval_days} дн. · далі {roman_date(watering.next_due_on)}",
-            )
-        )
+        rows.append(("Полив", f"кожні {watering.interval_days} дн. · далі {roman_date(watering.next_due_on)}"))
     for schedule in sheet.schedules:
         if schedule.task_type is CareTaskType.REPOTTING:
             rows.append(("Пересадка", roman_date(schedule.next_due_on)))
@@ -198,6 +202,58 @@ def _slips(sheet: PlantSheet) -> str:
         )
     return "".join(
         f'<div class="slip"><b>{kind}</b> {escape(text)}<span>{date}</span></div>' for kind, text, date in slips
+    )
+
+
+def _due_state(days_until_due: int) -> tuple[str, bool]:
+    if days_until_due < 0:
+        return f"прострочено на {-days_until_due} дн.", True
+    if days_until_due == 0:
+        return "сьогодні", True
+    return f"за {days_until_due} дн.", False
+
+
+def _regimen(sheet: PlantSheet) -> str:
+    """Every kind of care this plant is on, not only the watering the card had room for."""
+    if not sheet.schedules:
+        return ""
+    order = {task: position for position, task in enumerate(REGIMEN_ORDER)}
+    rows, notes = [], []
+    for schedule in sorted(sheet.schedules, key=lambda s: order.get(s.task_type, len(order))):
+        name = TASK_NAMES.get(schedule.task_type, str(schedule.task_type))
+        state, late = _due_state(schedule.days_until_due)
+        last = roman_date(schedule.last_performed_at) if schedule.last_performed_at else "ще не було"
+        late_mark = ' class="late"' if late else ""
+        rows.append(
+            f"<li{late_mark}>"
+            f'<span class="what">{escape(name)}</span>'
+            f'<span class="every">раз на {schedule.interval_days} дн.</span>'
+            f'<span class="when">востаннє {last} · далі {roman_date(schedule.next_due_on)}</span>'
+            f'<span class="state">{state}</span></li>'
+        )
+        if schedule.instructions:
+            notes.append(f"<p><b>{escape(name)}.</b> {escape(schedule.instructions)}</p>")
+    footnotes = f'<div class="notes">{"".join(notes)}</div>' if notes else ""
+    return (
+        f'<section class="plate-block regimen"><h3>Regimen · розпис догляду</h3>'
+        f'<p class="sub">Кожен вид догляду, його період і коли настане наступний. Червоне — прострочено.</p>'
+        f'<ol class="rows">{"".join(rows)}</ol>{footnotes}</section>'
+    )
+
+
+def _diarium(sheet: PlantSheet) -> str:
+    """The whole care record, folded away — the slips show the last few, this holds everything kept."""
+    if len(sheet.recent_events) < 4:
+        return ""
+    entries = "".join(
+        f"<li><span>{roman_date(event.performed_at)}</span>"
+        f"{escape(PAST_TASK_NAMES.get(event.task_type, TASK_NAMES.get(event.task_type, str(event.task_type))))}"
+        f" — {escape(event.performed_by_display_name)}</li>"
+        for event in sheet.recent_events
+    )
+    return (
+        f'<details class="diarium"><summary>Diarium · увесь запис догляду '
+        f"({len(sheet.recent_events)})</summary><ol>{entries}</ol></details>"
     )
 
 
@@ -257,6 +313,30 @@ def _growth(sheet: PlantSheet, photo_url) -> str:
 </section>"""
 
 
+def find_neighbours(entries, plant_id: int):
+    """The folders either side of this one, so a sheet is a place in a drawer rather than an island."""
+    position = next((index for index, entry in enumerate(entries) if entry.id == plant_id), None)
+    if position is None:
+        return None, None
+    return (
+        entries[position - 1] if position > 0 else None,
+        entries[position + 1] if position + 1 < len(entries) else None,
+    )
+
+
+def _tabs(drawer, current_id: int) -> str:
+    """The other folders' tabs, standing up behind this one — switching sheets the way a drawer does."""
+    if not drawer:
+        return ""
+    tabs = "".join(
+        f'<span class="tab here">{escape(entry.name)}</span>'
+        if entry.id == current_id
+        else f'<a class="tab" href="/p/{entry.reference}">{escape(entry.name)}</a>'
+        for entry in drawer
+    )
+    return f'<nav class="tabs">{tabs}</nav>'
+
+
 def _turn(neighbours) -> str:
     """A drawer is only a drawer if you can reach the next folder without going back to the pot."""
     previous, following = neighbours if neighbours else (None, None)
@@ -314,8 +394,7 @@ def render_plant_sheet(
     sheet: PlantSheet,
     photo_url,
     bot_name: str,
-    wrong_password: bool = False,
-    neighbours=None,
+    drawer=(),
 ) -> str:
     swatches = "".join(f'<i style="background:{colour}"></i>' for colour in CALIBRATION_SWATCHES)
     latest = sheet.photos[-1] if sheet.photos else None
@@ -370,16 +449,14 @@ def render_plant_sheet(
         if last
         else "Ще не поливали"
     )
-    warning = '<p class="wrong">Пароль не той.</p>' if wrong_password else ""
-    # a details/summary reveal, so the password never rides in the url and the page needs no javascript
+    # a details/summary reveal, so the second deliberate tap needs no javascript
     action = (
-        f'<div class="act"><details{" open" if wrong_password else ""}>'
+        f'<div class="act"><details>'
         f"<summary>Записати полив</summary>"
         f'<form method="post" action="water">'
-        f'<label for="pw">Пароль</label>'
-        f'<input id="pw" name="password" type="password" inputmode="numeric" autocomplete="off" required>'
-        f'<button type="submit">Підтвердити</button>'
-        f"</form>{warning}</details><p>{note}</p></div>"
+        f'<p class="ask">Точно полито?</p>'
+        f'<button type="submit">Так, записати</button>'
+        f"</form></details><p>{note}</p></div>"
     )
     return f"""<!doctype html>
 <html lang="uk">
@@ -394,8 +471,9 @@ def render_plant_sheet(
 </head>
 <body>
 <p class="drawer-tag"><span>{escape(sheet.species or "Hortus")}</span><span>Hortus Domesticus · HD</span></p>
+{_tabs(drawer, sheet.id)}
 <div class="folder">
-  <span class="tab">{escape(sheet.name)}</span>
+  {'' if drawer else f'<span class="tab here">{escape(sheet.name)}</span>'}
   <article class="sheet">
     <div class="calib"><div class="swatches">{swatches}</div><div class="ruler"></div></div>
     <header class="head"><div><h1>Hortus Domesticus</h1><p>Домашній гербарій</p></div>
@@ -411,10 +489,12 @@ def render_plant_sheet(
       {temperature_gauge}
       {humidity_gauge}
     </section>
+    {_regimen(sheet)}
     {compare}
     {rhythm}
     {_climate_plate(sheet.climate, sheet.ideal_humidity_min_percent)}
     {_carers(sheet)}
+    {_diarium(sheet)}
     <div class="lower">
       <div class="packet"><h3>Fragmenta</h3><p>{escape(sheet.notes) if sheet.notes else "—"}</p></div>
       <div><div class="slips">{_slips(sheet)}</div>{_label(sheet)}</div>
@@ -425,7 +505,7 @@ def render_plant_sheet(
   <p>{len(sheet.photos)} знімк{"ів" if len(sheet.photos) != 1 else "ок"} · доглядає {bot_name}</p>
   <div class="strip">{plates}</div></section>
 {action}
-{_turn(neighbours)}
+{_turn(find_neighbours(drawer, sheet.id))}
 <script>{SCRIPT}</script>
 </body>
 </html>"""

@@ -32,7 +32,6 @@ class Settings(BaseSettings):
     WEB_ENABLED: bool = False
     WEB_PORT: int = 8080
     # a latch on the action button, not a lock — it stops an accidental tap, nothing more
-    WEB_ACTION_PASSWORD: str = "12345"
     WEB_ACTOR_NAME: str = ""
 
     # what the bot calls itself where it signs something — an annotation on a plant sheet, say.

@@ -26,7 +26,7 @@ body{
   box-shadow:0 30px 70px rgba(0,0,0,.62), inset 0 1px 0 var(--manila-edge);
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23f)' opacity='.09'/%3E%3C/svg%3E");
 }
-.tab{position:absolute; top:-25px; left:clamp(20px,7vw,64px); max-width:calc(100% - clamp(40px,14vw,128px));
+.folder > .tab{position:absolute; top:-25px; left:clamp(20px,7vw,64px); max-width:calc(100% - clamp(40px,14vw,128px));
   background:var(--manila); color:var(--drawer); font-family:var(--plaque); font-size:10px; letter-spacing:.24em;
   padding:6px 20px 5px; border-radius:4px 4px 0 0; box-shadow:0 -3px 10px rgba(0,0,0,.36); text-indent:.24em;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -244,3 +244,47 @@ body{
 @keyframes press{from{transform:rotate(-11deg) scale(2.4); opacity:0}}
 @keyframes fade{from{opacity:0}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+
+/* ── the row of tabs: the other folders standing up behind this one ── */
+.tabs{max-width:830px; margin:0 auto; display:flex; align-items:flex-end; gap:3px; overflow-x:auto;
+  scrollbar-width:none; padding:0 clamp(6px,2vw,16px); scroll-snap-type:x proximity}
+.tabs::-webkit-scrollbar{display:none}
+.tabs .tab{flex:0 0 auto; scroll-snap-align:center; text-decoration:none; white-space:nowrap;
+  font-family:var(--plaque); font-size:9.5px; letter-spacing:.2em; text-indent:.2em;
+  padding:8px 15px 6px; border-radius:5px 5px 0 0; background:var(--manila-dark); color:rgba(31,26,20,.62);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.28); -webkit-tap-highlight-color:transparent}
+.tabs a.tab:hover{background:var(--manila); color:var(--drawer)}
+.tabs .tab.here{background:var(--manila); color:var(--drawer); padding:11px 18px 9px;
+  box-shadow:0 -3px 10px rgba(0,0,0,.34)}
+.tabs .tab:focus-visible{outline:2px solid var(--gilt); outline-offset:2px}
+
+/* ── regimen: every kind of care, not only watering ──────── */
+.regimen .rows{list-style:none; margin:0; padding:0}
+.regimen .rows li{display:grid; grid-template-columns:1fr auto; gap:1px 12px; padding:9px 0;
+  border-top:1px solid rgba(106,92,72,.3)}
+.regimen .what{font-family:var(--plaque); font-size:11px; letter-spacing:.16em; color:var(--ink)}
+.regimen .every{font-family:var(--type); font-size:10px; color:var(--ink-mid); text-align:right; align-self:center}
+.regimen .when{font-family:var(--type); font-size:10px; color:var(--ink-ghost); letter-spacing:.04em}
+.regimen .state{font-family:var(--type); font-size:10px; color:var(--ink-mid); text-align:right;
+  white-space:nowrap; align-self:center}
+.regimen li.late .state{color:var(--oxblood)}
+.regimen li.late .what{color:var(--oxblood)}
+.regimen .notes{margin-top:12px; border-top:1px solid var(--ink-mid); padding-top:10px}
+.regimen .notes p{margin:0 0 6px; font-family:var(--type); font-size:10.5px; color:var(--ink-mid); line-height:1.65}
+.regimen .notes b{font-family:var(--plaque); font-size:9.5px; letter-spacing:.14em; color:var(--green)}
+
+/* ── diarium: the whole record, folded away ──────────────── */
+.diarium{margin-top:clamp(16px,3vw,24px); border-top:1px solid var(--ink-mid); padding-top:12px}
+.diarium summary{cursor:pointer; list-style:none; font-family:var(--plaque); font-size:10px; letter-spacing:.22em;
+  color:var(--ink); text-indent:.22em; padding:4px 0; -webkit-tap-highlight-color:transparent}
+.diarium summary::-webkit-details-marker{display:none}
+.diarium summary::after{content:" ▾"; color:var(--ink-ghost); letter-spacing:0}
+.diarium[open] summary::after{content:" ▴"}
+.diarium ol{list-style:none; margin:11px 0 0; padding:0; columns:2; column-gap:26px;
+  font-family:var(--type); font-size:10px; color:var(--ink-mid)}
+.diarium li{break-inside:avoid; padding:3px 0; border-bottom:1px dotted rgba(106,92,72,.26)}
+.diarium li span{color:var(--ink-ghost); margin-right:8px; font-variant-numeric:tabular-nums}
+@media(max-width:560px){.diarium ol{columns:1}}
+
+/* ── the confirming tap in front of the action ───────────── */
+.act .ask{margin:0 0 11px; font-family:var(--serif); font-size:16px; font-style:italic; color:var(--gilt)}

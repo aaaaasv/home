@@ -3,8 +3,7 @@ from datetime import timedelta
 from src.common.constants import CareTaskType
 from src.modules.plant_care.use_cases.retrieve_drawer import RetrieveDrawerUseCase
 from src.tests.integration.base import FROZEN_NOW, BaseIntegrationTestCase
-from src.web.app import find_neighbours
-from src.web.rendering import render_drawer
+from src.web.rendering import find_neighbours, render_drawer
 
 
 class DrawerTestCase(BaseIntegrationTestCase):

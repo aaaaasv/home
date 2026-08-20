@@ -77,18 +77,19 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         self.assertIn("Домовик", page)
         self.assertIn(roman_date(FROZEN_NOW - timedelta(days=30)), page)
 
-    async def test_render_asks_for_a_password_behind_the_watering_button(self):
+    async def test_render_puts_the_watering_button_behind_one_confirming_tap(self):
         page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
 
-        self.assertIn("Записати полив", page)
-        self.assertIn('name="password"', page)
-        self.assertNotIn("Пароль не той", page)
+        self.assertIn("<summary>Записати полив</summary>", page)
+        self.assertIn('<p class="ask">Точно полито?</p>', page)
+        self.assertIn('<button type="submit">Так, записати</button>', page)
 
-    async def test_render_after_a_wrong_password_opens_the_form_and_says_so(self):
-        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик", wrong_password=True)
+    async def test_render_asks_for_no_password_at_all(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
 
-        self.assertIn("Пароль не той", page)
-        self.assertIn("<details open>", page)
+        self.assertNotIn('type="password"', page)
+        self.assertNotIn('name="password"', page)
+        self.assertNotIn("Пароль", page)
 
     async def test_sheet_can_be_fetched_by_its_slug(self):
         async with self.uow as uow:
@@ -131,7 +132,7 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
     async def test_render_puts_the_plants_own_name_on_the_folder_tab_not_a_fixed_family(self):
         page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
 
-        self.assertIn('<span class="tab">Кактус</span>', page)
+        self.assertIn('<span class="tab here">Кактус</span>', page)
         self.assertNotIn("NEPENTHACEAE", page)
 
     async def test_render_marks_the_newest_plate_as_the_one_on_the_mount(self):

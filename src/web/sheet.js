@@ -95,6 +95,14 @@
     }
   }
 
+  /* ── keep the open folder's tab in view ───────────────────────────────
+     with five tabs on a phone the row scrolls, and the one you are reading
+     is the one that should be visible when the page opens. */
+  const here = one(".tabs .tab.here");
+  if (here && here.parentElement.scrollWidth > here.parentElement.clientWidth) {
+    here.scrollIntoView({ block: "nearest", inline: "center" });
+  }
+
   /* ── the growth wipe ───────────────────────────────────────────────────
      a range input rather than a custom drag: it is already touch-sized,
      keyboard-reachable, and sits at 50% with no script at all. */
