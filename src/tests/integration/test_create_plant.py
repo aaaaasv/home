@@ -105,3 +105,23 @@ class CreatePlantTestCase(BaseIntegrationTestCase):
         card = await self.build_use_case()(command)
 
         self.assertEqual(card.name, "Монстера")
+
+    async def test_create_plant_gives_it_a_url_slug_transliterated_from_its_name(self):
+        await self.build_use_case()(
+            CreatePlantCommand(name="Містер Біг", species="Dracaena", watering_interval_days=10)
+        )
+
+        async with self.uow as uow:
+            created = await uow.plants.retrieve_active_by_name("Містер Біг")
+
+        self.assertEqual(created.slug, "mister-bih")
+
+    async def test_create_two_plants_whose_names_transliterate_alike_keeps_the_slugs_distinct(self):
+        # «Мʼята» and «Міата» are different names that romanise to the same word
+        await self.build_use_case()(CreatePlantCommand(name="Мʼята", watering_interval_days=7))
+
+        await self.build_use_case()(CreatePlantCommand(name="Міата", watering_interval_days=7))
+
+        async with self.uow as uow:
+            slugs = sorted(await uow.plants.list_slugs())
+        self.assertEqual(slugs, ["miata", "miata-2"])

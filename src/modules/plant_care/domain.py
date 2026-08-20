@@ -315,6 +315,7 @@ class PlantSheet(DomainModel):
     """One plant as a specimen sheet: what it is, where it came from, and how it has actually been kept."""
 
     id: int
+    slug: str | None
     name: str
     species: str | None
     location: str | None
@@ -352,6 +353,7 @@ class PlantSheet(DomainModel):
         gaps = [round((later - earlier).total_seconds() / 86400, 1) for earlier, later in zip(waterings, waterings[1:])]
         return cls(
             id=plant.id,
+            slug=plant.slug,
             name=plant.name,
             species=plant.species,
             location=plant.location,

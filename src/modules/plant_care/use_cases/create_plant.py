@@ -10,6 +10,7 @@ from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.commands import CreatePlantCommand
 from src.modules.plant_care.domain import PlantCard
 from src.modules.plant_care.services.photo_storage import PhotoStorage
+from src.modules.plant_care.services.slug import unique_slug
 
 
 class CreatePlantUseCase(BaseActorUseCase):
@@ -31,6 +32,7 @@ class CreatePlantUseCase(BaseActorUseCase):
             plant = await uow.plants.create(
                 {
                     "name": command.name,
+                    "slug": unique_slug(command.name, await uow.plants.list_slugs()),
                     "species": command.species,
                     "location": command.location,
                     "notes": command.notes,

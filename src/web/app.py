@@ -29,13 +29,13 @@ def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) 
         return f"/photo/{photo_id}"
 
     async def plant_sheet(request: web.Request) -> web.Response:
-        plant_id = int(request.match_info["plant_id"])
+        reference = request.match_info["reference"]
         try:
-            sheet = await RetrievePlantSheetUseCase(uow=uow_factory(), household_calendar=household_calendar)(plant_id)
+            sheet = await RetrievePlantSheetUseCase(uow=uow_factory(), household_calendar=household_calendar)(reference)
         except DomainError:
             raise web.HTTPNotFound(text="Немає такої рослини")
-        can_act = bool(settings.WEB_ACTION_TOKEN) and _token_matches(request, settings)
-        body = render_plant_sheet(sheet, photo_url, settings.BOT_DISPLAY_NAME, can_act)
+        wrong_password = request.query.get("wrong") == "1"
+        body = render_plant_sheet(sheet, photo_url, settings.BOT_DISPLAY_NAME, wrong_password)
         return web.Response(text=body, content_type="text/html", charset="utf-8")
 
     async def plant_photo(request: web.Request) -> web.FileResponse:
@@ -50,9 +50,16 @@ def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) 
         return web.FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
     async def record_watering(request: web.Request) -> web.Response:
-        if not _token_matches(request, settings):
-            raise web.HTTPForbidden(text="Потрібен ключ")
-        plant_id = int(request.match_info["plant_id"])
+        reference = request.match_info["reference"]
+        form = await request.post()
+        # a doorbell latch, not a lock: it keeps a curious guest from tapping the button by accident
+        if not secrets.compare_digest(str(form.get("password", "")), settings.WEB_ACTION_PASSWORD):
+            raise web.HTTPFound(f"/p/{reference}?wrong=1")
+        async with uow_factory() as uow:
+            plant = await uow.plants.retrieve_active_by_slug(reference)
+        if plant is None:
+            raise web.HTTPNotFound()
+        plant_id = plant.id
         actor = settings.web_actor
         try:
             await RecordCareEventUseCase(
@@ -70,18 +77,12 @@ def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) 
             )
         except DomainError as error:
             logger.warning("Web watering refused for plant %s: %s", plant_id, error)
-        raise web.HTTPFound(f"/p/{plant_id}?{request.query_string}")
+        raise web.HTTPFound(f"/p/{reference}")
 
-    application.router.add_get("/p/{plant_id:\\d+}", plant_sheet)
-    application.router.add_post("/p/{plant_id:\\d+}/water", record_watering)
+    application.router.add_get("/p/{reference:[a-z0-9-]+}", plant_sheet)
+    application.router.add_post("/p/{reference:[a-z0-9-]+}/water", record_watering)
     application.router.add_get("/photo/{photo_id:\\d+}", plant_photo)
     return application
-
-
-def _token_matches(request: web.Request, settings) -> bool:
-    expected = settings.WEB_ACTION_TOKEN
-    # compare_digest so a wrong key cannot be found one character at a time
-    return bool(expected) and secrets.compare_digest(request.query.get("k", ""), expected)
 
 
 async def start_web_app(application: web.Application, port: int) -> web.AppRunner:

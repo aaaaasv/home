@@ -34,6 +34,8 @@ class Plant(Base):
     ideal_temperature_max_celsius = Column(Float, nullable=True)
     ideal_humidity_min_percent = Column(Float, nullable=True)
     ideal_humidity_max_percent = Column(Float, nullable=True)
+    # the word a tag carries instead of a number
+    slug = Column(String(80), nullable=True, index=True, unique=True)
     # what a herbarium sheet records beyond the care schedule
     provenance = Column(Text, nullable=True)
     native_range = Column(String(160), nullable=True)

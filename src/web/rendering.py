@@ -204,7 +204,7 @@ def _gauge(
 <p class="{'warn' if warn else ''}">{verdict}</p></div>"""
 
 
-def render_plant_sheet(sheet: PlantSheet, photo_url, bot_name: str, can_act: bool) -> str:
+def render_plant_sheet(sheet: PlantSheet, photo_url, bot_name: str, wrong_password: bool = False) -> str:
     swatches = "".join(f'<i style="background:{colour}"></i>' for colour in CALIBRATION_SWATCHES)
     latest = sheet.photos[-1] if sheet.photos else None
     specimen = (
@@ -242,22 +242,35 @@ def render_plant_sheet(sheet: PlantSheet, photo_url, bot_name: str, can_act: boo
     )
     watering = sheet.watering
     rhythm = _rhythm_plate(sheet.watering_gaps_days, watering.interval_days) if watering else ""
-    action = ""
-    if can_act:
-        last = next((e for e in sheet.recent_events if e.task_type is CareTaskType.WATERING), None)
-        note = (
-            f"Останній — {roman_date(last.performed_at)}, {escape(last.performed_by_display_name)}"
-            if last
-            else "Ще не поливали"
-        )
-        action = (
-            f'<form class="act" method="post" action="water"><button type="submit">Записати полив</button>'
-            f"<p>{note}</p></form>"
-        )
-    return f"""<title>{escape(sheet.name)}, HD {sheet.id:03d}</title>
+    last = next((e for e in sheet.recent_events if e.task_type is CareTaskType.WATERING), None)
+    note = (
+        f"Останній — {roman_date(last.performed_at)}, {escape(last.performed_by_display_name)}"
+        if last
+        else "Ще не поливали"
+    )
+    warning = '<p class="wrong">Пароль не той.</p>' if wrong_password else ""
+    # a details/summary reveal, so the password never rides in the url and the page needs no javascript
+    action = (
+        f'<div class="act"><details{" open" if wrong_password else ""}>'
+        f"<summary>Записати полив</summary>"
+        f'<form method="post" action="water">'
+        f'<label for="pw">Пароль</label>'
+        f'<input id="pw" name="password" type="password" inputmode="numeric" autocomplete="off" required>'
+        f'<button type="submit">Підтвердити</button>'
+        f"</form>{warning}</details><p>{note}</p></div>"
+    )
+    return f"""<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1F1A14">
+<title>{escape(sheet.name)}, HD {sheet.id:03d}</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{GOOGLE_FONTS_URL}">
 <style>{STYLESHEET}</style>
+</head>
+<body>
 <p class="drawer-tag"><span>{escape(sheet.species or "Hortus")}</span><span>Hortus Domesticus · HD</span></p>
 <div class="folder">
   <article class="sheet">
@@ -287,4 +300,6 @@ def render_plant_sheet(sheet: PlantSheet, photo_url, bot_name: str, can_act: boo
 <section class="contact"><h2>Зібрання таблиць</h2>
   <p>{len(sheet.photos)} знімк{"ів" if len(sheet.photos) != 1 else "ок"} · доглядає {bot_name}</p>
   <div class="strip">{plates}</div></section>
-{action}"""
+{action}
+</body>
+</html>"""

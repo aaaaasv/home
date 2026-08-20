@@ -23,14 +23,18 @@ class RetrievePlantSheetUseCase(BaseUseCase):
         super().__init__(uow)
         self.household_calendar = household_calendar
 
-    async def __call__(self, plant_id: int) -> PlantSheet:
+    async def __call__(self, reference: str) -> PlantSheet:
+        """Reference is the slug a tag carries, or a plain id for anything written before slugs existed."""
         today = self.household_calendar.today()
         since = self.household_calendar.now() - timedelta(hours=CLIMATE_WINDOW_HOURS)
 
         async with self.uow as uow:
-            plant = await uow.plants.retrieve_active(plant_id)
+            plant = await uow.plants.retrieve_active_by_slug(reference)
+            if plant is None and reference.isdigit():
+                plant = await uow.plants.retrieve_active(int(reference))
             if plant is None:
-                raise DoesNotExistError(f"Plant {plant_id} not found")
+                raise DoesNotExistError(f"Plant {reference} not found")
+            plant_id = plant.id
 
             schedules = await uow.care_schedules.list_by_plant_id(plant_id)
             recent_events = await uow.care_events.list_recent_by_plant_id(plant_id, limit=SHEET_HISTORY_SIZE)

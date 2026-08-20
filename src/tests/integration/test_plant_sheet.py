@@ -24,7 +24,7 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         )
 
     def sheet(self):
-        return RetrievePlantSheetUseCase(uow=self.uow, household_calendar=self.household_calendar)(self.plant_id)
+        return RetrievePlantSheetUseCase(uow=self.uow, household_calendar=self.household_calendar)(str(self.plant_id))
 
     async def water(self, actor, performed_at):
         await RecordCareEventUseCase(
@@ -70,27 +70,48 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
     async def test_render_puts_the_plant_and_its_binomial_on_the_page(self):
         await self.water(OWNER, FROZEN_NOW - timedelta(days=2))
 
-        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик", can_act=False)
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
 
         self.assertIn("Кактус", page)
         self.assertIn("Nepenthes", page)
         self.assertIn("Домовик", page)
         self.assertIn(roman_date(FROZEN_NOW - timedelta(days=30)), page)
 
-    async def test_render_without_the_key_offers_no_watering_button(self):
-        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик", can_act=False)
-
-        self.assertNotIn("Записати полив", page)
-
-    async def test_render_with_the_key_offers_the_watering_button(self):
-        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик", can_act=True)
+    async def test_render_asks_for_a_password_behind_the_watering_button(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
 
         self.assertIn("Записати полив", page)
+        self.assertIn('name="password"', page)
+        self.assertNotIn("Пароль не той", page)
+
+    async def test_render_after_a_wrong_password_opens_the_form_and_says_so(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик", wrong_password=True)
+
+        self.assertIn("Пароль не той", page)
+        self.assertIn("<details open>", page)
+
+    async def test_sheet_can_be_fetched_by_its_slug(self):
+        async with self.uow as uow:
+            plant = await uow.plants.retrieve(self.plant_id)
+            plant.slug = "kaktus"
+
+        sheet = await RetrievePlantSheetUseCase(uow=self.uow, household_calendar=self.household_calendar)("kaktus")
+
+        self.assertEqual(sheet.id, self.plant_id)
+        self.assertEqual(sheet.slug, "kaktus")
 
     async def test_render_a_plant_that_has_photos_shows_the_specimen_and_the_strip(self):
         photo_id = await self.seed_plant_photo(self.plant_id, telegram_file_id="file-1")
 
-        page = render_plant_sheet(await self.sheet(), lambda pid: f"/photo/{pid}", "Домовик", can_act=False)
+        page = render_plant_sheet(await self.sheet(), lambda pid: f"/photo/{pid}", "Домовик")
 
         self.assertIn(f'src="/photo/{photo_id}"', page)
         self.assertIn('class="mount"', page)
+
+    async def test_render_declares_a_mobile_viewport_because_every_visit_arrives_from_a_phone(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
+
+        self.assertIn('<meta name="viewport" content="width=device-width, initial-scale=1">', page)
+        self.assertTrue(page.startswith('<!doctype html>\n<html lang="uk">'))
+        self.assertIn('<meta charset="utf-8">', page)
+        self.assertTrue(page.rstrip().endswith("</html>"))

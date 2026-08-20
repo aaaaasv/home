@@ -108,8 +108,8 @@ body{
 .contact{max-width:830px; margin:clamp(26px,5vw,44px) auto 0}
 .contact h2{margin:0 0 3px; text-align:center; font-family:var(--plaque); font-size:11px; letter-spacing:.32em; color:var(--gilt); font-weight:400; text-indent:.32em}
 .contact > p{margin:0 0 18px; text-align:center; font-size:15px; font-style:italic; color:rgba(235,226,204,.46)}
-.strip{display:flex; gap:clamp(9px,2vw,17px); overflow-x:auto; padding:3px 2px 16px}
-.strip figure{flex:0 0 auto; width:108px; margin:0; text-align:center}
+.strip{display:flex; gap:clamp(9px,2vw,17px); overflow-x:auto; padding:3px 2px 16px; scroll-snap-type:x proximity; overscroll-behavior-x:contain}
+.strip figure{flex:0 0 auto; width:108px; margin:0; text-align:center; scroll-snap-align:start}
 .strip .card{position:relative; background:var(--sheet); padding:6px 6px 5px; box-shadow:0 7px 18px rgba(0,0,0,.44)}
 .strip img{display:block; width:100%; height:88px; object-fit:cover; filter:saturate(.85)}
 .strip .vacant{height:99px; display:grid; place-content:center; border:1px dashed rgba(176,141,79,.34); font-family:var(--type); font-size:8.5px; letter-spacing:.12em; color:rgba(176,141,79,.44)}
@@ -145,3 +145,21 @@ body{
 /* ── distribution note under the binomial ────────────────── */
 .range{margin-top:6px; font-family:var(--type); font-size:10.5px; letter-spacing:.06em; color:var(--ink-mid)}
 .range b{color:var(--ink); font-weight:400; letter-spacing:.02em}
+
+/* ── the action, revealed by its own summary so no javascript is needed ── */
+.act details{display:inline-block; text-align:center}
+.act summary{list-style:none; cursor:pointer; display:inline-block; font-family:var(--plaque); font-size:11.5px;
+  letter-spacing:.26em; text-indent:.26em; color:var(--drawer); -webkit-tap-highlight-color:transparent;
+  background:linear-gradient(180deg,#DCC088,var(--gilt)); padding:16px 34px; box-shadow:0 5px 16px rgba(0,0,0,.5)}
+.act summary::-webkit-details-marker{display:none}
+.act summary:hover{background:linear-gradient(180deg,#EBD9A8,#DCC088)}
+.act details[open] summary{background:linear-gradient(180deg,var(--gilt),#8E7238)}
+.act form{display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap; margin-top:12px}
+.act label{font-family:var(--type); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--gilt)}
+.act input{font-family:var(--type); font-size:16px; letter-spacing:.3em; width:118px; text-align:center;
+  padding:9px 10px; background:var(--sheet); border:1px solid var(--gilt-dim,#6E5A34); color:var(--ink)}
+.act input:focus-visible{outline:2px solid var(--gilt); outline-offset:2px}
+.act form button{font-family:var(--plaque); font-size:10px; letter-spacing:.2em; text-indent:.2em;
+  padding:14px 22px; border:1px solid var(--gilt); background:transparent; color:var(--gilt); cursor:pointer}
+.act form button:hover{background:var(--gilt); color:var(--drawer)}
+.act .wrong{margin:9px 0 0; color:#C4553F; font-size:14px; font-style:italic}

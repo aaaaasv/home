@@ -32,3 +32,11 @@ class PlantRepository(SQLAlchemyRepository[Plant]):
     async def retrieve_active_by_name(self, name: str) -> Plant | None:
         result = await self.session.execute(select(Plant).where(Plant.name == name, Plant.is_archived.is_(False)))
         return result.scalar_one_or_none()
+
+    async def retrieve_active_by_slug(self, slug: str) -> Plant | None:
+        result = await self.session.execute(select(Plant).where(Plant.slug == slug, Plant.is_archived.is_(False)))
+        return result.scalars().first()
+
+    async def list_slugs(self) -> set[str]:
+        result = await self.session.execute(select(Plant.slug).where(Plant.slug.is_not(None)))
+        return set(result.scalars().all())
