@@ -36,6 +36,7 @@ from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.config import Settings, get_settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
+from src.web.app import build_web_app, start_web_app
 
 logger = logging.getLogger(__name__)
 
@@ -280,9 +281,18 @@ async def run() -> None:
     scheduler.start()
     logger.info("Digest scheduled at %s %s", settings.DAILY_DIGEST_TIME, settings.TIMEZONE)
 
+    # the specimen sheets share this loop with polling and the scheduler, the way everything else here does
+    web_runner = None
+    if settings.WEB_ENABLED:
+        web_runner = await start_web_app(
+            build_web_app(UnitOfWork, HouseholdCalendar(timezone=settings.timezone), settings), settings.WEB_PORT
+        )
+
     try:
         await dispatcher.start_polling(bot)
     finally:
+        if web_runner is not None:
+            await web_runner.cleanup()
         scheduler.shutdown(wait=False)
         await ecoflow_station.stop()
         if transit_board is not None:

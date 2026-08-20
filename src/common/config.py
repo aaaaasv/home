@@ -4,6 +4,8 @@ from zoneinfo import ZoneInfo
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.common.domain import Actor
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")
@@ -22,6 +24,15 @@ class Settings(BaseSettings):
 
     DATABASE_PATH: str = "home.db"
     PHOTO_STORAGE_PATH: str = "photos"
+
+    # the LAN web surface: one specimen sheet per plant, for whoever taps the NFC tag on the pot.
+    # plain http by ip on purpose — dns is an extra dependency in this path, and an internal-CA
+    # certificate warns every guest phone. the token is a capability scoped to *actions*: reading is open
+    # on the lan, watering needs the key that is written into the tag
+    WEB_ENABLED: bool = False
+    WEB_PORT: int = 8080
+    WEB_ACTION_TOKEN: str = ""
+    WEB_ACTOR_NAME: str = ""
 
     # what the bot calls itself where it signs something — an annotation on a plant sheet, say.
     # a name, not a brand: set it to whatever the household actually calls the thing
@@ -243,6 +254,11 @@ class Settings(BaseSettings):
     @property
     def timezone(self) -> ZoneInfo:
         return ZoneInfo(self.TIMEZONE)
+
+    @property
+    def web_actor(self) -> Actor:
+        """Who the sheet records care as — a tap on a pot has no Telegram user behind it."""
+        return Actor(telegram_user_id=0, display_name=self.WEB_ACTOR_NAME or self.BOT_DISPLAY_NAME)
 
     @property
     def daily_digest_time(self) -> time:

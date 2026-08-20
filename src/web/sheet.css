@@ -1,0 +1,147 @@
+:root{
+  --drawer:#1F1A14; --drawer-lift:#2C251B;
+  --manila:#9C8455; --manila-dark:#7E6841; --manila-edge:#B79C68;
+  --sheet:#EFE8D5; --sheet-shade:#DED4BB; --sheet-deep:#C9BC9C;
+  --ink:#282019; --ink-mid:#6A5C48; --ink-ghost:#A2957C;
+  --green:#4C5F35; --oxblood:#8A3324; --gilt:#B08D4F;
+  --plaque:"Cinzel",Georgia,serif; --serif:"EB Garamond",Georgia,serif; --type:"Courier Prime",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--drawer); color:var(--ink);
+  font-family:var(--serif); font-size:17px; line-height:1.55;
+  background-image:
+    repeating-linear-gradient(91deg, rgba(0,0,0,.22) 0 1px, transparent 1px 7px),
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(176,141,79,.10), transparent 72%);
+  padding:clamp(12px,3.4vw,44px) clamp(8px,2.6vw,26px) clamp(44px,9vw,92px);
+}
+.drawer-tag{max-width:830px; margin:0 auto clamp(12px,2.6vw,22px); display:flex; justify-content:space-between; align-items:baseline; gap:14px; font-family:var(--plaque); font-size:10.5px; letter-spacing:.32em; color:var(--gilt); text-indent:.32em}
+.drawer-tag span:last-child{letter-spacing:.16em; color:rgba(176,141,79,.6)}
+
+/* ── manila folder ───────────────────────────────────────── */
+.folder{position:relative; max-width:830px; margin:0 auto; background:var(--manila);
+  padding:clamp(13px,2.6vw,22px) clamp(11px,2.4vw,20px) clamp(18px,3vw,26px);
+  box-shadow:0 30px 70px rgba(0,0,0,.62), inset 0 1px 0 var(--manila-edge);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23f)' opacity='.09'/%3E%3C/svg%3E");
+}
+.folder::before{content:"NEPENTHACEAE"; position:absolute; top:-25px; left:clamp(20px,7vw,64px);
+  background:var(--manila); color:var(--drawer); font-family:var(--plaque); font-size:10px; letter-spacing:.24em;
+  padding:6px 20px 5px; border-radius:4px 4px 0 0; box-shadow:0 -3px 10px rgba(0,0,0,.36); text-indent:.24em}
+
+/* ── the sheet ───────────────────────────────────────────── */
+.sheet{position:relative; background:var(--sheet); padding:clamp(14px,2.8vw,26px) clamp(14px,3vw,30px) clamp(20px,3.4vw,32px);
+  box-shadow:0 4px 14px rgba(0,0,0,.3), 0 0 0 1px rgba(40,32,25,.2);
+  background-image:
+    radial-gradient(circle at 8% 4%, rgba(138,51,36,.05), transparent 22%),
+    radial-gradient(circle at 94% 88%, rgba(106,92,72,.09), transparent 26%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)' opacity='.06'/%3E%3C/svg%3E");
+}
+
+/* ── digitisation furniture: colour chart + ruler ─────────── */
+.calib{display:flex; align-items:stretch; gap:10px; margin-bottom:clamp(12px,2.4vw,18px); overflow:hidden}
+.swatches{display:flex; flex:0 0 auto; border:1px solid var(--ink-mid)}
+.swatches i{width:15px; height:15px; display:block}
+.ruler{flex:1; position:relative; height:15px; border:1px solid var(--ink-mid); border-left:0;
+  background:repeating-linear-gradient(90deg, var(--ink-mid) 0 1px, transparent 1px 10px);
+  background-size:100% 6px; background-repeat:no-repeat; background-position:0 bottom;
+  min-width:80px}
+.ruler::after{content:"cm"; position:absolute; right:4px; top:1px; font-family:var(--type); font-size:8.5px; color:var(--ink-ghost)}
+
+.head{display:flex; justify-content:space-between; align-items:flex-start; gap:14px; border-bottom:2px solid var(--ink); padding-bottom:9px; margin-bottom:clamp(14px,3vw,24px)}
+.head h1{margin:0; font-family:var(--plaque); font-size:clamp(12px,2.6vw,16px); letter-spacing:.24em; font-weight:600; text-indent:.24em}
+.head p{margin:3px 0 0; font-family:var(--type); font-size:10px; letter-spacing:.12em; color:var(--ink-mid); text-transform:uppercase}
+.barcode{flex:0 0 auto; text-align:center}
+.barcode .bars{height:34px; width:104px; background:repeating-linear-gradient(90deg,var(--ink) 0 1px,transparent 1px 3px,var(--ink) 3px 5px,transparent 5px 6px,var(--ink) 6px 8px,transparent 8px 11px)}
+.barcode small{display:block; font-family:var(--type); font-size:9px; letter-spacing:.16em; color:var(--ink-mid); margin-top:2px}
+
+/* ── mounted specimen with linen straps ──────────────────── */
+.mount{position:relative; width:min(100%,382px); margin:0 auto clamp(16px,3vw,26px)}
+.mount img{display:block; width:100%; height:auto; filter:saturate(.88) contrast(1.04)}
+.strap{position:absolute; background:linear-gradient(180deg,#D8CDB0,#C4B695); border:1px solid rgba(106,92,72,.5); box-shadow:0 1px 3px rgba(40,32,25,.28); height:15px}
+.strap.a{top:16%; left:-16px; width:76px; transform:rotate(-3.5deg)}
+.strap.b{top:52%; right:-14px; width:66px; transform:rotate(4deg)}
+.strap.c{bottom:12%; left:-10px; width:58px; transform:rotate(2.5deg)}
+
+/* ── binomial ────────────────────────────────────────────── */
+.binomial{text-align:center; margin-bottom:clamp(14px,3vw,22px)}
+.binomial .fam{font-family:var(--plaque); font-size:11px; letter-spacing:.3em; color:var(--ink-mid); text-indent:.3em}
+.binomial h2{margin:5px 0 2px; font-size:clamp(28px,6.6vw,44px); font-style:italic; font-weight:400; line-height:1.04}
+.binomial .auth{font-family:var(--type); font-size:11px; color:var(--ink-ghost); letter-spacing:.06em}
+.binomial .vern{margin-top:5px; font-size:16px; color:var(--ink-mid); font-style:italic}
+.binomial .vern b{font-style:normal; font-weight:600; color:var(--ink)}
+
+/* ── habitat readings ────────────────────────────────────── */
+.readings{display:grid; grid-template-columns:1fr; gap:14px; border-top:1px solid var(--ink-mid); border-bottom:1px solid var(--ink-mid); padding:13px 0; margin-bottom:clamp(16px,3vw,24px)}
+@media(min-width:600px){.readings{grid-template-columns:1fr 1fr; gap:26px}}
+.reading h3{margin:0 0 7px; font-family:var(--type); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-ghost); font-weight:400}
+.bar{position:relative; height:22px; border-bottom:1px solid var(--ink-mid)}
+.bar .ideal{position:absolute; top:6px; height:10px; background:repeating-linear-gradient(45deg,rgba(76,95,53,.34) 0 3px,rgba(76,95,53,.12) 3px 6px); border-inline:1px solid var(--green)}
+.bar .now{position:absolute; top:0; bottom:0; width:2px; background:var(--oxblood)}
+.bar .now b{position:absolute; top:-16px; left:50%; transform:translateX(-50%); font-family:var(--type); font-size:11px; color:var(--oxblood); white-space:nowrap}
+.reading p{margin:7px 0 0; font-size:14px; font-style:italic; color:var(--ink-mid)}
+.reading p.warn{color:var(--oxblood)}
+
+/* ── lower half: packet + slips + label ──────────────────── */
+.lower{display:grid; grid-template-columns:1fr; gap:clamp(16px,3vw,26px); align-items:end}
+@media(min-width:700px){.lower{grid-template-columns:200px 1fr}}
+.packet{position:relative; background:linear-gradient(160deg,#E2D9BF,#D3C7A6); border:1px solid var(--ink-mid); padding:14px 15px 16px; box-shadow:2px 3px 0 rgba(40,32,25,.1); transform:rotate(-.7deg)}
+.packet::before{content:""; position:absolute; top:0; left:0; right:0; height:26px; background:linear-gradient(160deg,#D9CEB0,#CBBE9A); border-bottom:1px solid rgba(106,92,72,.42); clip-path:polygon(0 0,100% 0,100% 42%,50% 100%,0 42%)}
+.packet h3{position:relative; margin:22px 0 7px; font-family:var(--type); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-ghost); font-weight:400}
+.packet p{margin:0; font-size:14.5px; line-height:1.5; font-style:italic; color:var(--ink)}
+
+.slips{display:flex; flex-direction:column; gap:7px}
+.slip{background:#F5F0E0; border:1px solid var(--ink-mid); padding:7px 11px; font-family:var(--type); font-size:11px; line-height:1.55; box-shadow:1px 2px 0 rgba(40,32,25,.07)}
+.slip:nth-child(odd){transform:rotate(.4deg)} .slip:nth-child(even){transform:rotate(-.5deg)}
+.slip b{color:var(--green); letter-spacing:.08em}
+.slip span{color:var(--ink-ghost); float:right}
+.label{position:relative; background:#F7F2E4; border:1px solid var(--ink); padding:15px 18px 17px; margin-top:9px; box-shadow:2px 3px 0 rgba(40,32,25,.11); transform:rotate(-.45deg); font-family:var(--type); font-size:12px; line-height:1.75}
+.label::before{content:""; position:absolute; inset:3px; border:1px solid rgba(106,92,72,.3); pointer-events:none}
+.label h3{margin:0 0 8px; font-family:var(--plaque); font-size:10px; letter-spacing:.2em; text-align:center; border-bottom:1px solid var(--ink-mid); padding-bottom:6px; text-indent:.2em}
+.label dl{margin:0; display:grid; grid-template-columns:auto 1fr; gap:1px 12px}
+.label dt{color:var(--ink-ghost); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; align-self:baseline}
+.label dd{margin:0; font-variant-numeric:tabular-nums}
+.stamp{position:absolute; right:-14px; bottom:-18px; width:74px; height:74px; transform:rotate(-11deg); border:3px double var(--oxblood); border-radius:50%; display:grid; place-content:center; text-align:center; color:var(--oxblood); font-family:var(--plaque); font-size:8px; letter-spacing:.1em; line-height:1.5; background:rgba(247,242,228,.6); opacity:.85}
+.stamp b{display:block; font-size:22px; letter-spacing:0}
+
+/* ── contact sheet ───────────────────────────────────────── */
+.contact{max-width:830px; margin:clamp(26px,5vw,44px) auto 0}
+.contact h2{margin:0 0 3px; text-align:center; font-family:var(--plaque); font-size:11px; letter-spacing:.32em; color:var(--gilt); font-weight:400; text-indent:.32em}
+.contact > p{margin:0 0 18px; text-align:center; font-size:15px; font-style:italic; color:rgba(235,226,204,.46)}
+.strip{display:flex; gap:clamp(9px,2vw,17px); overflow-x:auto; padding:3px 2px 16px}
+.strip figure{flex:0 0 auto; width:108px; margin:0; text-align:center}
+.strip .card{position:relative; background:var(--sheet); padding:6px 6px 5px; box-shadow:0 7px 18px rgba(0,0,0,.44)}
+.strip img{display:block; width:100%; height:88px; object-fit:cover; filter:saturate(.85)}
+.strip .vacant{height:99px; display:grid; place-content:center; border:1px dashed rgba(176,141,79,.34); font-family:var(--type); font-size:8.5px; letter-spacing:.12em; color:rgba(176,141,79,.44)}
+.strip figcaption{margin-top:6px; font-family:var(--type); font-size:10px; color:rgba(235,226,204,.55); font-variant-numeric:tabular-nums}
+.strip .fut figcaption{color:rgba(235,226,204,.3)}
+
+.act{max-width:830px; margin:clamp(22px,4vw,34px) auto 0; text-align:center}
+.act button{font-family:var(--plaque); font-size:11.5px; letter-spacing:.26em; text-indent:.26em; color:var(--drawer); background:linear-gradient(180deg,#DCC088,var(--gilt)); border:0; padding:14px 34px; cursor:pointer; box-shadow:0 5px 16px rgba(0,0,0,.5)}
+.act button:hover{background:linear-gradient(180deg,#EBD9A8,#DCC088)}
+.act button:focus-visible{outline:2px solid var(--sheet); outline-offset:4px}
+.act p{margin:11px 0 0; font-size:15px; font-style:italic; color:rgba(235,226,204,.45)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ── engraved plates: rhythm + trace ─────────────────────── */
+.plate-block{border-top:1px solid var(--ink-mid); margin-top:clamp(16px,3vw,24px); padding-top:13px}
+.plate-block h3{margin:0 0 3px; font-family:var(--plaque); font-size:10px; letter-spacing:.22em; color:var(--ink); font-weight:600; text-indent:.22em}
+.plate-block .sub{margin:0 0 11px; font-family:var(--type); font-size:10px; color:var(--ink-ghost); letter-spacing:.04em}
+.plate-block svg{display:block; width:100%; height:auto}
+.legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:8px; font-family:var(--type); font-size:9.5px; color:var(--ink-mid); letter-spacing:.06em}
+.legend i{display:inline-block; width:16px; height:0; border-top-width:2px; border-top-style:solid; vertical-align:middle; margin-right:5px}
+
+/* ── curators ────────────────────────────────────────────── */
+.curators{display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end; margin-top:11px}
+.curator{flex:1 1 96px; min-width:96px}
+.curator .who{font-family:var(--type); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-ghost)}
+.curator .tally{display:flex; align-items:flex-end; gap:8px; margin-top:3px}
+.curator .marks{font-family:var(--serif); font-size:21px; letter-spacing:2px; color:var(--green); line-height:1}
+.curator .n{font-family:var(--type); font-size:11px; color:var(--ink-mid)}
+
+/* ── blank ruled field (unfilled form line) ──────────────── */
+.blank{display:inline-block; min-width:118px; border-bottom:1px dotted var(--ink-mid); color:var(--ink-ghost); font-style:italic; font-size:11px}
+
+/* ── distribution note under the binomial ────────────────── */
+.range{margin-top:6px; font-family:var(--type); font-size:10.5px; letter-spacing:.06em; color:var(--ink-mid)}
+.range b{color:var(--ink); font-weight:400; letter-spacing:.02em}

@@ -292,3 +292,82 @@ class PlantPhotoReview(DomainModel):
     summary: str
     change: str | None
     action: str | None
+
+
+class CarerTally(DomainModel):
+    name: str
+    count: int
+
+
+class ClimatePoint(DomainModel):
+    hour: str
+    temperature_celsius: float
+    relative_humidity_percent: float
+
+
+class PlantSheet(DomainModel):
+    """One plant as a specimen sheet: what it is, where it came from, and how it has actually been kept."""
+
+    id: int
+    name: str
+    species: str | None
+    location: str | None
+    notes: str | None
+    provenance: str | None
+    native_range: str | None
+    substrate: str | None
+    toxicity: str | None
+    created_at: datetime
+    age_days: int
+    ideal_temperature_min_celsius: float | None
+    ideal_temperature_max_celsius: float | None
+    ideal_humidity_min_percent: float | None
+    ideal_humidity_max_percent: float | None
+    current_temperature_celsius: float | None
+    current_humidity_percent: float | None
+    schedules: list[CareScheduleDetails]
+    recent_events: list[CareEventDetails]
+    photos: list[PlantPhotoDetails]
+    carers: list[CarerTally]
+    watering_gaps_days: list[float]
+    climate: list[ClimatePoint]
+
+    @property
+    def watering(self) -> CareScheduleDetails | None:
+        return next((s for s in self.schedules if s.task_type == CareTaskType.WATERING), None)
+
+    @property
+    def humidity_is_low(self) -> bool:
+        floor, now = self.ideal_humidity_min_percent, self.current_humidity_percent
+        return floor is not None and now is not None and now < floor
+
+    @classmethod
+    def from_models(cls, plant, schedules, recent_events, photos, carers, waterings, climate, latest_climate, today):
+        gaps = [round((later - earlier).total_seconds() / 86400, 1) for earlier, later in zip(waterings, waterings[1:])]
+        return cls(
+            id=plant.id,
+            name=plant.name,
+            species=plant.species,
+            location=plant.location,
+            notes=plant.notes,
+            provenance=plant.provenance,
+            native_range=plant.native_range,
+            substrate=plant.substrate,
+            toxicity=plant.toxicity,
+            created_at=plant.created_at,
+            age_days=max((today - plant.created_at.date()).days, 0),
+            ideal_temperature_min_celsius=plant.ideal_temperature_min_celsius,
+            ideal_temperature_max_celsius=plant.ideal_temperature_max_celsius,
+            ideal_humidity_min_percent=plant.ideal_humidity_min_percent,
+            ideal_humidity_max_percent=plant.ideal_humidity_max_percent,
+            current_temperature_celsius=latest_climate.temperature_celsius if latest_climate else None,
+            current_humidity_percent=latest_climate.relative_humidity_percent if latest_climate else None,
+            schedules=[CareScheduleDetails.from_schedule(s, today) for s in schedules],
+            recent_events=[CareEventDetails.from_event(e) for e in recent_events],
+            photos=[PlantPhotoDetails.from_photo(p) for p in photos],
+            carers=[CarerTally(name=name, count=count) for name, count in carers],
+            watering_gaps_days=gaps,
+            climate=[
+                ClimatePoint(hour=hour, temperature_celsius=t, relative_humidity_percent=h) for hour, t, h in climate
+            ],
+        )

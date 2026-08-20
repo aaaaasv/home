@@ -1,4 +1,6 @@
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import func, select
 
 from src.common.constants import CareTaskType
 from src.infrastructure.db.models import CareEvent, Plant
@@ -31,3 +33,22 @@ class CareEventRepository(SQLAlchemyRepository[CareEvent]):
             .limit(limit)
         )
         return [(event, plant) for event, plant in result.all()]
+
+    async def count_by_carer(self, plant_id: int, task_type: CareTaskType) -> list[tuple[str, int]]:
+        """Who has done this task for this plant, most diligent first — the sheet credits them by name."""
+        result = await self.session.execute(
+            select(CareEvent.performed_by_display_name, func.count())
+            .where(CareEvent.plant_id == plant_id, CareEvent.task_type == task_type)
+            .group_by(CareEvent.performed_by_display_name)
+            .order_by(func.count().desc())
+        )
+        return [(name, count) for name, count in result.all()]
+
+    async def list_performed_at(self, plant_id: int, task_type: CareTaskType) -> list[datetime]:
+        """Every time this task was done, oldest first, so the gaps between them can be drawn."""
+        result = await self.session.execute(
+            select(CareEvent.performed_at)
+            .where(CareEvent.plant_id == plant_id, CareEvent.task_type == task_type)
+            .order_by(CareEvent.performed_at)
+        )
+        return list(result.scalars().all())
