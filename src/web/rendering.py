@@ -273,6 +273,7 @@ def render_plant_sheet(sheet: PlantSheet, photo_url, bot_name: str, wrong_passwo
 <body>
 <p class="drawer-tag"><span>{escape(sheet.species or "Hortus")}</span><span>Hortus Domesticus · HD</span></p>
 <div class="folder">
+  <span class="tab">{escape(sheet.name)}</span>
   <article class="sheet">
     <div class="calib"><div class="swatches">{swatches}</div><div class="ruler"></div></div>
     <header class="head"><div><h1>Hortus Domesticus</h1><p>Домашній гербарій</p></div>

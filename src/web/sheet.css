@@ -16,8 +16,9 @@ body{
     radial-gradient(ellipse 70% 50% at 50% 0%, rgba(176,141,79,.10), transparent 72%);
   padding:clamp(12px,3.4vw,44px) clamp(8px,2.6vw,26px) clamp(44px,9vw,92px);
 }
-.drawer-tag{max-width:830px; margin:0 auto clamp(12px,2.6vw,22px); display:flex; justify-content:space-between; align-items:baseline; gap:14px; font-family:var(--plaque); font-size:10.5px; letter-spacing:.32em; color:var(--gilt); text-indent:.32em}
-.drawer-tag span:last-child{letter-spacing:.16em; color:rgba(176,141,79,.6)}
+.drawer-tag{max-width:830px; margin:0 auto clamp(30px,2.6vw,34px); display:flex; justify-content:space-between; align-items:baseline; gap:14px; font-family:var(--plaque); font-size:10.5px; letter-spacing:.32em; color:var(--gilt); text-indent:.32em}
+.drawer-tag span{min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.drawer-tag span:last-child{letter-spacing:.16em; color:rgba(176,141,79,.6); flex:0 0 auto}
 
 /* ── manila folder ───────────────────────────────────────── */
 .folder{position:relative; max-width:830px; margin:0 auto; background:var(--manila);
@@ -25,9 +26,10 @@ body{
   box-shadow:0 30px 70px rgba(0,0,0,.62), inset 0 1px 0 var(--manila-edge);
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23f)' opacity='.09'/%3E%3C/svg%3E");
 }
-.folder::before{content:"NEPENTHACEAE"; position:absolute; top:-25px; left:clamp(20px,7vw,64px);
+.tab{position:absolute; top:-25px; left:clamp(20px,7vw,64px); max-width:calc(100% - clamp(40px,14vw,128px));
   background:var(--manila); color:var(--drawer); font-family:var(--plaque); font-size:10px; letter-spacing:.24em;
-  padding:6px 20px 5px; border-radius:4px 4px 0 0; box-shadow:0 -3px 10px rgba(0,0,0,.36); text-indent:.24em}
+  padding:6px 20px 5px; border-radius:4px 4px 0 0; box-shadow:0 -3px 10px rgba(0,0,0,.36); text-indent:.24em;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
 /* ── the sheet ───────────────────────────────────────────── */
 .sheet{position:relative; background:var(--sheet); padding:clamp(14px,2.8vw,26px) clamp(14px,3vw,30px) clamp(20px,3.4vw,32px);
@@ -74,7 +76,7 @@ body{
 /* ── habitat readings ────────────────────────────────────── */
 .readings{display:grid; grid-template-columns:1fr; gap:14px; border-top:1px solid var(--ink-mid); border-bottom:1px solid var(--ink-mid); padding:13px 0; margin-bottom:clamp(16px,3vw,24px)}
 @media(min-width:600px){.readings{grid-template-columns:1fr 1fr; gap:26px}}
-.reading h3{margin:0 0 7px; font-family:var(--type); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-ghost); font-weight:400}
+.reading h3{margin:0 0 21px; font-family:var(--type); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-ghost); font-weight:400}
 .bar{position:relative; height:22px; border-bottom:1px solid var(--ink-mid)}
 .bar .ideal{position:absolute; top:6px; height:10px; background:repeating-linear-gradient(45deg,rgba(76,95,53,.34) 0 3px,rgba(76,95,53,.12) 3px 6px); border-inline:1px solid var(--green)}
 .bar .now{position:absolute; top:0; bottom:0; width:2px; background:var(--oxblood)}
@@ -95,7 +97,7 @@ body{
 .slip:nth-child(odd){transform:rotate(.4deg)} .slip:nth-child(even){transform:rotate(-.5deg)}
 .slip b{color:var(--green); letter-spacing:.08em}
 .slip span{color:var(--ink-ghost); float:right}
-.label{position:relative; background:#F7F2E4; border:1px solid var(--ink); padding:15px 18px 17px; margin-top:9px; box-shadow:2px 3px 0 rgba(40,32,25,.11); transform:rotate(-.45deg); font-family:var(--type); font-size:12px; line-height:1.75}
+.label{position:relative; background:#F7F2E4; border:1px solid var(--ink); padding:15px 18px 52px; margin-top:9px; box-shadow:2px 3px 0 rgba(40,32,25,.11); transform:rotate(-.45deg); font-family:var(--type); font-size:12px; line-height:1.75}
 .label::before{content:""; position:absolute; inset:3px; border:1px solid rgba(106,92,72,.3); pointer-events:none}
 .label h3{margin:0 0 8px; font-family:var(--plaque); font-size:10px; letter-spacing:.2em; text-align:center; border-bottom:1px solid var(--ink-mid); padding-bottom:6px; text-indent:.2em}
 .label dl{margin:0; display:grid; grid-template-columns:auto 1fr; gap:1px 12px}

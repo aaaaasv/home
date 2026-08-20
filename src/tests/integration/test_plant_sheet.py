@@ -127,3 +127,9 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
 
         self.assertEqual([(carer.name, carer.count) for carer in sheet.carers], [("Богданчик", 1)])
         self.assertEqual([event.performed_by_display_name for event in sheet.recent_events], ["Богданчик"])
+
+    async def test_render_puts_the_plants_own_name_on_the_folder_tab_not_a_fixed_family(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
+
+        self.assertIn('<span class="tab">Кактус</span>', page)
+        self.assertNotIn("NEPENTHACEAE", page)
