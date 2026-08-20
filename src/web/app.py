@@ -1,8 +1,8 @@
 """A small read-mostly web surface for the household, served on the LAN.
 
-Plain HTTP by IP on purpose: DNS is an extra dependency in a path whose whole point is that tapping a pot
-works, and HTTPS with an internal CA greets every guest phone with a certificate warning. The token is a
-capability — whoever holds the tag can water that plant — so it is scoped to actions, never to reading.
+Plain HTTP on purpose: no public certificate authority will issue for `garden.lan`, and an internal CA
+greets every guest phone with a warning instead. Reading is open to anyone on the network, which is the
+point — the password guards only the one action that spends water.
 """
 
 import logging
@@ -16,10 +16,22 @@ from src.common.exceptions import DomainError
 from src.common.household_calendar import HouseholdCalendar
 from src.modules.plant_care.commands import RecordCareEventCommand
 from src.modules.plant_care.use_cases.record_care_event import RecordCareEventUseCase
+from src.modules.plant_care.use_cases.retrieve_drawer import RetrieveDrawerUseCase
 from src.modules.plant_care.use_cases.retrieve_plant_sheet import RetrievePlantSheetUseCase
-from src.web.rendering import render_plant_sheet
+from src.web.rendering import render_drawer, render_plant_sheet
 
 logger = logging.getLogger(__name__)
+
+
+def find_neighbours(entries, plant_id: int):
+    """The folders either side of this one, so a sheet is a place in a drawer rather than an island."""
+    position = next((index for index, entry in enumerate(entries) if entry.id == plant_id), None)
+    if position is None:
+        return None, None
+    return (
+        entries[position - 1] if position > 0 else None,
+        entries[position + 1] if position + 1 < len(entries) else None,
+    )
 
 
 def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) -> web.Application:
@@ -28,14 +40,22 @@ def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) 
     def photo_url(photo_id: int) -> str:
         return f"/photo/{photo_id}"
 
+    async def drawer(request: web.Request) -> web.Response:
+        entries = await RetrieveDrawerUseCase(uow=uow_factory(), household_calendar=household_calendar)()
+        body = render_drawer(entries, photo_url, settings.BOT_DISPLAY_NAME)
+        return web.Response(text=body, content_type="text/html", charset="utf-8")
+
     async def plant_sheet(request: web.Request) -> web.Response:
         reference = request.match_info["reference"]
         try:
             sheet = await RetrievePlantSheetUseCase(uow=uow_factory(), household_calendar=household_calendar)(reference)
         except DomainError:
             raise web.HTTPNotFound(text="Немає такої рослини")
+        entries = await RetrieveDrawerUseCase(uow=uow_factory(), household_calendar=household_calendar)()
         wrong_password = request.query.get("wrong") == "1"
-        body = render_plant_sheet(sheet, photo_url, settings.BOT_DISPLAY_NAME, wrong_password)
+        body = render_plant_sheet(
+            sheet, photo_url, settings.BOT_DISPLAY_NAME, wrong_password, find_neighbours(entries, sheet.id)
+        )
         return web.Response(text=body, content_type="text/html", charset="utf-8")
 
     async def plant_photo(request: web.Request) -> web.FileResponse:
@@ -79,6 +99,7 @@ def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) 
             logger.warning("Web watering refused for plant %s: %s", plant_id, error)
         raise web.HTTPFound(f"/p/{reference}")
 
+    application.router.add_get("/", drawer)
     application.router.add_get("/p/{reference:[a-z0-9-]+}", plant_sheet)
     application.router.add_post("/p/{reference:[a-z0-9-]+}/water", record_watering)
     application.router.add_get("/photo/{photo_id:\\d+}", plant_photo)

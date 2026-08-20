@@ -4,13 +4,27 @@ Ukrainian lives here because this is a delivery layer, the same way src/bot/ is.
 comes from PlantSheet — nothing is computed twice, and nothing is invented when a field is empty.
 """
 
+import json
 from html import escape
 
 from src.common.constants import CareTaskType
-from src.modules.plant_care.domain import ClimatePoint, PlantSheet
-from src.web.styles import GOOGLE_FONTS_URL, STYLESHEET
+from src.modules.plant_care.domain import ClimatePoint, DrawerEntry, PlantSheet
+from src.web.styles import GOOGLE_FONTS_URL, SCRIPT, STYLESHEET
 
-ROMAN_MONTHS = ("i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii")
+ROMAN_MONTHS = (
+    "i",
+    "ii",
+    "iii",
+    "iv",
+    "v",
+    "vi",
+    "vii",
+    "viii",
+    "ix",
+    "x",
+    "xi",
+    "xii",
+)
 CALIBRATION_SWATCHES = (
     "#B33A2B",
     "#C98A2E",
@@ -31,7 +45,10 @@ TASK_NAMES = {
     CareTaskType.ROTATING: "Поворот",
     CareTaskType.PHOTO: "Знімок",
 }
-PAST_TASK_NAMES = {CareTaskType.WATERING: "Полито", CareTaskType.FERTILIZING: "Підживлено"}
+PAST_TASK_NAMES = {
+    CareTaskType.WATERING: "Полито",
+    CareTaskType.FERTILIZING: "Підживлено",
+}
 
 
 def roman_date(moment) -> str:
@@ -114,12 +131,19 @@ def _climate_plate(points: list[ClimatePoint], humidity_floor: float | None) -> 
             f'<text x="{width - pad + 2}" y="{y + 3:.1f}" font-size="8.5" fill="#8A3324" '
             f'font-family="Courier Prime,monospace">{humidity_floor:.0f}%</text>'
         )
+    readings = escape(
+        json.dumps([[int(p.hour[-2:]), p.temperature_celsius, p.relative_humidity_percent] for p in points]),
+        quote=True,
+    )
     return f"""<section class="plate-block"><h3>Tabula III · мікроклімат, дві доби</h3>
 <p class="sub">Погодинне середнє. Затінені смуги — ніч. Червоний пунктир — нижня межа вологості.</p>
+<div id="climate" data-points='{readings}'>
 <svg viewBox="0 0 {width} {height}" role="img" aria-label="Температура і вологість за дві доби">
 {nights}{floor_line}
 <polyline points="{humidity_line}" fill="none" stroke="#8A3324" stroke-width="1.6"/>
 <polyline points="{temperature_line}" fill="none" stroke="#4C5F35" stroke-width="1.6"/>{ticks}</svg>
+<i id="climate-rule"></i></div>
+<p class="readout" id="climate-readout"></p>
 <div class="legend"><span><i style="border-color:#4C5F35">
 </i>температура, {min(temperatures):.1f}–{max(temperatures):.1f} °C</span>
 <span><i style="border-color:#8A3324"></i>вологість, {min(humidities):.1f}–{max(humidities):.1f} %</span>
@@ -135,7 +159,12 @@ def _label(sheet: PlantSheet) -> str:
         ("Субстрат", _blank(sheet.substrate)),
     ]
     if watering is not None:
-        rows.append(("Полив", f"кожні {watering.interval_days} дн. · далі {roman_date(watering.next_due_on)}"))
+        rows.append(
+            (
+                "Полив",
+                f"кожні {watering.interval_days} дн. · далі {roman_date(watering.next_due_on)}",
+            )
+        )
     for schedule in sheet.schedules:
         if schedule.task_type is CareTaskType.REPOTTING:
             rows.append(("Пересадка", roman_date(schedule.next_due_on)))
@@ -160,7 +189,13 @@ def _slips(sheet: PlantSheet) -> str:
         )
     for event in list(reversed(sheet.recent_events))[-3:]:
         verb = PAST_TASK_NAMES.get(event.task_type, TASK_NAMES.get(event.task_type, str(event.task_type)))
-        slips.append(("Annot.", f"{verb} — {event.performed_by_display_name}", roman_date(event.performed_at)))
+        slips.append(
+            (
+                "Annot.",
+                f"{verb} — {event.performed_by_display_name}",
+                roman_date(event.performed_at),
+            )
+        )
     return "".join(
         f'<div class="slip"><b>{kind}</b> {escape(text)}<span>{date}</span></div>' for kind, text, date in slips
     )
@@ -204,22 +239,109 @@ def _gauge(
 <p class="{'warn' if warn else ''}">{verdict}</p></div>"""
 
 
-def render_plant_sheet(sheet: PlantSheet, photo_url, bot_name: str, wrong_password: bool = False) -> str:
+def _growth(sheet: PlantSheet, photo_url) -> str:
+    """First plate against latest — the one comparison a photo archive is actually for."""
+    if len(sheet.photos) < 2:
+        return ""
+    first, last = sheet.photos[0], sheet.photos[-1]
+    return f"""<section class="plate-block compare"><h3>Tabula IV · зріст</h3>
+<p class="sub">Ліворуч перший знімок, праворуч останній — за {(last.taken_at - first.taken_at).days} діб.
+Потягніть засувку.</p>
+<div class="compare-frame">
+  <img class="earlier" src="{photo_url(first.id)}" alt="{escape(sheet.name)}, перший знімок">
+  <img class="later" src="{photo_url(last.id)}" alt="{escape(sheet.name)}, останній знімок">
+  <i class="seam"></i>
+  <b class="then">{roman_date(first.taken_at)}</b><b class="now">{roman_date(last.taken_at)}</b>
+</div>
+<input id="wipe" type="range" min="0" max="100" value="50" aria-label="Порівняти перший і останній знімок">
+</section>"""
+
+
+def _turn(neighbours) -> str:
+    """A drawer is only a drawer if you can reach the next folder without going back to the pot."""
+    previous, following = neighbours if neighbours else (None, None)
+    back = f'<a href="/p/{previous.reference}">◀ {escape(previous.name)}</a>' if previous else "<span></span>"
+    forward = f'<a href="/p/{following.reference}">{escape(following.name)} ▶</a>' if following else "<span></span>"
+    return f'<nav class="turn">{back}<a class="all" href="/">Уся картотека</a>{forward}</nav>'
+
+
+def render_drawer(entries: list[DrawerEntry], photo_url, bot_name: str) -> str:
+    """The card catalogue — every plant as a folder, which is how a guest finds the other four."""
+    files = []
+    for entry in entries:
+        cover = (
+            f'<div class="cover"><img src="{photo_url(entry.cover_photo_id)}" alt="{escape(entry.name)}"></div>'
+            if entry.cover_photo_id
+            else '<div class="cover vacant">без знімка</div>'
+        )
+        due = ""
+        if entry.days_until_watering is not None:
+            days = entry.days_until_watering
+            if days < 0:
+                text, urgent = f"полив прострочено на {-days} дн.", True
+            elif days == 0:
+                text, urgent = "полив сьогодні", True
+            else:
+                text, urgent = f"полив за {days} дн.", False
+            due = f'<span class="due{" now" if urgent else ""}">{text}</span>'
+        files.append(
+            f'<a class="file" href="/p/{entry.reference}" data-tab="{escape(entry.name)}">{cover}'
+            f"<div><h2>{escape(entry.species or entry.name)}</h2>"
+            f'<p class="vern">{escape(entry.name)}</p>'
+            f'<p class="meta">{entry.age_days} діб у домі</p>{due}</div></a>'
+        )
+    return f"""<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1F1A14">
+<title>Hortus Domesticus</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="{GOOGLE_FONTS_URL}">
+<style>{STYLESHEET}</style>
+</head>
+<body>
+<header class="drawer-plate"><h1>Hortus Domesticus</h1>
+  <p>Домашній гербарій · {len(entries)} аркуш{"ів" if len(entries) != 1 else ""} · доглядає {escape(bot_name)}</p>
+</header>
+<main class="drawer">{"".join(files)}</main>
+</body>
+</html>"""
+
+
+def render_plant_sheet(
+    sheet: PlantSheet,
+    photo_url,
+    bot_name: str,
+    wrong_password: bool = False,
+    neighbours=None,
+) -> str:
     swatches = "".join(f'<i style="background:{colour}"></i>' for colour in CALIBRATION_SWATCHES)
     latest = sheet.photos[-1] if sheet.photos else None
+    total = len(sheet.photos)
     specimen = (
         (
-            f'<figure class="mount"><img src="{photo_url(latest.id)}" alt="{escape(sheet.name)}">'
-            f'<i class="strap a"></i><i class="strap b"></i><i class="strap c"></i></figure>'
+            f'<figure class="mount"><img id="mounted" src="{photo_url(latest.id)}" alt="{escape(sheet.name)}">'
+            f'<i class="strap a"></i><i class="strap b"></i><i class="strap c"></i>'
+            f'<button class="loupe-btn" id="loupe" type="button" aria-pressed="false" '
+            f'aria-label="Лупа">&#9906;</button>'
+            f'<figcaption class="mount-cap" id="mount-caption">'
+            f"{roman_date(latest.taken_at)} · знімок {total} з {total}</figcaption></figure>"
         )
         if latest
         else ""
     )
-    plates = "".join(
-        f'<figure><div class="card"><img src="{photo_url(photo.id)}" alt="{escape(sheet.name)}"></div>'
-        f"<figcaption>{roman_date(photo.taken_at)}</figcaption></figure>"
-        for photo in sheet.photos
-    )
+    plates = ""
+    for index, photo in enumerate(sheet.photos, start=1):
+        mounted_now = ' class="is-mounted"' if index == total else ""
+        plates += (
+            f'<figure data-photo="{photo_url(photo.id)}"'
+            f' data-caption="{roman_date(photo.taken_at)} · знімок {index} з {total}"{mounted_now}>'
+            f'<div class="card"><img src="{photo_url(photo.id)}" alt="{escape(sheet.name)}"></div>'
+            f"<figcaption>{roman_date(photo.taken_at)}</figcaption></figure>"
+        )
+    compare = _growth(sheet, photo_url)
     temperature_gauge = _gauge(
         "Температура",
         sheet.current_temperature_celsius,
@@ -289,6 +411,7 @@ def render_plant_sheet(sheet: PlantSheet, photo_url, bot_name: str, wrong_passwo
       {temperature_gauge}
       {humidity_gauge}
     </section>
+    {compare}
     {rhythm}
     {_climate_plate(sheet.climate, sheet.ideal_humidity_min_percent)}
     {_carers(sheet)}
@@ -302,5 +425,7 @@ def render_plant_sheet(sheet: PlantSheet, photo_url, bot_name: str, wrong_passwo
   <p>{len(sheet.photos)} знімк{"ів" if len(sheet.photos) != 1 else "ок"} · доглядає {bot_name}</p>
   <div class="strip">{plates}</div></section>
 {action}
+{_turn(neighbours)}
+<script>{SCRIPT}</script>
 </body>
 </html>"""

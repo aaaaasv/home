@@ -165,3 +165,82 @@ body{
   padding:14px 22px; border:1px solid var(--gilt); background:transparent; color:var(--gilt); cursor:pointer}
 .act form button:hover{background:var(--gilt); color:var(--drawer)}
 .act .wrong{margin:9px 0 0; color:#C4553F; font-size:14px; font-style:italic}
+
+/* ── the plate mounted on the sheet, and its caption ──────── */
+.mount-cap{margin-top:9px; text-align:center; font-family:var(--type); font-size:10px; letter-spacing:.14em; color:var(--ink-ghost)}
+.mount img.swap{animation:plate-settle .42s ease both}
+@keyframes plate-settle{from{opacity:0; transform:translateY(-7px) rotate(-.6deg)}}
+
+/* ── the loupe ────────────────────────────────────────────── */
+.loupe-btn{position:absolute; right:9px; top:9px; z-index:3; width:38px; height:38px; border-radius:50%;
+  border:1px solid var(--gilt); background:linear-gradient(160deg,rgba(247,242,228,.9),rgba(222,212,187,.86));
+  color:var(--drawer); font-size:16px; line-height:1; cursor:pointer; box-shadow:0 3px 9px rgba(0,0,0,.34);
+  display:grid; place-content:center; -webkit-tap-highlight-color:transparent}
+.loupe-btn.on{background:linear-gradient(160deg,#DCC088,var(--gilt))}
+.mount.magnifying{touch-action:none; cursor:crosshair}
+.loupe-glass{position:absolute; left:0; top:0; width:132px; height:132px; border-radius:50%; pointer-events:none;
+  border:3px double var(--gilt); box-shadow:0 8px 22px rgba(0,0,0,.5), inset 0 0 0 5px rgba(247,242,228,.28);
+  background-repeat:no-repeat; opacity:0; transition:opacity .16s}
+.loupe-glass.on{opacity:1}
+
+/* ── scrubbing the climate plate ──────────────────────────── */
+#climate{position:relative; touch-action:pan-y}
+#climate-rule{position:absolute; top:0; bottom:26px; width:1px; background:var(--oxblood); opacity:0; pointer-events:none}
+#climate.reading #climate-rule{opacity:.75}
+.readout{min-height:15px; margin-top:5px; font-family:var(--type); font-size:10.5px; letter-spacing:.08em;
+  color:var(--oxblood); text-align:center; font-variant-numeric:tabular-nums}
+
+/* ── the growth wipe ──────────────────────────────────────── */
+.compare{--wipe:50%}
+.compare-frame{position:relative; overflow:hidden; background:var(--sheet-deep); border:1px solid var(--ink-mid)}
+.compare-frame img{display:block; width:100%; height:auto}
+.compare-frame img.later{position:absolute; inset:0; height:100%; object-fit:cover;
+  clip-path:inset(0 0 0 var(--wipe))}
+.compare-frame .seam{position:absolute; top:0; bottom:0; left:var(--wipe); width:2px; background:var(--gilt);
+  box-shadow:0 0 10px rgba(0,0,0,.5); pointer-events:none}
+.compare-frame b{position:absolute; bottom:7px; font-family:var(--type); font-size:9.5px; letter-spacing:.1em;
+  color:var(--sheet); background:rgba(31,26,20,.62); padding:3px 7px}
+.compare-frame b.then{left:7px}
+.compare-frame b.now{right:7px}
+.compare input[type=range]{width:100%; margin:11px 0 0; accent-color:var(--gilt)}
+
+/* ── the drawer index ─────────────────────────────────────── */
+.drawer{max-width:830px; margin:0 auto; display:grid; gap:clamp(15px,3vw,24px)}
+.drawer-plate{max-width:830px; margin:0 auto clamp(20px,4vw,30px); text-align:center}
+.drawer-plate h1{margin:0; font-family:var(--plaque); font-size:clamp(19px,4.6vw,29px); letter-spacing:.2em;
+  color:var(--gilt); font-weight:400; text-indent:.2em}
+.drawer-plate p{margin:6px 0 0; font-family:var(--type); font-size:11px; letter-spacing:.2em; color:rgba(235,226,204,.5)}
+.file{position:relative; display:grid; grid-template-columns:88px 1fr; gap:clamp(11px,2.6vw,18px); align-items:center;
+  background:var(--manila); color:var(--ink); text-decoration:none; padding:14px 15px 14px 14px; margin-top:22px;
+  box-shadow:0 16px 34px rgba(0,0,0,.5), inset 0 1px 0 var(--manila-edge)}
+.file::before{content:attr(data-tab); position:absolute; top:-22px; left:clamp(14px,5vw,34px); max-width:70%;
+  background:var(--manila); color:var(--drawer); font-family:var(--plaque); font-size:9.5px; letter-spacing:.22em;
+  padding:6px 17px 5px; border-radius:4px 4px 0 0; box-shadow:0 -3px 9px rgba(0,0,0,.34); text-indent:.22em;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.file .cover{background:var(--sheet); padding:5px; box-shadow:2px 3px 0 rgba(40,32,25,.16)}
+.file .cover img{display:block; width:100%; height:74px; object-fit:cover; filter:saturate(.86)}
+.file .cover.vacant{height:84px; display:grid; place-content:center; border:1px dashed var(--ink-ghost);
+  font-family:var(--type); font-size:8.5px; letter-spacing:.12em; color:var(--ink-ghost)}
+.file h2{margin:0; font-family:var(--serif); font-size:clamp(17px,4vw,21px); font-style:italic; font-weight:500}
+.file .vern{margin:1px 0 0; font-family:var(--plaque); font-size:10px; letter-spacing:.2em; color:var(--ink-mid)}
+.file .meta{margin:7px 0 0; font-family:var(--type); font-size:10px; letter-spacing:.06em; color:var(--ink-mid)}
+.file .due{display:inline-block; margin-top:6px; font-family:var(--type); font-size:9.5px; letter-spacing:.1em;
+  border:1px solid var(--ink-mid); padding:2px 8px; color:var(--ink-mid)}
+.file .due.now{border-color:var(--oxblood); color:var(--oxblood)}
+.file:focus-visible{outline:2px solid var(--gilt); outline-offset:3px}
+
+/* ── moving between sheets ────────────────────────────────── */
+.turn{max-width:830px; margin:clamp(20px,4vw,30px) auto 0; display:flex; justify-content:space-between;
+  align-items:center; gap:12px; font-family:var(--plaque); font-size:9.5px; letter-spacing:.2em}
+.turn a{color:var(--gilt); text-decoration:none; padding:11px 4px; text-indent:.2em}
+.turn a:hover{color:#DCC088}
+.turn .all{border:1px solid rgba(176,141,79,.5); padding:11px 16px}
+
+/* ── things arriving, rather than simply being there ──────── */
+.bar .now{animation:needle .85s cubic-bezier(.22,.9,.28,1) both}
+@keyframes needle{from{left:0}}
+.bar .now b{animation:fade .7s .3s ease both}
+.stamp{animation:press .5s .45s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes press{from{transform:rotate(-11deg) scale(2.4); opacity:0}}
+@keyframes fade{from{opacity:0}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}

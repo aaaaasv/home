@@ -133,3 +133,39 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
 
         self.assertIn('<span class="tab">Кактус</span>', page)
         self.assertNotIn("NEPENTHACEAE", page)
+
+    async def test_render_marks_the_newest_plate_as_the_one_on_the_mount(self):
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=9))
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=1))
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
+
+        self.assertEqual(page.count('data-caption="'), 2)
+        self.assertIn('знімок 2 з 2" class="is-mounted"', page)
+        self.assertIn('id="mounted"', page)
+
+    async def test_render_compares_first_and_latest_plate_once_there_are_two(self):
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=9))
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=1))
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
+
+        self.assertIn("Tabula IV · зріст", page)
+        self.assertIn("за 8 діб", page)
+        self.assertIn('id="wipe"', page)
+
+    async def test_render_a_single_plate_offers_no_comparison_to_make(self):
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=1))
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
+
+        self.assertNotIn("Tabula IV", page)
+        self.assertNotIn('id="wipe"', page)
+
+    async def test_render_hands_the_climate_readings_to_the_page_for_scrubbing(self):
+        await self.seed_room_climate_readings(44.0, FROZEN_NOW - timedelta(hours=6), FROZEN_NOW)
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
+
+        self.assertIn('id="climate" data-points=', page)
+        self.assertIn('id="climate-readout"', page)

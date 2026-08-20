@@ -307,6 +307,34 @@ class CarerTally(DomainModel):
     count: int
 
 
+class DrawerEntry(DomainModel):
+    """One folder in the card catalogue — enough to recognise a plant without opening its sheet."""
+
+    id: int
+    slug: str | None
+    name: str
+    species: str | None
+    cover_photo_id: int | None
+    age_days: int
+    days_until_watering: int | None
+
+    @property
+    def reference(self) -> str:
+        return self.slug or str(self.id)
+
+    @classmethod
+    def from_models(cls, plant, watering, cover_photo_id, today) -> "DrawerEntry":
+        return cls(
+            id=plant.id,
+            slug=plant.slug,
+            name=plant.name,
+            species=plant.species,
+            cover_photo_id=cover_photo_id,
+            age_days=max((today - plant.created_at.date()).days, 0),
+            days_until_watering=(watering.next_due_on - today).days if watering else None,
+        )
+
+
 class ClimatePoint(DomainModel):
     hour: str
     temperature_celsius: float
