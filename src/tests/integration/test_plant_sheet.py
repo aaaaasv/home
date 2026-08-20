@@ -142,7 +142,7 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
 
         self.assertEqual(page.count('data-caption="'), 2)
-        self.assertIn('знімок 2 з 2" class="is-mounted"', page)
+        self.assertIn('знімок 2 із 2" class="is-mounted"', page)
         self.assertIn('id="mounted"', page)
 
     async def test_render_compares_first_and_latest_plate_once_there_are_two(self):
@@ -170,3 +170,11 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
 
         self.assertIn('id="climate" data-points=', page)
         self.assertIn('id="climate-readout"', page)
+
+    async def test_render_a_lone_plate_is_captioned_by_date_without_a_one_of_one_count(self):
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=1))
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
+
+        self.assertIn('id="mount-caption">11.vii.2026</figcaption>', page)
+        self.assertNotIn("знімок", page)

@@ -295,6 +295,13 @@ def _gauge(
 <p class="{'warn' if warn else ''}">{verdict}</p></div>"""
 
 
+def _plate_caption(taken_at, index: int, total: int) -> str:
+    """Ordinal only when there is something to count — and «із», because «з» between digits reads as a 3."""
+    if total < 2:
+        return roman_date(taken_at)
+    return f"{roman_date(taken_at)} · знімок {index} із {total}"
+
+
 def _growth(sheet: PlantSheet, photo_url) -> str:
     """First plate against latest — the one comparison a photo archive is actually for."""
     if len(sheet.photos) < 2:
@@ -406,7 +413,7 @@ def render_plant_sheet(
             f'<button class="loupe-btn" id="loupe" type="button" aria-pressed="false" '
             f'aria-label="Лупа">&#9906;</button>'
             f'<figcaption class="mount-cap" id="mount-caption">'
-            f"{roman_date(latest.taken_at)} · знімок {total} з {total}</figcaption></figure>"
+            f"{_plate_caption(latest.taken_at, total, total)}</figcaption></figure>"
         )
         if latest
         else ""
@@ -416,7 +423,7 @@ def render_plant_sheet(
         mounted_now = ' class="is-mounted"' if index == total else ""
         plates += (
             f'<figure data-photo="{photo_url(photo.id)}"'
-            f' data-caption="{roman_date(photo.taken_at)} · знімок {index} з {total}"{mounted_now}>'
+            f' data-caption="{_plate_caption(photo.taken_at, index, total)}"{mounted_now}>'
             f'<div class="card"><img src="{photo_url(photo.id)}" alt="{escape(sheet.name)}"></div>'
             f"<figcaption>{roman_date(photo.taken_at)}</figcaption></figure>"
         )
