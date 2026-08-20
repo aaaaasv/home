@@ -177,19 +177,6 @@ The container runs as uid 1000 so the database stays writable and backup-able fr
 > there is no way to say which version is running. Replacing this with a versioned image build is tracked in
 > Linear.
 
-## Things that were reverse-engineered
-
-If you arrived here searching for one of these, it is the file you want. None is documented publicly
-elsewhere as far as I could find.
-
-| | Where | What was worked out |
-|---|---|---|
-| **hotline.ua prices** | `src/bot/services/hotline_price_source.py` | Product pages are a client-rendered SPA now. Prices come from a GraphQL endpoint that needs a token **only a product page mints — category tokens are rejected**, so one is lifted from the first product under an evergreen category |
-| **Kyiv transit ETA** | `src/modules/transit/services/` | The official GTFS-realtime feed carries vehicle positions but unusable `stop_times`, so arrival is computed from position along the route shape, with direction resolved by which shape endpoint is nearest a configured destination |
-| **Yasno outages** | `src/modules/power/services/yasno_schedule_provider.py` | The planned-outage API's slot semantics — `"Definite"` means power off — and touching slots that must be fused into one interval |
-| **DSTU-signed documents** | `scripts/unwrap_signed_document.py` | Ukrainian official documents arrive as PKCS#7 signed with DSTU 4145, which OpenSSL cannot read — so `openssl smime -verify -noverify` fails. The payload extracts with a plain DER walk and no crypto at all |
-| **EcoFlow Delta 2** | `src/vendor/eflib/` | Not mine — vendored from [rabits/ha-ef-ble](https://github.com/rabits/ha-ef-ble), Apache-2.0. See `src/vendor/eflib/VENDORED.md` |
-
 ## Repository hygiene
 
 Runtime state (`data/`, `*.db`, `photos/`), credentials (`*.password`, `*.key`) and the household's own
