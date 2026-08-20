@@ -99,8 +99,12 @@
      with five tabs on a phone the row scrolls, and the one you are reading
      is the one that should be visible when the page opens. */
   const here = one(".tabs .tab.here");
-  if (here && here.parentElement.scrollWidth > here.parentElement.clientWidth) {
-    here.scrollIntoView({ block: "nearest", inline: "center" });
+  if (here) {
+    const row = here.parentElement;
+    // scrollIntoView would scroll every scrollable ancestor, the document included; only the row should move
+    if (row.scrollWidth > row.clientWidth) {
+      row.scrollLeft = here.offsetLeft - (row.clientWidth - here.offsetWidth) / 2;
+    }
   }
 
   /* ── the growth wipe ───────────────────────────────────────────────────
