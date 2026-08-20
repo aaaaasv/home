@@ -17,6 +17,7 @@ from src.modules.plant_care.commands import RecordCareEventCommand
 from src.modules.plant_care.use_cases.record_care_event import RecordCareEventUseCase
 from src.modules.plant_care.use_cases.retrieve_drawer import RetrieveDrawerUseCase
 from src.modules.plant_care.use_cases.retrieve_plant_sheet import RetrievePlantSheetUseCase
+from src.web.rendering import ACTIONABLE_TASKS as WEB_ACTIONABLE_TASKS
 from src.web.rendering import render_drawer, render_plant_sheet
 
 logger = logging.getLogger(__name__)
@@ -54,35 +55,41 @@ def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) 
             raise web.HTTPNotFound()
         return web.FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
-    async def record_watering(request: web.Request) -> web.Response:
+    async def record_care(request: web.Request) -> web.Response:
         reference = request.match_info["reference"]
+        try:
+            task_type = CareTaskType(request.match_info["task"])
+        except ValueError:
+            raise web.HTTPNotFound()
+        if task_type not in WEB_ACTIONABLE_TASKS:
+            raise web.HTTPNotFound()
         async with uow_factory() as uow:
             plant = await uow.plants.retrieve_active_by_slug(reference)
+            if plant is None and reference.isdigit():
+                plant = await uow.plants.retrieve_active(int(reference))
         if plant is None:
             raise web.HTTPNotFound()
-        plant_id = plant.id
-        actor = settings.web_actor
         try:
             await RecordCareEventUseCase(
                 uow=uow_factory(),
-                actor=actor,
+                actor=settings.web_actor,
                 household_calendar=household_calendar,
                 recent_care_guard_hours=settings.RECENT_CARE_GUARD_HOURS,
             )(
                 RecordCareEventCommand(
-                    plant_id=plant_id,
-                    task_type=CareTaskType.WATERING,
+                    plant_id=plant.id,
+                    task_type=task_type,
                     performed_at=household_calendar.now(),
                     force=True,
                 )
             )
         except DomainError as error:
-            logger.warning("Web watering refused for plant %s: %s", plant_id, error)
+            logger.warning("Web %s refused for plant %s: %s", task_type.value, plant.id, error)
         raise web.HTTPFound(f"/p/{reference}")
 
     application.router.add_get("/", drawer)
     application.router.add_get("/p/{reference:[a-z0-9-]+}", plant_sheet)
-    application.router.add_post("/p/{reference:[a-z0-9-]+}/water", record_watering)
+    application.router.add_post("/p/{reference:[a-z0-9-]+}/care/{task:[a-z]+}", record_care)
     application.router.add_get("/photo/{photo_id:\\d+}", plant_photo)
     return application
 

@@ -12,8 +12,9 @@ body{
   margin:0; background:var(--drawer); color:var(--ink);
   font-family:var(--serif); font-size:17px; line-height:1.55;
   background-image:
-    repeating-linear-gradient(91deg, rgba(0,0,0,.22) 0 1px, transparent 1px 7px),
-    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(176,141,79,.10), transparent 72%);
+    repeating-linear-gradient(91deg, rgba(0,0,0,.2) 0 1px, transparent 1px 7px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Cg fill='none' stroke='%23B08D4F' stroke-opacity='.07'%3E%3Cpath d='M32 1 L63 32 L32 63 L1 32 Z'/%3E%3Ccircle cx='32' cy='32' r='8'/%3E%3Cpath d='M32 12 L32 20 M32 44 L32 52 M12 32 L20 32 M44 32 L52 32'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(176,141,79,.13), transparent 72%);
   padding:clamp(12px,3.4vw,44px) clamp(8px,2.6vw,26px) clamp(44px,9vw,92px);
 }
 .drawer-tag{max-width:830px; margin:0 auto clamp(30px,2.6vw,34px); display:flex; justify-content:space-between; align-items:baseline; gap:14px; font-family:var(--plaque); font-size:10.5px; letter-spacing:.32em; color:var(--gilt); text-indent:.32em}
@@ -23,7 +24,8 @@ body{
 /* ── manila folder ───────────────────────────────────────── */
 .folder{position:relative; max-width:830px; margin:0 auto; background:var(--manila);
   padding:clamp(13px,2.6vw,22px) clamp(11px,2.4vw,20px) clamp(18px,3vw,26px);
-  box-shadow:0 30px 70px rgba(0,0,0,.62), inset 0 1px 0 var(--manila-edge);
+  box-shadow:0 30px 70px rgba(0,0,0,.62), inset 0 1px 0 var(--manila-edge),
+    inset 0 0 0 1px rgba(176,141,79,.34);
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23f)' opacity='.09'/%3E%3C/svg%3E");
 }
 .folder > .tab{position:absolute; top:-25px; left:clamp(20px,7vw,64px); max-width:calc(100% - clamp(40px,14vw,128px));
@@ -126,7 +128,11 @@ body{
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* ── engraved plates: rhythm + trace ─────────────────────── */
-.plate-block{border-top:1px solid var(--ink-mid); margin-top:clamp(16px,3vw,24px); padding-top:13px}
+.plate-block{position:relative; margin-top:clamp(22px,4vw,34px); padding-top:22px}
+.plate-block::before{content:""; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,var(--ink-mid) 14%,var(--ink-mid) 86%,transparent)}
+.plate-block::after{content:""; position:absolute; top:-4px; left:50%; margin-left:-4.5px; width:9px; height:9px;
+  transform:rotate(45deg); background:var(--gilt); box-shadow:0 0 0 4px var(--sheet)}
 .plate-block h3{margin:0 0 3px; font-family:var(--plaque); font-size:10px; letter-spacing:.22em; color:var(--ink); font-weight:600; text-indent:.22em}
 .plate-block .sub{margin:0 0 11px; font-family:var(--type); font-size:10px; color:var(--ink-ghost); letter-spacing:.04em}
 .plate-block svg{display:block; width:100%; height:auto}
@@ -288,3 +294,61 @@ body{
 
 /* ── the confirming tap in front of the action ───────────── */
 .act .ask{margin:0 0 11px; font-family:var(--serif); font-size:16px; font-style:italic; color:var(--gilt)}
+
+/* ── the sheet's own furniture: keyline, corner lozenges, blind stamp ── */
+.sheet > *{position:relative; z-index:1}
+.sheet::before{content:""; position:absolute; inset:8px; pointer-events:none; z-index:1;
+  border:1px solid rgba(106,92,72,.34);
+  box-shadow:inset 0 0 0 3px var(--sheet), inset 0 0 0 4px rgba(176,141,79,.42);
+  background-repeat:no-repeat;
+  background-position:left -5px top -5px, right -5px top -5px, left -5px bottom -5px, right -5px bottom -5px;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Cpath d='M5 0 L10 5 L5 10 L0 5 Z' fill='%23B08D4F'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Cpath d='M5 0 L10 5 L5 10 L0 5 Z' fill='%23B08D4F'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Cpath d='M5 0 L10 5 L5 10 L0 5 Z' fill='%23B08D4F'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Cpath d='M5 0 L10 5 L5 10 L0 5 Z' fill='%23B08D4F'/%3E%3C/svg%3E")}
+.sheet::after{content:"HD"; position:absolute; top:50%; left:50%; z-index:0; pointer-events:none;
+  transform:translate(-50%,-50%) rotate(-8deg); font-family:var(--plaque); font-weight:600;
+  font-size:min(44vw,300px); line-height:1; letter-spacing:.06em; color:rgba(106,92,72,.05)}
+
+/* ── the binomial as the hero it should be ───────────────── */
+.binomial .fam{display:flex; align-items:center; justify-content:center; gap:clamp(9px,2.4vw,16px)}
+.binomial .fam::before,.binomial .fam::after{content:""; height:1px; flex:0 1 clamp(24px,10vw,86px);
+  background:linear-gradient(90deg,transparent,var(--ink-mid))}
+.binomial .fam::after{background:linear-gradient(90deg,var(--ink-mid),transparent)}
+.binomial h2{text-wrap:balance}
+.binomial .vern{position:relative; padding-bottom:15px}
+.binomial .vern::after{content:""; position:absolute; left:50%; bottom:0; margin-left:-27px; width:54px; height:1px;
+  background:var(--gilt)}
+.binomial .vern::before{content:""; position:absolute; left:50%; bottom:-3px; margin-left:-3.5px; width:7px;
+  height:7px; transform:rotate(45deg); background:var(--gilt); box-shadow:0 0 0 3px var(--sheet); z-index:1}
+
+/* ── ruled form paper behind the label, and an initial in the packet ── */
+.label{background-image:repeating-linear-gradient(180deg,transparent 0 21px,rgba(106,92,72,.075) 21px 22px)}
+.packet p::first-letter{float:left; font-family:var(--serif); font-size:36px; line-height:.8; padding:5px 8px 0 0;
+  color:var(--oxblood); font-style:normal}
+
+/* ── regimen rows now carry their own action ─────────────── */
+.regimen .rows li{grid-template-columns:1fr auto;
+  grid-template-areas:"what every" "when state" "deed deed"}
+.regimen .what{grid-area:what}
+.regimen .every{grid-area:every}
+.regimen .when{grid-area:when}
+.regimen .state{grid-area:state}
+.regimen .deed{grid-area:deed; margin-top:7px}
+@media(min-width:600px){
+  .regimen .rows li{grid-template-columns:1fr auto minmax(96px,auto);
+    grid-template-areas:"what every deed" "when state deed"; align-items:center}
+  .regimen .deed{margin-top:0; justify-self:end}
+}
+.regimen .do{display:inline-block}
+.regimen .do summary{list-style:none; cursor:pointer; display:inline-block; font-family:var(--plaque);
+  font-size:9px; letter-spacing:.18em; text-indent:.18em; color:var(--drawer); padding:9px 15px;
+  background:linear-gradient(180deg,#DCC088,var(--gilt)); box-shadow:0 2px 6px rgba(40,32,25,.32);
+  -webkit-tap-highlight-color:transparent}
+.regimen .do summary::-webkit-details-marker{display:none}
+.regimen .do[open] summary{background:linear-gradient(180deg,var(--gilt),#8E7238)}
+.regimen .do form{margin-top:7px}
+.regimen .do button{font-family:var(--plaque); font-size:9px; letter-spacing:.16em; text-indent:.16em;
+  padding:9px 14px; border:1px solid var(--ink-mid); background:transparent; color:var(--ink); cursor:pointer}
+.regimen .do button:hover{background:var(--ink); color:var(--sheet)}

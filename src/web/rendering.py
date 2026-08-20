@@ -48,7 +48,13 @@ TASK_NAMES = {
 PAST_TASK_NAMES = {
     CareTaskType.WATERING: "Полито",
     CareTaskType.FERTILIZING: "Підживлено",
+    CareTaskType.FLUSH: "Промито",
+    CareTaskType.ROTATING: "Повернуто",
+    CareTaskType.REPOTTING: "Пересаджено",
+    CareTaskType.PHOTO: "Знято",
 }
+# a photograph is completed by uploading one, which a sheet in a browser cannot do
+ACTIONABLE_TASKS = frozenset(TASK_NAMES) - {CareTaskType.PHOTO}
 # the order a person thinks about care in, not the order the enum happens to declare
 REGIMEN_ORDER = (
     CareTaskType.WATERING,
@@ -160,18 +166,12 @@ def _climate_plate(points: list[ClimatePoint], humidity_floor: float | None) -> 
 
 
 def _label(sheet: PlantSheet) -> str:
-    watering = sheet.watering
     rows = [
         ("Надійшов", f"{roman_date(sheet.created_at)} · {sheet.age_days} діб у домі"),
         ("Походження", _blank(sheet.provenance)),
         ("Локалітет", _blank(sheet.location)),
         ("Субстрат", _blank(sheet.substrate)),
     ]
-    if watering is not None:
-        rows.append(("Полив", f"кожні {watering.interval_days} дн. · далі {roman_date(watering.next_due_on)}"))
-    for schedule in sheet.schedules:
-        if schedule.task_type is CareTaskType.REPOTTING:
-            rows.append(("Пересадка", roman_date(schedule.next_due_on)))
     rows.append(("Токсичність", _blank(sheet.toxicity)))
     fields = "".join(f"<dt>{escape(name)}</dt><dd>{value}</dd>" for name, value in rows)
     return f"""<div class="label"><h3>Hortus Domesticus</h3><dl>{fields}</dl>
@@ -214,29 +214,52 @@ def _due_state(days_until_due: int) -> tuple[str, bool]:
 
 
 def _regimen(sheet: PlantSheet) -> str:
-    """Every kind of care this plant is on, not only the watering the card had room for."""
+    """
+    Every kind of care in one place, each row carrying its own button.
+
+    care used to be told five times over — once in the label, once here, once by the rhythm plate, once on
+    the slips and once beside a lone watering button. This is the one that owns it.
+    """
     if not sheet.schedules:
         return ""
     order = {task: position for position, task in enumerate(REGIMEN_ORDER)}
+    last_by_task = {}
+    for event in reversed(sheet.recent_events):
+        last_by_task[event.task_type] = event
     rows, notes = [], []
     for schedule in sorted(sheet.schedules, key=lambda s: order.get(s.task_type, len(order))):
         name = TASK_NAMES.get(schedule.task_type, str(schedule.task_type))
         state, late = _due_state(schedule.days_until_due)
-        last = roman_date(schedule.last_performed_at) if schedule.last_performed_at else "ще не було"
+        performed = last_by_task.get(schedule.task_type)
+        if performed is not None:
+            done = f"востаннє {roman_date(performed.performed_at)} · {escape(performed.performed_by_display_name)}"
+        elif schedule.last_performed_at is not None:
+            done = f"востаннє {roman_date(schedule.last_performed_at)}"
+        else:
+            done = "ще не робили"
+        action = ""
+        if schedule.task_type in ACTIONABLE_TASKS:
+            verb = PAST_TASK_NAMES.get(schedule.task_type, name)
+            action = (
+                f'<details class="do"><summary>{escape(verb)}</summary>'
+                f'<form method="post" action="care/{schedule.task_type.value}">'
+                f'<button type="submit">Так, записати</button></form></details>'
+            )
         late_mark = ' class="late"' if late else ""
         rows.append(
             f"<li{late_mark}>"
             f'<span class="what">{escape(name)}</span>'
             f'<span class="every">раз на {schedule.interval_days} дн.</span>'
-            f'<span class="when">востаннє {last} · далі {roman_date(schedule.next_due_on)}</span>'
-            f'<span class="state">{state}</span></li>'
+            f'<span class="when">{done}</span>'
+            f'<span class="state">далі {roman_date(schedule.next_due_on)} · {state}</span>'
+            f'<span class="deed">{action}</span></li>'
         )
         if schedule.instructions:
             notes.append(f"<p><b>{escape(name)}.</b> {escape(schedule.instructions)}</p>")
     footnotes = f'<div class="notes">{"".join(notes)}</div>' if notes else ""
     return (
         f'<section class="plate-block regimen"><h3>Regimen · розпис догляду</h3>'
-        f'<p class="sub">Кожен вид догляду, його період і коли настане наступний. Червоне — прострочено.</p>'
+        f'<p class="sub">Що, як часто, коли востаннє й ким. Червоне — прострочено.</p>'
         f'<ol class="rows">{"".join(rows)}</ol>{footnotes}</section>'
     )
 
@@ -450,21 +473,6 @@ def render_plant_sheet(
     )
     watering = sheet.watering
     rhythm = _rhythm_plate(sheet.watering_gaps_days, watering.interval_days) if watering else ""
-    last = next((e for e in sheet.recent_events if e.task_type is CareTaskType.WATERING), None)
-    note = (
-        f"Останній — {roman_date(last.performed_at)}, {escape(last.performed_by_display_name)}"
-        if last
-        else "Ще не поливали"
-    )
-    # a details/summary reveal, so the second deliberate tap needs no javascript
-    action = (
-        f'<div class="act"><details>'
-        f"<summary>Записати полив</summary>"
-        f'<form method="post" action="water">'
-        f'<p class="ask">Точно полито?</p>'
-        f'<button type="submit">Так, записати</button>'
-        f"</form></details><p>{note}</p></div>"
-    )
     return f"""<!doctype html>
 <html lang="uk">
 <head>
@@ -511,7 +519,6 @@ def render_plant_sheet(
 <section class="contact"><h2>Зібрання таблиць</h2>
   <p>{len(sheet.photos)} знімк{"ів" if len(sheet.photos) != 1 else "ок"} · доглядає {bot_name}</p>
   <div class="strip">{plates}</div></section>
-{action}
 {_turn(find_neighbours(drawer, sheet.id))}
 <script>{SCRIPT}</script>
 </body>

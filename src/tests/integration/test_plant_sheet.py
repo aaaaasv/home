@@ -77,12 +77,35 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         self.assertIn("Домовик", page)
         self.assertIn(roman_date(FROZEN_NOW - timedelta(days=30)), page)
 
-    async def test_render_puts_the_watering_button_behind_one_confirming_tap(self):
-        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
+    async def test_render_gives_every_actionable_care_type_its_own_confirming_button(self):
+        await self.seed_care_schedule(
+            plant_id=self.plant_id, task_type=CareTaskType.FERTILIZING, interval_days=14, next_due_on=self.today
+        )
 
-        self.assertIn("<summary>Записати полив</summary>", page)
-        self.assertIn('<p class="ask">Точно полито?</p>', page)
-        self.assertIn('<button type="submit">Так, записати</button>', page)
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertIn('<form method="post" action="care/watering"><button type="submit">Так, записати</button>', page)
+        self.assertIn('<form method="post" action="care/fertilizing">', page)
+        self.assertIn("<summary>Полито</summary>", page)
+        self.assertIn("<summary>Підживлено</summary>", page)
+
+    async def test_render_offers_no_button_for_a_photo_because_a_page_cannot_take_one(self):
+        await self.seed_care_schedule(
+            plant_id=self.plant_id, task_type=CareTaskType.PHOTO, interval_days=30, next_due_on=self.today
+        )
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertIn("Знімок", page)
+        self.assertNotIn('action="care/photo"', page)
+
+    async def test_render_tells_the_watering_story_only_inside_the_regimen(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        # the label used to repeat the schedule the regimen already owns
+        self.assertNotIn("<dt>Полив</dt>", page)
+        self.assertNotIn("<dt>Пересадка</dt>", page)
+        self.assertEqual(page.count('action="care/watering"'), 1)
 
     async def test_render_asks_for_no_password_at_all(self):
         page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
