@@ -330,16 +330,15 @@ body{
 
 /* ── regimen rows now carry their own action ─────────────── */
 .regimen .rows li{grid-template-columns:1fr auto;
-  grid-template-areas:"what every" "when state" "deed deed"}
+  grid-template-areas:"what every" "when state" "deed deed" "note note"}
 .regimen .what{grid-area:what}
 .regimen .every{grid-area:every}
 .regimen .when{grid-area:when}
 .regimen .state{grid-area:state}
 .regimen .deed{grid-area:deed; margin-top:7px}
 @media(min-width:600px){
-  .regimen .rows li{grid-template-columns:1fr auto minmax(96px,auto);
-    grid-template-areas:"what every deed" "when state deed"; align-items:center}
-  .regimen .deed{margin-top:0; justify-self:end}
+  .regimen .rows li{grid-template-columns:1fr auto;
+    grid-template-areas:"what every" "when state" "deed deed" "note note"}
 }
 .regimen .do{display:inline-block}
 .regimen .do summary{list-style:none; cursor:pointer; display:inline-block; font-family:var(--plaque);
@@ -352,3 +351,20 @@ body{
 .regimen .do button{font-family:var(--plaque); font-size:9px; letter-spacing:.16em; text-indent:.16em;
   padding:9px 14px; border:1px solid var(--ink-mid); background:transparent; color:var(--ink); cursor:pointer}
 .regimen .do button:hover{background:var(--ink); color:var(--sheet)}
+
+/* ── one line of equal buttons per row, notes beneath ────── */
+.regimen .deed{display:flex; justify-content:flex-end; align-items:flex-start; gap:8px; margin-top:9px}
+.regimen .deed > *{flex:0 0 auto}
+/* both controls share a width so the column of buttons reads as a column */
+.regimen .info,
+.regimen .do summary{min-width:124px; text-align:center; box-sizing:border-box}
+.regimen .info{font-family:var(--plaque); font-size:9px; letter-spacing:.18em; text-indent:.18em; padding:9px 14px;
+  border:1px solid var(--ink-mid); background:transparent; color:var(--ink-mid); cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+.regimen .info:hover{border-color:var(--ink); color:var(--ink)}
+.regimen .info[aria-expanded="true"]{background:var(--sheet-shade); color:var(--ink); border-color:var(--ink)}
+.regimen .info:focus-visible,.regimen .do summary:focus-visible{outline:2px solid var(--gilt); outline-offset:2px}
+.regimen .note{grid-area:note; margin-top:10px; padding:11px 13px; background:rgba(247,242,228,.72);
+  border-left:2px solid var(--green); font-family:var(--type); font-size:10.5px; line-height:1.7;
+  color:var(--ink-mid); letter-spacing:.02em}
+.regimen .note[hidden]{display:none}

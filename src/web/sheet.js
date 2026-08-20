@@ -107,6 +107,21 @@
     }
   }
 
+  /* ── per-row care notes ────────────────────────────────────────────────
+     the note ships visible so a page with no script still shows it; the
+     button only takes over once there is something to toggle with. */
+  all(".regimen .info").forEach((button) => {
+    const note = document.getElementById(button.getAttribute("aria-controls"));
+    if (!note) return;
+    note.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+    button.addEventListener("click", () => {
+      const open = note.hidden;
+      note.hidden = !open;
+      button.setAttribute("aria-expanded", String(open));
+    });
+  });
+
   /* ── the growth wipe ───────────────────────────────────────────────────
      a range input rather than a custom drag: it is already touch-sized,
      keyboard-reachable, and sits at 50% with no script at all. */

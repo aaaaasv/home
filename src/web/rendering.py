@@ -39,7 +39,7 @@ CALIBRATION_SWATCHES = (
 )
 TASK_NAMES = {
     CareTaskType.WATERING: "Полив",
-    CareTaskType.FERTILIZING: "Живлення",
+    CareTaskType.FERTILIZING: "Підживлення",
     CareTaskType.REPOTTING: "Пересадка",
     CareTaskType.FLUSH: "Промивання",
     CareTaskType.ROTATING: "Поворот",
@@ -215,7 +215,7 @@ def _due_state(days_until_due: int) -> tuple[str, bool]:
 
 def _regimen(sheet: PlantSheet) -> str:
     """
-    Every kind of care in one place, each row carrying its own button.
+    Every kind of care in one place, each row carrying its own buttons.
 
     care used to be told five times over — once in the label, once here, once by the rhythm plate, once on
     the slips and once beside a lone watering button. This is the one that owns it.
@@ -226,25 +226,37 @@ def _regimen(sheet: PlantSheet) -> str:
     last_by_task = {}
     for event in reversed(sheet.recent_events):
         last_by_task[event.task_type] = event
-    rows, notes = [], []
+    rows = []
     for schedule in sorted(sheet.schedules, key=lambda s: order.get(s.task_type, len(order))):
-        name = TASK_NAMES.get(schedule.task_type, str(schedule.task_type))
+        task = schedule.task_type
+        name = TASK_NAMES.get(task, str(task))
         state, late = _due_state(schedule.days_until_due)
-        performed = last_by_task.get(schedule.task_type)
+        performed = last_by_task.get(task)
         if performed is not None:
             done = f"востаннє {roman_date(performed.performed_at)} · {escape(performed.performed_by_display_name)}"
         elif schedule.last_performed_at is not None:
             done = f"востаннє {roman_date(schedule.last_performed_at)}"
         else:
             done = "ще не робили"
-        action = ""
-        if schedule.task_type in ACTIONABLE_TASKS:
-            verb = PAST_TASK_NAMES.get(schedule.task_type, name)
-            action = (
+        buttons = ""
+        if schedule.instructions:
+            # aria-expanded starts true and the note is visible; the script hides it and takes over the toggle
+            buttons += (
+                f'<button class="info" type="button" aria-expanded="true" '
+                f'aria-controls="note-{task.value}">Деталі</button>'
+            )
+        if task in ACTIONABLE_TASKS:
+            verb = PAST_TASK_NAMES.get(task, name)
+            buttons += (
                 f'<details class="do"><summary>{escape(verb)}</summary>'
-                f'<form method="post" action="care/{schedule.task_type.value}">'
+                f'<form method="post" action="care/{task.value}">'
                 f'<button type="submit">Так, записати</button></form></details>'
             )
+        note = (
+            f'<div class="note" id="note-{task.value}">{escape(schedule.instructions)}</div>'
+            if schedule.instructions
+            else ""
+        )
         late_mark = ' class="late"' if late else ""
         rows.append(
             f"<li{late_mark}>"
@@ -252,15 +264,12 @@ def _regimen(sheet: PlantSheet) -> str:
             f'<span class="every">раз на {schedule.interval_days} дн.</span>'
             f'<span class="when">{done}</span>'
             f'<span class="state">далі {roman_date(schedule.next_due_on)} · {state}</span>'
-            f'<span class="deed">{action}</span></li>'
+            f'<span class="deed">{buttons}</span>{note}</li>'
         )
-        if schedule.instructions:
-            notes.append(f"<p><b>{escape(name)}.</b> {escape(schedule.instructions)}</p>")
-    footnotes = f'<div class="notes">{"".join(notes)}</div>' if notes else ""
     return (
         f'<section class="plate-block regimen"><h3>Regimen · розпис догляду</h3>'
         f'<p class="sub">Що, як часто, коли востаннє й ким. Червоне — прострочено.</p>'
-        f'<ol class="rows">{"".join(rows)}</ol>{footnotes}</section>'
+        f'<ol class="rows">{"".join(rows)}</ol></section>'
     )
 
 

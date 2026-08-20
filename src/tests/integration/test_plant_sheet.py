@@ -201,3 +201,30 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
 
         self.assertIn('id="mount-caption">11.vii.2026</figcaption>', page)
         self.assertNotIn("знімок", page)
+
+    async def test_render_names_fertilizing_the_way_a_gardener_would(self):
+        await self.seed_care_schedule(
+            plant_id=self.plant_id, task_type=CareTaskType.FERTILIZING, interval_days=30, next_due_on=self.today
+        )
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertIn("Підживлення", page)
+        self.assertNotIn("Живлення<", page)
+
+    async def test_render_puts_care_instructions_behind_a_details_button_on_their_own_row(self):
+        async with self.uow as uow:
+            schedule = await uow.care_schedules.retrieve_for_plant(self.plant_id, CareTaskType.WATERING)
+            schedule.instructions = "Поливай, коли верхні 1–2 см ґрунту підсохли"
+            await uow.commit()
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertIn('aria-controls="note-watering">Деталі</button>', page)
+        self.assertIn('<div class="note" id="note-watering">Поливай, коли верхні 1–2 см ґрунту підсохли</div>', page)
+
+    async def test_render_offers_no_details_button_for_care_with_no_instructions(self):
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
+
+        self.assertNotIn("Деталі", page)
+        self.assertNotIn('class="note"', page)
