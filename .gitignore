@@ -43,3 +43,6 @@ home-infrastructure/
 
 # local deploy target — your host, not the repo's
 Makefile.local
+
+# the youtube family ledger — friends' initials and what they owe
+YT.csv
