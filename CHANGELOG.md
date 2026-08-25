@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Deploys now ship a built image with a version on it instead of whatever happened to be in the working
+  tree, so what runs on the Pi can be named. The Pi stops compiling anything.
+
 ### Added
 
 - Сторінка рослини у браузері — гербарний аркуш з фото, ритмом поливу, мікрокліматом кімнати й тим, хто
