@@ -102,7 +102,7 @@ class Settings(BaseSettings):
 
     # presence: the router's local api tells the bot which phones are on Wi-Fi, to catch "everyone left, ac still on"
     PRESENCE_ENABLED: bool = False
-    ROUTER_HOST: str = "192.168.50.1"
+    ROUTER_HOST: str = ""
     ROUTER_USERNAME: str = ""
     ROUTER_PASSWORD: str = ""
     PRESENCE_PHONE_MACS: str = ""
