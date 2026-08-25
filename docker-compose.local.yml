@@ -1,0 +1,7 @@
+# Local development only: builds the image instead of pulling one.
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+services:
+  bot:
+    build: .
+    image: home-bot:local
+    pull_policy: never

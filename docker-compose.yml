@@ -1,8 +1,10 @@
 services:
   bot:
-    build: .
-    image: home-bot:latest
+    # no build here on purpose: the pi runs a published image and never compiles. use
+    # docker-compose.local.yml to build on this machine instead
+    image: ${BOT_IMAGE:-ghcr.io/aaaaasv/home-bot}:${BOT_VERSION:-latest}
     container_name: home-bot
+    pull_policy: always
     # run as the host user so the sqlite file and photos stay writable/backupable from outside the container
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     env_file: .env
