@@ -1,5 +1,5 @@
 from src.common.use_case import BaseUseCase
-from src.modules.plant_care.services.room_climate_sensor import RoomClimate
+from src.modules.room_climate.domain import RoomClimate
 
 
 class RetrieveRoomClimateUseCase(BaseUseCase):

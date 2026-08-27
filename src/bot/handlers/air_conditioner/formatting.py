@@ -16,7 +16,7 @@ from src.bot.handlers.air_conditioner.messages import (
     AIR_CONDITIONER_UPDATED_AT,
 )
 from src.modules.air_conditioner.domain import AirConditionerRuntimeNotice, AirConditionerState
-from src.modules.plant_care.services.room_climate_sensor import RoomClimate
+from src.modules.room_climate.domain import RoomClimate
 from src.modules.weather.domain import VentilationEffect
 
 

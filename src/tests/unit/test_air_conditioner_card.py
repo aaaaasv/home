@@ -10,7 +10,7 @@ from src.bot.handlers.air_conditioner.keyboards import (
     build_air_conditioner_stop_keyboard,
 )
 from src.modules.air_conditioner.domain import AirConditionerFanSpeed, AirConditionerMode, AirConditionerState
-from src.modules.plant_care.services.room_climate_sensor import RoomClimate
+from src.modules.room_climate.domain import RoomClimate
 from src.modules.weather.domain import VentilationEffect
 
 MOMENT = datetime(2026, 7, 20, 12, 47, tzinfo=ZoneInfo("Europe/Kyiv"))

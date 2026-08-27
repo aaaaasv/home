@@ -6,7 +6,7 @@ from src.common.config import Settings
 from src.common.constants import ClimateDimension, ClimateStatus
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.plant_care.services.room_climate_sensor import RoomClimate
+from src.modules.room_climate.domain import RoomClimate
 from src.tests.fakes import FixedRoomClimateSensor, RecordingBot, StubForumTopic
 from src.tests.integration.base import BaseIntegrationTestCase
 

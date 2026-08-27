@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Room climate is its own module instead of a part of plant care. The air-conditioner card and the weather
+  digest were reading the room through the plants; now nothing outside `plant_care` mentions plants to ask
+  what the air is doing.
+
 - The six clients that talk to the outside world — Open-Meteo, Yasno, the transit feeds, Gemini — moved out of
   the domain into `src/infrastructure/adapters/`, along with the code that reads each vendor's payload shape.
   A vendor changing their JSON now stops at the adapter instead of reaching into the domain.

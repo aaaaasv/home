@@ -15,10 +15,10 @@ from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
-from src.modules.plant_care.services.room_climate_sensor import RoomClimateSensor
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.presence.services.presence_source import PresenceSource
+from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
 from src.modules.shopping.services.price_source import PriceSource
 from src.modules.system_health.services.pi_health_sensor import PiHealthSensor
 from src.modules.transit.services.route_shape_catalog import RouteShapeCatalog

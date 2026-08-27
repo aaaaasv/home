@@ -37,9 +37,9 @@ from src.modules.assistant.services.language_model import LanguageModel
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
 from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 from src.modules.plant_care.services.photo_storage import NullPhotoStorage, PhotoStorage
-from src.modules.plant_care.services.room_climate_sensor import NullRoomClimateSensor, RoomClimateSensor
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
 from src.modules.presence.services.presence_source import NullPresenceSource, PresenceSource
+from src.modules.room_climate.services.room_climate_sensor import NullRoomClimateSensor, RoomClimateSensor
 from src.modules.shopping.domain import ReputabilityPolicy
 from src.modules.system_health.services.pi_health_sensor import NullPiHealthSensor, PiHealthSensor
 from src.modules.transit.domain import GeoPoint, StopLocation, parse_watched_routes

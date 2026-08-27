@@ -34,7 +34,7 @@ from src.bot.handlers.weather.messages import (
     WIND_NOTABLE_THRESHOLD_METERS_PER_SECOND,
     WIND_STRONGEST_LABEL,
 )
-from src.modules.plant_care.services.room_climate_sensor import RoomClimate
+from src.modules.room_climate.domain import RoomClimate
 from src.modules.weather.domain import PollenReading, VentilationEffect, WeatherReport
 
 

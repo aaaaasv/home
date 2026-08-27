@@ -26,8 +26,8 @@ from src.common.config import Settings
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.air_conditioner.domain import AirConditionerState
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
-from src.modules.plant_care.services.room_climate_sensor import RoomClimate
-from src.modules.plant_care.use_cases.retrieve_room_climate import RetrieveRoomClimateUseCase
+from src.modules.room_climate.domain import RoomClimate
+from src.modules.room_climate.use_cases.retrieve_room_climate import RetrieveRoomClimateUseCase
 from src.modules.weather.domain import VentilationEffect
 from src.modules.weather.services.ventilation import resolve_ventilation_effect
 from src.modules.weather.services.weather_provider import WeatherProvider

@@ -2,8 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 from src.common.constants import ClimateComfortTransition, ClimateDimension, ClimateStatus
 from src.modules.plant_care.domain import ClimateProblem
-from src.modules.plant_care.services.room_climate_sensor import RoomClimate
 from src.modules.plant_care.use_cases.evaluate_plant_climate import EvaluatePlantClimateUseCase
+from src.modules.room_climate.domain import RoomClimate
 from src.tests.fakes import FixedRoomClimateSensor
 from src.tests.integration.base import BaseIntegrationTestCase
 
