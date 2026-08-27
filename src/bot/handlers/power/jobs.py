@@ -4,12 +4,17 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, tzinfo
 
 from aiogram import Bot
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.handlers.power.messages import POWER_OUTAGE_EMERGENCY, POWER_OUTAGE_SOON
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
+from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND, OUTAGE_PING_KIND, PostedMessageTracker
 from src.common.config import Settings
+from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.yasno_schedule_provider import (
@@ -140,3 +145,79 @@ class YasnoScheduleJob:
     async def _already_posted(self, kind: str, reference: str) -> bool:
         async with self.uow_factory() as uow:
             return bool(await uow.posted_messages.list_by_reference(kind, reference))
+
+
+def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """Poll the station on its own cadence and follow the outage schedule on its — each switched on separately."""
+    _register_station_jobs(scheduler, context)
+    _register_outage_schedule_jobs(scheduler, context)
+
+
+def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    settings = context.settings
+    if not settings.ECOFLOW_ENABLED or context.ecoflow_station is None:
+        return
+
+    ecoflow_poll_job = EcoFlowPollJob(
+        ecoflow_station=context.ecoflow_station,
+        uow_factory=context.uow_factory,
+        timezone=settings.timezone,
+        conserved_after=timedelta(minutes=settings.ECOFLOW_CONSERVED_AFTER_MINUTES),
+    )
+    # no boot run: the held-open link needs a moment to come up, and a None read before it does would read as
+    # "shelved" — the first sample at +interval lands after the link is established
+    scheduler.add_job(
+        ecoflow_poll_job.__call__,
+        trigger=IntervalTrigger(minutes=settings.ECOFLOW_POLL_MINUTES),
+        id="ecoflow_poll",
+        replace_existing=True,
+    )
+    # the conservation regime rides on those same ble reads — its card only speaks while the station is shelved
+    if context.conservation_board is not None:
+        scheduler.add_job(
+            context.conservation_board.refresh,
+            trigger=IntervalTrigger(hours=settings.ECOFLOW_CONSERVATION_CHECK_HOURS),
+            next_run_time=current_time(),
+            misfire_grace_time=120,
+            id="ecoflow_conservation",
+            replace_existing=True,
+        )
+
+
+def _register_outage_schedule_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    settings = context.settings
+    if (
+        not settings.YASNO_ENABLED
+        or context.power_topic is None
+        or context.schedule_provider is None
+        or context.outage_schedule_board is None
+    ):
+        return
+
+    # a fresh board each morning — silent when nothing is planned
+    yasno_digest_time = settings.yasno_digest_time
+    scheduler.add_job(
+        context.outage_schedule_board.post,
+        trigger=CronTrigger(hour=yasno_digest_time.hour, minute=yasno_digest_time.minute),
+        id="outage_schedule_post",
+        replace_existing=True,
+    )
+    yasno_job = YasnoScheduleJob(
+        bot=context.bot,
+        chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+        power_topic=context.power_topic,
+        uow_factory=context.uow_factory,
+        schedule_provider=context.schedule_provider,
+        outage_schedule_board=context.outage_schedule_board,
+        settings=settings,
+        timezone=settings.timezone,
+    )
+    scheduler.add_job(
+        yasno_job.__call__,
+        trigger=IntervalTrigger(minutes=settings.YASNO_POLL_MINUTES),
+        # run once on boot (grace window so a slow startup does not skip it), so a mid-day restart catches an outage
+        next_run_time=current_time(),
+        misfire_grace_time=120,
+        id="yasno_schedule",
+        replace_existing=True,
+    )

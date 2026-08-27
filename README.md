@@ -110,6 +110,16 @@ src/vendor/                  vendored third-party code, read as a dependency not
 `src/bot/` parses the update, calls one use case, renders the reply. It holds no business logic.
 Dependencies reach handlers through aiogram's workflow data, the way `Depends` works in FastAPI.
 
+**A module owns everything of its own, including its schedule.** Its rendering, buttons, strings and
+scheduled jobs live under `src/bot/handlers/<name>/`; `jobs.py` exposes one `register_jobs`, and
+`reminders.py` does nothing but collect those registrations. So a module's cadence, its triggers and the
+flag that switches it on stay in one folder, and adding one never edits a file every other module also
+edits. A handful of architecture tests fail if that starts to slip.
+
+**A module earns use cases only when it remembers something.** `presence`, `system_health` and `weather`
+own no table and never open a Unit of Work — they read a sensor, decide, and answer. A use case there would
+be a pass-through to a service, and reads worse than the call it wraps.
+
 **Time.** Everything is stored UTC through the `UtcDateTime` column type — SQLite keeps no offset, so it is
 re-attached on read. A due date is a calendar day in the household timezone, and only `CareCalendar` may
 convert between the two.
@@ -125,6 +135,7 @@ task type does not fit. Every button payload is asserted under the cap.
 4. Include the router in `src/bot/application.py`, filtered by `InModuleTopic` on its own
    `ForumTopicRegistry`, and add the module's section to `messages.WELCOME`
 5. Register the command in `wrong_topic.MODULE_COMMANDS` and `main.GROUP_COMMANDS`
+6. If it has scheduled work, add its `register_jobs` to `reminders.JOB_REGISTRARS`
 
 `start.router` must stay included first: `/cancel` has to win over any module's FSM state that swallows
 plain text.

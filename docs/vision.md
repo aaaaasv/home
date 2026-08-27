@@ -1,6 +1,6 @@
 # The home system — what it is and where things go
 
-> **Статус:** довідник · 2026-08-18
+> **Статус:** довідник · 2026-08-24
 
 The canonical document. `README.md` describes the bot; this describes the system the bot is one part of.
 
@@ -64,16 +64,25 @@ Thirteen software modules at L5. No battery at L0.
 
 The single most valuable message this system could send — «світло зникло» — is the one it cannot send,
 while the thirteenth module shipped and then sat behind a feature flag. The Pi is the nervous system (bot,
-DNS for the entire flat, Uptime Kuma, and a proxy a **day job** depends on), and it runs from an SD card
-with no UPS and, until today, no commits.
+DNS for the entire flat, Uptime Kuma, and the far end of an SSH tunnel a **day job** depends on), and it
+runs from an SD card with no UPS and, until today, no commits.
 
 The problem is not that there are too many modules. Modules are cheap under this doctrine and most of them
 earn their keep. The problem is that **survivability and recoverability lag behaviour by about six months.**
 
-The Pi's contested role is worth naming, but not overstating: it carries a work proxy as well as the home's
-critical path. That proxy tolerates roughly ten minutes of downtime, so an occasional restart — fitting the
-X728, adding a Zigbee dongle — is a scheduling detail, not an incident. What it does rule out is *frequent*
-or unplanned restarts, which is an argument for making the Pi stable rather than for moving anything off it.
+The Pi's contested role is worth naming, and it is heavier than an earlier draft of this section claimed.
+The Pi hosts **no proxy software at all**, which was the useful half of that draft. What it does host is a
+systemd unit holding an *outbound* SSH connection open, with `Restart=always`, so that a day job's traffic
+can leave from a residential address.
+
+The tunnel is therefore the Pi's own responsibility, not the far end's, and the practical consequence is a
+cost that does not look like one: after a reboot the remote side keeps the forwarded port bound by the dead
+session, and ssh refuses to idle without its forward — so it exits and systemd retries until the far side
+reaps the stale listener. Measured once at close to an hour. **A planned restart costs up to an hour of
+tunnel downtime rather than the seconds the reboot takes**, and nothing alerts on it.
+
+That is an argument for batching Pi work into one window. The fix belongs on the far side and is recorded
+with the rest of the operational detail, which does not live in this repository.
 
 The sharper version of the same problem is the other machine: layer 3's law says loss is unacceptable, and
 it is currently served by a laptop that gets switched off — so backups do not run and the archive is

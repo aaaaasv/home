@@ -81,3 +81,11 @@ PRIVATE_WELCOME = "🏠 <b>Домашній бот</b>\n\nЯ працюю в с�
 RENAME_BUTTON = "✏️ Перейменувати"
 REMOVE_BUTTON = "✖️ Прибрати"
 BACK_BUTTON = "← Назад"
+
+# the error router is the last-resort net under every module, so its wording must fit any of them: it once said
+# «не знаходжу цю рослину» to someone whose shopping item had just been bought from under them
+NOT_FOUND = "Не знаходжу цього запису 🤔"
+ALREADY_EXISTS = "Такий запис уже є."
+CONFLICT = "Так не вийде — стан змінився."
+INVALID_INPUT = "Некоректні дані."
+UNEXPECTED_ERROR = "Щось пішло не так 😕 Спробуй ще раз."

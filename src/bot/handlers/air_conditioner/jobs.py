@@ -4,9 +4,12 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.handlers.air_conditioner.formatting import render_air_conditioner_long_run
 from src.bot.handlers.air_conditioner.keyboards import build_air_conditioner_stop_keyboard
+from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.config import Settings
 from src.infrastructure.db.uow import UnitOfWork
@@ -58,3 +61,25 @@ class AirConditionerRuntimeJob:
             disable_notification=False,
         )
         logger.info("Reported the air conditioner running for %s hours", notice.hours)
+
+
+def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """Watch for a unit left running, but only where there is a topic to say it in."""
+    settings = context.settings
+    if not settings.AIR_CONDITIONER_ENABLED or context.weather_topic is None or context.air_conditioner is None:
+        return
+
+    runtime_job = AirConditionerRuntimeJob(
+        bot=context.bot,
+        chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+        weather_topic=context.weather_topic,
+        uow_factory=context.uow_factory,
+        air_conditioner=context.air_conditioner,
+        settings=settings,
+    )
+    scheduler.add_job(
+        runtime_job.__call__,
+        trigger=IntervalTrigger(minutes=settings.AIR_CONDITIONER_CHECK_MINUTES),
+        id="air_conditioner_runtime",
+        replace_existing=True,
+    )
