@@ -38,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - «Живлення» → «Підживлення», «Знімок» → «Фотографування»
 - Порожній конверт «Fragmenta» більше не показується, а «У межах бажаного» прибрано — це й так видно на шкалі
 
+- Every module now registers its own scheduled work in its own `jobs.py`; the scheduler only collects the
+  registrations. Adding or removing a module no longer edits a shared file that every other module also edits.
+
+### Fixed
+
+- Помилка в будь-якому розділі більше не відповідає «не знаходжу цю рослину». Спільний текст помилки був
+  узятий із розділу рослин, тож зниклий запис у покупках повідомлявся як зникла рослина
+
 ## [0.1.0]
 
 ### Added

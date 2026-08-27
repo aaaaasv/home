@@ -4,8 +4,11 @@ from collections.abc import Callable
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from src.bot.handlers.chores.formatting import render_chore_deadline_card
+from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import CHORE_DEADLINE_KIND, PostedMessageTracker
 from src.common.config import Settings
@@ -100,3 +103,24 @@ class ChoreDeadlineJob:
             disable_notification=True,
         )
         await self.posted_message_tracker.remember(CHORE_DEADLINE_KIND, posted, reference=str(reminder.chore_id))
+
+
+def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """Keep one card alive per crossed deadline, checked hourly."""
+    settings = context.settings
+    chore_deadline_job = ChoreDeadlineJob(
+        bot=context.bot,
+        chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+        chores_topic=context.chores_topic,
+        uow_factory=context.uow_factory,
+        household_calendar=context.household_calendar,
+        settings=settings,
+        posted_message_tracker=context.build_posted_message_tracker(),
+    )
+    # hourly, but only within waking hours — a deadline crossing pings at a civilized time, never at 03:00
+    scheduler.add_job(
+        chore_deadline_job.__call__,
+        trigger=CronTrigger(minute=0, hour=f"{settings.CHORE_REMINDER_START_HOUR}-{settings.CHORE_REMINDER_END_HOUR}"),
+        id="chore_deadlines",
+        replace_existing=True,
+    )

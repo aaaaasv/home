@@ -3,6 +3,7 @@ import unittest
 
 from src.bot.handlers.weather.board import WeatherDigestBoard
 from src.bot.reminders import build_scheduler
+from src.bot.scheduling import SchedulerContext
 from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
@@ -30,16 +31,18 @@ class SchedulerJobsAreAwaitableTestCase(unittest.TestCase):
                 timezone=KYIV,
             )
         return build_scheduler(
-            bot=None,
-            settings=settings,
-            household_calendar=HouseholdCalendar(timezone=KYIV),
-            care_topic=None,
-            shopping_topic=None,
-            chores_topic=None,
-            room_climate_sensor=NullRoomClimateSensor(),
-            price_source=ScriptedPriceSource({}),
-            weather_topic=object() if weather_enabled else None,
-            weather_digest_board=weather_digest_board,
+            SchedulerContext(
+                bot=None,
+                settings=settings,
+                household_calendar=HouseholdCalendar(timezone=KYIV),
+                care_topic=None,
+                shopping_topic=None,
+                chores_topic=None,
+                room_climate_sensor=NullRoomClimateSensor(),
+                price_source=ScriptedPriceSource({}),
+                weather_topic=object() if weather_enabled else None,
+                weather_digest_board=weather_digest_board,
+            )
         )
 
     def test_every_scheduled_job_is_a_coroutine_function(self):

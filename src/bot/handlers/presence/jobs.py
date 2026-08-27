@@ -3,9 +3,12 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.handlers.air_conditioner.keyboards import build_air_conditioner_stop_keyboard
 from src.bot.handlers.presence.messages import PRESENCE_EVERYONE_LEFT_AC_ON
+from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.config import Settings
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
@@ -60,3 +63,30 @@ class PresenceJob:
             disable_notification=False,
         )
         logger.info("Everyone left with the air conditioner still on")
+
+
+def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """Watch the roster of phones on the wi-fi — pointless without a unit to catch running in an empty flat."""
+    settings = context.settings
+    if (
+        not settings.PRESENCE_ENABLED
+        or context.weather_topic is None
+        or context.presence_source is None
+        or context.air_conditioner is None
+    ):
+        return
+
+    presence_job = PresenceJob(
+        bot=context.bot,
+        chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+        weather_topic=context.weather_topic,
+        presence_source=context.presence_source,
+        air_conditioner=context.air_conditioner,
+        settings=settings,
+    )
+    scheduler.add_job(
+        presence_job.__call__,
+        trigger=IntervalTrigger(minutes=settings.PRESENCE_CHECK_MINUTES),
+        id="presence",
+        replace_existing=True,
+    )
