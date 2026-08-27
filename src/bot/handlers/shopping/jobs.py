@@ -3,8 +3,11 @@ import logging
 from collections.abc import Callable
 
 from aiogram import Bot
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from src.bot.handlers.shopping.formatting import render_price_drop_alert, render_price_watch_broken
+from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
@@ -61,3 +64,23 @@ class PriceWatchJob:
                 text=render_price_watch_broken(outcome.failures),
             )
         logger.info("Price watch: %s drop(s), %s failure(s)", len(outcome.drops), len(outcome.failures))
+
+
+def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """Re-read every tracked price once a day, at an hour when a drop is still worth acting on."""
+    settings = context.settings
+    price_watch_job = PriceWatchJob(
+        bot=context.bot,
+        chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+        shopping_topic=context.shopping_topic,
+        uow_factory=context.uow_factory,
+        price_source=context.price_source,
+        tech_topic=context.tech_topic,
+    )
+    price_watch_time = settings.price_watch_time
+    scheduler.add_job(
+        price_watch_job.__call__,
+        trigger=CronTrigger(hour=price_watch_time.hour, minute=price_watch_time.minute),
+        id="price_watch",
+        replace_existing=True,
+    )

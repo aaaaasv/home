@@ -32,6 +32,7 @@ from src.bot.handlers.transit.board import TRANSIT_MODULE_NAME, TransitBoard
 from src.bot.handlers.weather.board import WEATHER_MODULE_NAME, WeatherDigestBoard
 from src.bot.preflight import verify_reminder_chat
 from src.bot.reminders import build_scheduler
+from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.config import Settings, get_settings
 from src.common.household_calendar import HouseholdCalendar
@@ -233,26 +234,28 @@ async def run() -> None:
         air_conditioner=air_conditioner,
     )
     scheduler = build_scheduler(
-        bot=bot,
-        settings=settings,
-        household_calendar=HouseholdCalendar(timezone=settings.timezone),
-        care_topic=care_topic,
-        shopping_topic=shopping_topic,
-        chores_topic=chores_topic,
-        room_climate_sensor=build_room_climate_sensor(settings),
-        price_source=build_price_source(settings),
-        weather_topic=weather_topic,
-        weather_digest_board=weather_digest_board,
-        air_conditioner=air_conditioner,
-        tech_topic=tech_topic,
-        pi_health_sensor=build_pi_health_sensor(settings),
-        presence_source=build_presence_source(settings),
-        ecoflow_station=ecoflow_station,
-        power_topic=power_topic,
-        schedule_provider=schedule_provider,
-        outage_schedule_board=outage_schedule_board,
-        conservation_board=conservation_board,
-        shape_catalog=shape_catalog,
+        SchedulerContext(
+            bot=bot,
+            settings=settings,
+            household_calendar=HouseholdCalendar(timezone=settings.timezone),
+            care_topic=care_topic,
+            shopping_topic=shopping_topic,
+            chores_topic=chores_topic,
+            room_climate_sensor=build_room_climate_sensor(settings),
+            price_source=build_price_source(settings),
+            weather_topic=weather_topic,
+            weather_digest_board=weather_digest_board,
+            air_conditioner=air_conditioner,
+            tech_topic=tech_topic,
+            pi_health_sensor=build_pi_health_sensor(settings),
+            presence_source=build_presence_source(settings),
+            ecoflow_station=ecoflow_station,
+            power_topic=power_topic,
+            schedule_provider=schedule_provider,
+            outage_schedule_board=outage_schedule_board,
+            conservation_board=conservation_board,
+            shape_catalog=shape_catalog,
+        )
     )
 
     # drop the pre-topic default list, which the two scoped lists below now replace

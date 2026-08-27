@@ -4,15 +4,20 @@ from collections.abc import Callable
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.formatting import exceeds_caption_limit
 from src.bot.handlers.plants.formatting import render_plant_comfort_restored, render_plant_discomfort_card
 from src.bot.handlers.plants.keyboards import build_care_cards
+from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import CARE_DIGEST_KIND, PLANT_DISCOMFORT_KIND, PostedMessageTracker
 from src.common.config import Settings
 from src.common.constants import ClimateComfortTransition
 from src.common.household_calendar import HouseholdCalendar
+from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.domain import CareDigest, PlantComfortChange
 from src.modules.plant_care.services.room_climate_sensor import RoomClimateSensor
@@ -253,3 +258,54 @@ class RoomClimateJob:
         for stale_reference in posted_day_by_reference.keys() - live_references:
             await self.posted_message_tracker.clear_one(PLANT_DISCOMFORT_KIND, stale_reference)
         logger.info("Discomfort cards: %s reposted, %s standing", reposted, len(live_references))
+
+
+def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """Sample the room climate while a sensor is fitted, and always keep the daily care digest coming."""
+    settings = context.settings
+    if settings.CLIMATE_SENSOR_ENABLED:
+        climate_job = RoomClimateJob(
+            bot=context.bot,
+            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+            care_topic=context.care_topic,
+            uow_factory=context.uow_factory,
+            sensor=context.room_climate_sensor,
+            settings=settings,
+            posted_message_tracker=context.build_posted_message_tracker(),
+            household_calendar=context.household_calendar,
+        )
+        # pass the bound __call__, not the instance: apscheduler only awaits jobs it sees as coroutine functions,
+        # and a callable instance is not one — passing the instance runs it sync and drops the coroutine unawaited
+        scheduler.add_job(
+            climate_job.__call__,
+            trigger=IntervalTrigger(seconds=settings.CLIMATE_SAMPLE_INTERVAL_SECONDS),
+            id="room_climate",
+            replace_existing=True,
+        )
+        # once a day (and once on boot), repost each still-uncomfortable plant's card silently at the bottom,
+        # so a standing alert that scrolled away stays visible without a second ping
+        scheduler.add_job(
+            climate_job.refresh_discomfort_cards,
+            trigger=CronTrigger(hour=settings.daily_digest_time.hour, minute=settings.daily_digest_time.minute),
+            next_run_time=current_time(),
+            id="plant_discomfort_refresh",
+            replace_existing=True,
+        )
+
+    digest_job = DailyCareDigestJob(
+        bot=context.bot,
+        chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+        care_topic=context.care_topic,
+        uow_factory=context.uow_factory,
+        household_calendar=context.household_calendar,
+        settings=settings,
+        posted_message_tracker=context.build_posted_message_tracker(),
+    )
+    scheduler.add_job(
+        digest_job.__call__,
+        trigger=IntervalTrigger(minutes=settings.DIGEST_CHECK_INTERVAL_MINUTES),
+        # fire once right after start too, so a digest missed while the pi was down is caught up on boot
+        next_run_time=current_time(),
+        id="daily_care_digest",
+        replace_existing=True,
+    )

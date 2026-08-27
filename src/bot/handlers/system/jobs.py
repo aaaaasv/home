@@ -2,8 +2,11 @@
 import logging
 
 from aiogram import Bot
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.handlers.system.formatting import render_system_health_alert
+from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.config import Settings
 from src.modules.system_health.monitor import SystemHealthMonitor
@@ -54,3 +57,24 @@ class SystemHealthJob:
             disable_notification=False,
         )
         logger.info("Reported %s system health issue(s)", len(issues))
+
+
+def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """Read the Pi's own vitals on an interval, once there is a tech topic to report them in."""
+    settings = context.settings
+    if not settings.SYSTEM_HEALTH_ENABLED or context.tech_topic is None or context.pi_health_sensor is None:
+        return
+
+    system_health_job = SystemHealthJob(
+        bot=context.bot,
+        chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+        tech_topic=context.tech_topic,
+        sensor=context.pi_health_sensor,
+        settings=settings,
+    )
+    scheduler.add_job(
+        system_health_job.__call__,
+        trigger=IntervalTrigger(minutes=settings.PI_HEALTH_CHECK_MINUTES),
+        id="system_health",
+        replace_existing=True,
+    )
