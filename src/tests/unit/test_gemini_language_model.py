@@ -1,15 +1,12 @@
 import json
 import unittest
 
-from src.modules.assistant.services.language_model import (
-    MODEL_ROLE,
-    USER_ROLE,
-    ConversationTurn,
-    ImageAttachment,
+from src.infrastructure.adapters.gemini_language_model import (
     build_request_body,
     extract_answer_text,
     names_the_daily_quota,
 )
+from src.modules.assistant.services.language_model import MODEL_ROLE, USER_ROLE, ConversationTurn, ImageAttachment
 
 
 class BuildRequestBodyTestCase(unittest.TestCase):

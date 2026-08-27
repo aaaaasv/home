@@ -5,12 +5,12 @@ from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from src.modules.transit.domain import GeoPoint
-from src.modules.transit.services.route_shape_catalog import (
+from src.infrastructure.adapters.gtfs_static_shape_catalog import (
     GtfsStaticShapeCatalog,
     read_shape_points_by_id,
     select_shapes_serving_stop,
 )
+from src.modules.transit.domain import GeoPoint
 
 STOP = GeoPoint(latitude=50.0368, longitude=30.0907)
 DESTINATION = GeoPoint(latitude=50.0389, longitude=30.1219)

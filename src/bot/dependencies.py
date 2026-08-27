@@ -17,33 +17,35 @@ from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.bot.services.telegram_photo_storage import TelegramPhotoStorage
 from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
+from src.infrastructure.adapters.alarm_map_air_raid_alert_source import AlarmMapAirRaidAlertSource
 from src.infrastructure.adapters.ecoflow_ble_station import EcoFlowBleStation
+from src.infrastructure.adapters.gemini_language_model import GeminiLanguageModel
 from src.infrastructure.adapters.gree_air_conditioner import GreeAirConditioner
+from src.infrastructure.adapters.gtfs_realtime_feed import GtfsRealtimeFeed
+from src.infrastructure.adapters.gtfs_static_shape_catalog import GtfsStaticShapeCatalog
 from src.infrastructure.adapters.hotline_price_source import HotlinePriceSource
+from src.infrastructure.adapters.open_meteo_weather_provider import OpenMeteoWeatherProvider
 from src.infrastructure.adapters.router_presence_source import RouterPresenceSource
 from src.infrastructure.adapters.sht31_room_climate_sensor import Sht31RoomClimateSensor
 from src.infrastructure.adapters.sysfs_pi_health_sensor import SysfsPiHealthSensor
+from src.infrastructure.adapters.yasno_schedule_provider import YasnoScheduleProvider
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner, NullAirConditioner
 from src.modules.assistant.services.conversation_memory import ConversationMemory
 from src.modules.assistant.services.knowledge_source import FileKnowledgeSource
-from src.modules.assistant.services.language_model import GeminiLanguageModel, LanguageModel
+from src.modules.assistant.services.language_model import LanguageModel
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
 from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 from src.modules.plant_care.services.photo_storage import NullPhotoStorage, PhotoStorage
-from src.modules.plant_care.services.room_climate_sensor import NullRoomClimateSensor, RoomClimateSensor
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
-from src.modules.power.services.yasno_schedule_provider import YasnoScheduleProvider
 from src.modules.presence.services.presence_source import NullPresenceSource, PresenceSource
+from src.modules.room_climate.services.room_climate_sensor import NullRoomClimateSensor, RoomClimateSensor
 from src.modules.shopping.domain import ReputabilityPolicy
 from src.modules.system_health.services.pi_health_sensor import NullPiHealthSensor, PiHealthSensor
 from src.modules.transit.domain import GeoPoint, StopLocation, parse_watched_routes
-from src.modules.transit.services.air_raid_alert_source import AlarmMapAirRaidAlertSource
 from src.modules.transit.services.arrival_estimator import ArrivalEstimator
-from src.modules.transit.services.realtime_feed import GtfsRealtimeFeed
-from src.modules.transit.services.route_shape_catalog import GtfsStaticShapeCatalog
 from src.modules.transit.use_cases.compose_transit_report import ComposeTransitReportUseCase
-from src.modules.weather.services.weather_provider import NullWeatherProvider, OpenMeteoWeatherProvider, WeatherProvider
+from src.modules.weather.services.weather_provider import NullWeatherProvider, WeatherProvider
 
 
 def build_photo_storage(bot: Bot, settings: Settings) -> PhotoStorage:

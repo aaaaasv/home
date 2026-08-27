@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from google.transit import gtfs_realtime_pb2
 
-from src.modules.transit.services.realtime_feed import parse_realtime_snapshot
+from src.infrastructure.adapters.gtfs_realtime_feed import parse_realtime_snapshot
 
 WATCHED_ROUTE_IDS = frozenset({"2_30", "3_127"})
 FETCHED_AT = datetime(2026, 8, 13, 9, 0, 30, tzinfo=timezone.utc)

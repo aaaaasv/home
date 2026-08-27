@@ -2,12 +2,8 @@ import unittest
 from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo
 
-from src.modules.power.services.yasno_schedule_provider import (
-    OutageInterval,
-    OutageScheduleStatus,
-    parse_outage_outlook,
-    parse_outage_schedule,
-)
+from src.infrastructure.adapters.yasno_schedule_provider import parse_outage_outlook, parse_outage_schedule
+from src.modules.power.domain import OutageInterval, OutageScheduleStatus
 
 KYIV = ZoneInfo("Europe/Kyiv")
 

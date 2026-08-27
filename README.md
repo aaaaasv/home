@@ -121,7 +121,7 @@ own no table and never open a Unit of Work — they read a sensor, decide, and a
 be a pass-through to a service, and reads worse than the call it wraps.
 
 **Time.** Everything is stored UTC through the `UtcDateTime` column type — SQLite keeps no offset, so it is
-re-attached on read. A due date is a calendar day in the household timezone, and only `CareCalendar` may
+re-attached on read. A due date is a calendar day in the household timezone, and only `HouseholdCalendar` may
 convert between the two.
 
 **Integer primary keys, not UUIDs.** Telegram caps `callback_data` at 64 bytes; a UUID plus an action plus a

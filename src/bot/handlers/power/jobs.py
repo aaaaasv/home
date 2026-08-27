@@ -16,12 +16,9 @@ from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND, OUTAG
 from src.common.config import Settings
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
+from src.modules.power.domain import OutageSchedule, OutageScheduleStatus
 from src.modules.power.services.ecoflow_station import EcoFlowStation
-from src.modules.power.services.yasno_schedule_provider import (
-    OutageSchedule,
-    OutageScheduleStatus,
-    YasnoScheduleProvider,
-)
+from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.power.use_cases.track_conservation import TrackConservationUseCase
 
 logger = logging.getLogger(__name__)
@@ -73,7 +70,7 @@ class YasnoScheduleJob:
         chat_id: int,
         power_topic: ForumTopicRegistry,
         uow_factory: Callable[[], UnitOfWork],
-        schedule_provider: YasnoScheduleProvider,
+        schedule_provider: OutageScheduleProvider,
         outage_schedule_board: OutageScheduleBoard,
         settings: Settings,
         timezone: tzinfo,

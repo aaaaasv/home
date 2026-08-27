@@ -20,10 +20,10 @@ from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.domain import CareDigest, PlantComfortChange
-from src.modules.plant_care.services.room_climate_sensor import RoomClimateSensor
 from src.modules.plant_care.use_cases.deliver_daily_care_digest import DeliverDailyCareDigestUseCase
 from src.modules.plant_care.use_cases.evaluate_plant_climate import EvaluatePlantClimateUseCase
 from src.modules.plant_care.use_cases.retrieve_uncomfortable_plants import RetrieveUncomfortablePlantsUseCase
+from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
 
 logger = logging.getLogger(__name__)
 

@@ -9,12 +9,12 @@ the slot schema matches denysdovhan/ha-yasno-outages (`api/models.py`).
 
 import asyncio
 import logging
-from dataclasses import dataclass
-from datetime import date, datetime, time
-from enum import StrEnum
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import aiohttp
+
+from src.modules.power.domain import OutageInterval, OutageOutlook, OutageSchedule, OutageScheduleStatus
 
 logger = logging.getLogger(__name__)
 
@@ -25,79 +25,10 @@ REQUEST_TIMEOUT_SECONDS = 15
 # kyiv city / дтек київські — the ids behind the endpoint the family's group belongs to
 KYIV_CITY_REGION_ID = 25
 KYIV_CITY_DSO_ID = 902
-
-MINUTES_PER_DAY = 24 * 60
 # only this slot type means the power is actually off; the api also emits normal-power stretches
 DEFINITE_OFF_SLOT_TYPE = "Definite"
 TODAY_KEY = "today"
 TOMORROW_KEY = "tomorrow"
-
-
-class OutageScheduleStatus(StrEnum):
-    NO_OUTAGES = "NoOutages"
-    SCHEDULE_APPLIES = "ScheduleApplies"
-    WAITING_FOR_SCHEDULE = "WaitingForSchedule"
-    EMERGENCY_SHUTDOWNS = "EmergencyShutdowns"
-    UNKNOWN = "Unknown"
-
-    @classmethod
-    def _missing_(cls, value: object) -> "OutageScheduleStatus":
-        # an unfamiliar status must not crash the poll — treat it as unknown and let the caller stay quiet
-        return cls.UNKNOWN
-
-
-@dataclass(frozen=True)
-class OutageInterval:
-    """One definite off-period, held as minutes from midnight so an end at 24:00 has an exact representation"""
-
-    start_minute: int
-    end_minute: int
-
-    @property
-    def start(self) -> time:
-        return _minutes_to_time(self.start_minute)
-
-    @property
-    def end(self) -> time:
-        # 1440 is midnight-end-of-day, which `time` cannot hold; render it as 23:59 so it stays within the day
-        return _minutes_to_time(min(self.end_minute, MINUTES_PER_DAY - 1))
-
-    def contains_minute(self, minute_of_day: int) -> bool:
-        return self.start_minute <= minute_of_day < self.end_minute
-
-
-@dataclass(frozen=True)
-class OutageSchedule:
-    """The outage picture for one group on one calendar day"""
-
-    day: date
-    status: OutageScheduleStatus
-    off_intervals: tuple[OutageInterval, ...]
-    updated_on: datetime | None
-
-    @property
-    def has_outages(self) -> bool:
-        return bool(self.off_intervals)
-
-    def is_off_at(self, moment: datetime) -> bool:
-        """Whether the group is scheduled off at the given local wall-clock moment (meaningful for moment on day)"""
-        return any(interval.contains_minute(_minute_of_day(moment)) for interval in self.off_intervals)
-
-    def next_off_interval(self, moment: datetime) -> OutageInterval | None:
-        """The first off-period that starts strictly after the given local moment — feeds the pre-outage ping"""
-        minute_of_day = _minute_of_day(moment)
-        for interval in self.off_intervals:
-            if interval.start_minute > minute_of_day:
-                return interval
-        return None
-
-
-@dataclass(frozen=True)
-class OutageOutlook:
-    """Today and tomorrow together, parsed from a single fetch"""
-
-    today: OutageSchedule
-    tomorrow: OutageSchedule | None
 
 
 class YasnoScheduleProvider:
@@ -198,11 +129,3 @@ def _parse_updated_on(value: object) -> datetime | None:
         return datetime.fromisoformat(value)
     except ValueError:
         return None
-
-
-def _minutes_to_time(minutes: int) -> time:
-    return time(hour=minutes // 60, minute=minutes % 60)
-
-
-def _minute_of_day(moment: datetime) -> int:
-    return moment.hour * 60 + moment.minute

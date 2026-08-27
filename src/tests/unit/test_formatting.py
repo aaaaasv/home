@@ -36,7 +36,7 @@ from src.modules.plant_care.domain import (
     PlantComfortChange,
     PlantPhotoReview,
 )
-from src.modules.plant_care.services.room_climate_sensor import RoomClimate
+from src.modules.room_climate.domain import RoomClimate
 from src.modules.shopping.constants import ShoppingHorizon
 from src.modules.shopping.domain import PriceDropAnnouncement, ShoppingItemDetails, ShoppingList
 from src.modules.system_health.domain import PiHealthReading
