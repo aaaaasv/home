@@ -3,7 +3,7 @@ import logging
 from aiogram import Router
 from aiogram.types import ErrorEvent
 
-from src.bot.handlers.plants.messages import PLANT_NOT_FOUND
+from src.bot import messages
 from src.common.constants import ErrorCode
 from src.common.exceptions import DomainError
 
@@ -11,13 +11,11 @@ logger = logging.getLogger(__name__)
 
 router = Router(name="errors")
 
-UNEXPECTED_ERROR = "Щось пішло не так 😕 Спробуй ще раз."
-
 ERROR_MESSAGES: dict[ErrorCode, str] = {
-    ErrorCode.NOT_FOUND: PLANT_NOT_FOUND,
-    ErrorCode.ALREADY_EXISTS: "Рослина з такою назвою вже є.",
-    ErrorCode.CONFLICT: "Так не вийде — стан змінився.",
-    ErrorCode.VALIDATION_ERROR: "Некоректні дані.",
+    ErrorCode.NOT_FOUND: messages.NOT_FOUND,
+    ErrorCode.ALREADY_EXISTS: messages.ALREADY_EXISTS,
+    ErrorCode.CONFLICT: messages.CONFLICT,
+    ErrorCode.VALIDATION_ERROR: messages.INVALID_INPUT,
 }
 
 
@@ -37,5 +35,5 @@ async def reply_with_error(event: ErrorEvent) -> bool:
 
 def _resolve_message(exception: Exception) -> str:
     if isinstance(exception, DomainError):
-        return ERROR_MESSAGES.get(exception.code, UNEXPECTED_ERROR)
-    return UNEXPECTED_ERROR
+        return ERROR_MESSAGES.get(exception.code, messages.UNEXPECTED_ERROR)
+    return messages.UNEXPECTED_ERROR
