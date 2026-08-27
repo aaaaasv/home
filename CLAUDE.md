@@ -156,6 +156,13 @@ src/vendor/                  vendored third-party code; read as a dependency, ne
 ```
 
 - **Use cases** are callable classes; logic lives in `__call__`, one per file.
+- **A module earns use cases only when it remembers something.** `presence`, `system_health` and `weather`
+  own no table and never open a Unit of Work: they read a sensor or an API, decide, and hand the answer
+  straight back. A use case there would be a one-line pass-through to a service, which reads worse than the
+  call it wraps. Their logic lives in a monitor or a service with its own unit tests. The moment such a
+  module has to remember anything between readings it gains a table, a repository and use cases like the
+  rest — `power` is exactly that story, and its state machine belongs in
+  `src/modules/power/use_cases/`, not in the job that calls it.
 - **Unit of Work** (`uow`) wraps database access as an async context manager and exposes repositories as
   attributes.
 - **Handlers parse the update, call one use case, render the reply.** They hold no business logic.
@@ -165,6 +172,13 @@ src/vendor/                  vendored third-party code; read as a dependency, ne
   `messages.py` hold only genuinely cross-module primitives; `reminders.py` holds only the scheduler
   assembly. Adding a module must not mean editing four shared files. There is no shared `keyboards.py`:
   every button belongs to exactly one module.
+- **A module schedules its own work.** `src/bot/handlers/<name>/jobs.py` exposes one
+  `register_jobs(scheduler, context)`; `reminders.py` only collects those registrations, and
+  `SchedulerContext` (`src/bot/scheduling.py`) carries whatever the composition root built. A module reads
+  its own settings flag there and registers nothing when it is switched off, so a cadence, a trigger and an
+  enabling flag never live in a shared file. `src/tests/unit/test_architecture.py` fails if a `jobs.py`
+  goes uncollected, if anything outside a `jobs.py` calls `add_job`, or if a shared delivery file starts
+  importing from one module.
 - **Time**: everything is stored UTC through the `UtcDateTime` column type — SQLite keeps no offset, so it
   is re-attached on read. A due date is a calendar day in the household timezone, and only `CareCalendar`
   may convert between the two.
@@ -182,6 +196,7 @@ src/vendor/                  vendored third-party code; read as a dependency, ne
 4. Include the router in `src/bot/application.py`, filtered by `InModuleTopic` on its own
    `ForumTopicRegistry`, and add the module's section to `messages.WELCOME`.
 5. Register any new command in `wrong_topic.MODULE_COMMANDS` and `main.GROUP_COMMANDS`.
+6. If it has scheduled work, add its `register_jobs` to `reminders.JOB_REGISTRARS`.
 
 `start.router` must stay included first: `/cancel` has to win over any module's FSM state that swallows
 plain text.
