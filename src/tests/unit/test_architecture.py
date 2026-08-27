@@ -13,9 +13,10 @@ DOMAIN_ROOT = pathlib.Path("src/modules")
 # must stay module-blind, or adding a module means editing it and the four god-files grow back
 COMPOSITION_ROOT = {"application.py", "dependencies.py", "reminders.py", "scheduling.py"}
 
-# aiogram is the delivery framework, apscheduler schedules delivery, sqlalchemy is the database. a domain module
-# that imports one of them can no longer be tested or replaced without it
-DELIVERY_AND_STORAGE_LIBRARIES = {"aiogram", "apscheduler", "sqlalchemy", "alembic"}
+# everything that reaches outside the process: the delivery framework, the scheduler, the database, and the http
+# and protobuf clients. a domain module importing any of them can no longer be tested or replaced without it, and
+# a vendor changing its payload shape starts reaching into the domain
+INFRASTRUCTURE_LIBRARIES = {"aiogram", "apscheduler", "sqlalchemy", "alembic", "aiohttp", "google"}
 
 
 def imported_root_packages(path: pathlib.Path) -> set[str]:
@@ -96,11 +97,11 @@ class LayerBoundariesTestCase(unittest.TestCase):
 
         self.assertEqual(offenders, {})
 
-    def test_no_domain_module_imports_the_delivery_framework_or_the_database(self):
+    def test_no_domain_module_reaches_outside_the_process(self):
         offenders = {
-            str(path): sorted(imported_root_packages(path) & DELIVERY_AND_STORAGE_LIBRARIES)
+            str(path): sorted(imported_root_packages(path) & INFRASTRUCTURE_LIBRARIES)
             for path in sorted(DOMAIN_ROOT.rglob("*.py"))
-            if imported_root_packages(path) & DELIVERY_AND_STORAGE_LIBRARIES
+            if imported_root_packages(path) & INFRASTRUCTURE_LIBRARIES
         }
 
         self.assertEqual(offenders, {})

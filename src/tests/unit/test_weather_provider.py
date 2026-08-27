@@ -2,14 +2,14 @@ import unittest
 from datetime import timedelta
 
 from src.common.time import current_time
-from src.modules.weather.domain import PollenSpecies
-from src.modules.weather.services.weather_provider import (
+from src.infrastructure.adapters.open_meteo_weather_provider import (
     WEATHER_RECENT_MAX_AGE_SECONDS,
     OpenMeteoWeatherProvider,
     parse_weather_report,
     resolve_peak_wind_speed,
     resolve_rain_outlook,
 )
+from src.modules.weather.domain import PollenSpecies
 
 # a real kyiv day: the 90% peak falls at 02:00, long before the 08:00 digest goes out
 KYIV_HOURLY_PROBABILITIES = [33, 60, 90, 70, 30, 28, 18, 45, 63, 43, 13, 8, 20, 15, 10, 23, 35, 40, 13, 3, 0, 0, 0, 0]

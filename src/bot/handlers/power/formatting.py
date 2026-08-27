@@ -25,9 +25,8 @@ from src.bot.handlers.power.messages import (
     POWER_SCHEDULE_INTERVAL,
     POWER_SCHEDULE_TITLE,
 )
-from src.modules.power.domain import EcoFlowState
+from src.modules.power.domain import EcoFlowState, OutageSchedule, OutageScheduleStatus
 from src.modules.power.services.conservation import ConservationAdvisory, ConservationKind, ConservationLevel
-from src.modules.power.services.yasno_schedule_provider import OutageSchedule, OutageScheduleStatus
 
 
 def render_ecoflow(state: EcoFlowState) -> str:
