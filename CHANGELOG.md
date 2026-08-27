@@ -7,15 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Deploys now ship a built image with a version on it instead of whatever happened to be in the working
-  tree, so what runs on the Pi can be named. The Pi stops compiling anything.
+## [0.2.0] - 2026-08-27
 
 ### Added
 
 - Сторінка рослини у браузері — гербарний аркуш з фото, ритмом поливу, мікрокліматом кімнати й тим, хто
   доглядає. Відкривається за адресою `garden.lan/p/<назва>`, зроблена для гостей і для NFC-міток на горщиках
 - Кнопка «Записати полив» просто на сторінці, за паролем, щоб ніхто не натиснув її випадково
-
 - Картотека на `garden.lan` — усі рослини як теки в шухляді, і стрілки «попередній / наступний» на кожному
   аркуші, щоб з однієї мітки можна було дійти до решти
 - Знімки стали живими: торкаєшся будь-якого — він лягає на аркуш; окрема таблиця порівнює перший знімок
@@ -37,9 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - «Записати полив» тепер питає «Точно полито?» замість пароля — від випадкового дотику цього досить
 - «Живлення» → «Підживлення», «Знімок» → «Фотографування»
 - Порожній конверт «Fragmenta» більше не показується, а «У межах бажаного» прибрано — це й так видно на шкалі
-
-- Every module now registers its own scheduled work in its own `jobs.py`; the scheduler only collects the
-  registrations. Adding or removing a module no longer edits a shared file that every other module also edits.
+- Оновлення на Pi тепер везе зібраний образ із номером версії, а не те, що випадково лежало в робочій теці,
+  тож завжди видно, що саме там працює. Pi більше нічого не компілює
+- Кожен модуль тепер сам призначає свою розкладену роботу; спільний файл розкладу перестав бути місцем,
+  яке доводиться правити щоразу
 
 ### Fixed
 
