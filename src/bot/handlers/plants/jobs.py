@@ -158,6 +158,7 @@ class RoomClimateJob:
         changes = await EvaluatePlantClimateUseCase(
             uow=self.uow_factory(),
             sensor=self.sensor,
+            household_calendar=self.household_calendar,
             alert_window_hours=self.settings.CLIMATE_ALERT_WINDOW_HOURS,
             temperature_hysteresis_celsius=self.settings.CLIMATE_HYSTERESIS_TEMPERATURE_CELSIUS,
             humidity_hysteresis_percent=self.settings.CLIMATE_HYSTERESIS_HUMIDITY_PERCENT,

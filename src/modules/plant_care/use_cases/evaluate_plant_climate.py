@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
-from statistics import median
+from statistics import mean, median
 
 from src.common.constants import ClimateComfortTransition, ClimateDimension, ClimateStatus
-from src.common.time import current_time
+from src.common.household_calendar import HouseholdCalendar
 from src.common.use_case import BaseUseCase
 from src.infrastructure.db.models import Plant, RoomClimateReading
 from src.infrastructure.db.uow import UnitOfWork
@@ -25,12 +25,14 @@ class EvaluatePlantClimateUseCase(BaseUseCase):
         self,
         uow: UnitOfWork,
         sensor: RoomClimateSensor,
+        household_calendar: HouseholdCalendar,
         alert_window_hours: int,
         temperature_hysteresis_celsius: float,
         humidity_hysteresis_percent: float,
     ):
         super().__init__(uow)
         self.sensor = sensor
+        self.household_calendar = household_calendar
         self.alert_window_hours = alert_window_hours
         self.temperature_hysteresis_celsius = temperature_hysteresis_celsius
         self.humidity_hysteresis_percent = humidity_hysteresis_percent
@@ -40,7 +42,8 @@ class EvaluatePlantClimateUseCase(BaseUseCase):
         if climate is None:
             return []
 
-        measured_at = current_time()
+        # the calendar, not the wall clock: it is the one thing allowed to say what "now" and "today" are
+        measured_at = self.household_calendar.now()
         window_start = measured_at - timedelta(hours=self.alert_window_hours)
 
         async with self.uow as uow:
@@ -51,6 +54,8 @@ class EvaluatePlantClimateUseCase(BaseUseCase):
                     "measured_at": measured_at,
                 }
             )
+            # fold today into its one summary row *before* pruning, or the day would be thrown away unrecorded
+            await self._summarise_day(uow, measured_at)
             await uow.room_climate_readings.delete_measured_before(
                 measured_at - timedelta(hours=self.alert_window_hours * 2)
             )
@@ -156,6 +161,33 @@ class EvaluatePlantClimateUseCase(BaseUseCase):
         if previous_status == ClimateStatus.TOO_HIGH and value > high - margin:
             return ClimateStatus.TOO_HIGH
         return ClimateStatus.OK
+
+    async def _summarise_day(self, uow: UnitOfWork, measured_at: datetime) -> None:
+        """
+        Rewrites today's summary from the raw readings that are still there.
+
+        recomputing beats accumulating a running mean: the raw table keeps twice the alert window, so a whole
+        household day is always present, and a rewrite cannot drift the way an incremental average can.
+        """
+        day = self.household_calendar.local_date(measured_at)
+        day_start = self.household_calendar.start_of_day(day)
+        readings = await uow.room_climate_readings.list_measured_since(day_start)
+        if not readings:
+            return
+
+        temperatures = [reading.temperature_celsius for reading in readings]
+        humidities = [reading.relative_humidity_percent for reading in readings]
+        await uow.room_climate_days.save_day(
+            day,
+            {
+                "minimum_temperature_celsius": min(temperatures),
+                "maximum_temperature_celsius": max(temperatures),
+                "average_temperature_celsius": mean(temperatures),
+                "minimum_humidity_percent": min(humidities),
+                "maximum_humidity_percent": max(humidities),
+                "average_humidity_percent": mean(humidities),
+            },
+        )
 
     def _covers_the_whole_window(self, readings: list[RoomClimateReading]) -> bool:
         if len(readings) < 2:
