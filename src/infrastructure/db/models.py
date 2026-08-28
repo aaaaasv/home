@@ -13,6 +13,7 @@ from sqlalchemy import (
     text,
 )
 
+from src.common.constants import PlantPhotoFrame
 from src.common.time import current_time
 from src.infrastructure.db.base import Base
 from src.infrastructure.db.types import UtcDateTime
@@ -94,6 +95,7 @@ class PlantPhoto(Base):
     telegram_file_unique_id = Column(String(64), nullable=False)
     local_path = Column(String(512), nullable=True)
     caption = Column(Text, nullable=True)
+    frame = Column(String(16), default=PlantPhotoFrame.OVERVIEW.value, nullable=False)
     added_by_telegram_user_id = Column(BigInteger, nullable=False)
     taken_at = Column(UtcDateTime, nullable=False)
     created_at = Column(UtcDateTime, default=current_time, nullable=False)

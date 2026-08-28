@@ -7,7 +7,7 @@ comes from PlantSheet — nothing is computed twice, and nothing is invented whe
 import json
 from html import escape
 
-from src.common.constants import CareTaskType
+from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.modules.plant_care.domain import ClimatePoint, DrawerEntry, PlantSheet
 from src.web.styles import GOOGLE_FONTS_URL, SCRIPT, STYLESHEET
 
@@ -355,10 +355,17 @@ def _plate_caption(taken_at, index: int, total: int) -> str:
 
 
 def _growth(sheet: PlantSheet, photo_url) -> str:
-    """First plate against latest — the one comparison a photo archive is actually for."""
-    if len(sheet.photos) < 2:
+    """
+    First plate against latest — the one comparison a photo archive is actually for.
+
+    only general frames qualify. a close-up of a leaf against a whole-plant shot would read as dramatic growth
+    when all that changed is how near the camera stood, so the detail plates stay out of this and live in the
+    collection above.
+    """
+    overviews = [photo for photo in sheet.photos if photo.frame == PlantPhotoFrame.OVERVIEW]
+    if len(overviews) < 2:
         return ""
-    first, last = sheet.photos[0], sheet.photos[-1]
+    first, last = overviews[0], overviews[-1]
     return f"""<section class="plate-block compare"><h3>Tabula IV · зріст</h3>
 <p class="sub">Ліворуч перший знімок, праворуч останній — за {(last.taken_at - first.taken_at).days} діб.
 Потягніть засувку.</p>

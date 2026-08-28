@@ -62,7 +62,12 @@ ADD_PLANT_ASK_LAST_WATERED = "Коли її востаннє поливали?"
 ADD_PLANT_EXPECTS_PHOTO = "Надішли саме фото або /skip."
 ADD_PLANT_EXPECTS_TEXT = "Надішли текст або /skip."
 
-ADD_PHOTO_ASK_PHOTO = "Надішли одне фото 📸\n\n/cancel — скасувати"
+ADD_PHOTO_ASK_PHOTO = (
+    "Надішли фото 📸\n"
+    "Перше — загальний кадр з того самого боку, що й минулого разу: саме його порівнюють між собою.\n"
+    "Далі можна крупні плани листя, скільки треба.\n\n"
+    "/cancel — скасувати"
+)
 CARE_POSTPONE_BUTTON = "⏳ нагадати через {days}"
 # a skippable task (fertilizing, photo) defers a whole cycle, so its button says "skip", not "in N days"
 CARE_SKIP_BUTTON = "⏭ пропустити"
@@ -81,6 +86,7 @@ SCHEDULE_REMOVE_CONFIRM_INSTRUCTIONS = "\n\n⚠️ Інструкція до ц�
 SCHEDULE_REMOVE_BUTTON = "Так, прибрати"
 
 PHOTO_ADDED = "📸 Фото додано."
+PHOTOS_ADDED = "📸 Додано {count} кадри. Перший — для порівняння, решта в зібранні."
 
 PHOTO_REVIEW_IN_PROGRESS = "🔎 Дивлюсь, що змінилось…"
 PHOTO_REVIEW_CHANGE_LABEL = "Зміни"

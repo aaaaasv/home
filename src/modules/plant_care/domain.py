@@ -9,6 +9,7 @@ from src.common.constants import (
     ClimateComfortTransition,
     ClimateDimension,
     ClimateStatus,
+    PlantPhotoFrame,
     PlantPhotoReviewStatus,
 )
 from src.common.domain import DomainModel
@@ -69,6 +70,7 @@ class PlantPhotoDetails(DomainModel):
     telegram_file_id: str
     caption: str | None
     taken_at: datetime
+    frame: PlantPhotoFrame
 
     @classmethod
     def from_photo(cls, photo: PlantPhoto) -> "PlantPhotoDetails":
@@ -77,6 +79,7 @@ class PlantPhotoDetails(DomainModel):
             telegram_file_id=photo.telegram_file_id,
             caption=photo.caption,
             taken_at=photo.taken_at,
+            frame=PlantPhotoFrame(photo.frame),
         )
 
 
