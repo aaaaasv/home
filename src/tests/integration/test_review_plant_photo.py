@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from src.common.constants import CareTaskType, PlantPhotoReviewStatus
+from src.common.constants import CareTaskType, PlantPhotoFrame, PlantPhotoReviewStatus
 from src.modules.plant_care.domain import PlantPhotoReview
 from src.modules.plant_care.use_cases.review_plant_photo import ReviewPlantPhotoUseCase
 from src.tests.fakes import RecordingPhotoAnalyst
@@ -54,6 +54,52 @@ class ReviewPlantPhotoTestCase(BaseIntegrationTestCase):
         self.assertEqual(context.current_photo_path, "photos/new.jpg")
         self.assertEqual(context.previous_photo_path, "photos/old.jpg")
         self.assertEqual(context.days_since_previous_photo, 31)
+
+    async def test_review_plant_photo_compares_the_overviews_and_ignores_the_close_ups(self):
+        await self.seed_plant_photo(
+            plant_id=self.plant_id,
+            telegram_file_unique_id="unique-old",
+            local_path="photos/old-overview.jpg",
+            taken_at=FROZEN_NOW - timedelta(days=31),
+            frame=PlantPhotoFrame.OVERVIEW.value,
+        )
+        await self.seed_plant_photo(
+            plant_id=self.plant_id,
+            telegram_file_unique_id="unique-new",
+            local_path="photos/new-overview.jpg",
+            taken_at=FROZEN_NOW,
+            frame=PlantPhotoFrame.OVERVIEW.value,
+        )
+        # the close-up arrives last in the session, and comparing it against last month's whole plant would
+        # report growth that is only the camera standing nearer
+        await self.seed_plant_photo(
+            plant_id=self.plant_id,
+            telegram_file_unique_id="unique-leaf",
+            local_path="photos/new-leaf.jpg",
+            taken_at=FROZEN_NOW + timedelta(seconds=5),
+            frame=PlantPhotoFrame.DETAIL.value,
+        )
+
+        review = await self.build_use_case()(self.plant_id)
+
+        self.assertEqual(review, HEALTHY_REVIEW)
+        context = self.photo_analyst.reviewed_contexts[0]
+        self.assertEqual(context.current_photo_path, "photos/new-overview.jpg")
+        self.assertEqual(context.previous_photo_path, "photos/old-overview.jpg")
+        self.assertEqual(context.days_since_previous_photo, 31)
+
+    async def test_review_plant_photo_with_only_close_ups_reviews_nothing(self):
+        await self.seed_plant_photo(
+            plant_id=self.plant_id,
+            local_path="photos/leaf.jpg",
+            taken_at=FROZEN_NOW,
+            frame=PlantPhotoFrame.DETAIL.value,
+        )
+
+        review = await self.build_use_case()(self.plant_id)
+
+        self.assertIsNone(review)
+        self.assertEqual(self.photo_analyst.reviewed_contexts, [])
 
     async def test_review_plant_photo_passes_the_plant_profile_and_the_room_climate(self):
         await self.seed_room_climate_readings(

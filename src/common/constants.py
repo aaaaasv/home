@@ -25,6 +25,18 @@ class CareTaskType(StrEnum):
 SKIPPABLE_TASK_TYPES = frozenset({CareTaskType.FERTILIZING, CareTaskType.FLUSH, CareTaskType.PHOTO})
 
 
+class PlantPhotoFrame(StrEnum):
+    """
+    What a photo is for. The care instruction asks for two different shots, and they are not interchangeable:
+    a general frame from the same side as last time, which is what growth is measured against, and close-ups of
+    the leaves, where pests and spots show first. Comparing a close-up against a general frame would invent
+    changes that are only a change of distance, so only OVERVIEW frames are ever compared.
+    """
+
+    OVERVIEW = "overview"
+    DETAIL = "detail"
+
+
 class PlantPhotoReviewStatus(StrEnum):
     OK = "ok"
     WATCH = "watch"

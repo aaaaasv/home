@@ -1,4 +1,4 @@
-from src.common.constants import CareTaskType
+from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.common.exceptions import DoesNotExistError
 from src.common.household_calendar import HouseholdCalendar
 from src.common.use_case import BaseUseCase
@@ -37,12 +37,18 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
         schedules: list[CareSchedule],
         room_climate: RoomClimateReading | None,
     ) -> PlantPhotoReviewContext | None:
-        current = photos[-1]
+        # only general frames are comparable: judging a close-up of one leaf against last month's whole-plant
+        # shot would report changes that are only a change of distance
+        overviews = [photo for photo in photos if photo.frame == PlantPhotoFrame.OVERVIEW.value]
+        if not overviews:
+            return None
+
+        current = overviews[-1]
         # a photo whose download failed has no local copy, and there is nothing to send without one
         if current.local_path is None:
             return None
 
-        previous = next((photo for photo in reversed(photos[:-1]) if photo.local_path is not None), None)
+        previous = next((photo for photo in reversed(overviews[:-1]) if photo.local_path is not None), None)
         return PlantPhotoReviewContext(
             plant_name=plant.name,
             species=plant.species,
