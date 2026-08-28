@@ -122,9 +122,7 @@ async def _identify_and_create(
         return
 
     await state.update_data(watering_interval_days=identification.watering_interval_days)
-    await _create_plant(
-        message, state, actor, uow_factory, household_calendar, photo_storage, note=messages.ADD_PLANT_FROM_PHOTO
-    )
+    await _create_plant(message, state, actor, uow_factory, household_calendar, photo_storage)
 
 
 @router.message(AddPlantStates.photo, Command("skip"))
@@ -185,7 +183,6 @@ async def _create_plant(
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
     photo_storage: PhotoStorage,
-    note: str | None = None,
 ) -> None:
     """
     Makes the plant the moment the wizard knows a name and a rhythm, which is everything it cannot invent.
@@ -215,8 +212,6 @@ async def _create_plant(
         )
     # the whole wizard collapses to the one thing worth keeping — the finished card
     await sweep_transient_messages(message.bot, message.chat.id, collected_data)
-    if note is not None:
-        await message.answer(note)
     await send_plant_card(message, card, household_calendar)
 
 
