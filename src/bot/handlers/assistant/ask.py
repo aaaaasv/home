@@ -38,12 +38,17 @@ async def answer_in_place(
     answer_question: AnswerQuestionUseCase,
     question: str,
     images: Sequence[ImageAttachment] = (),
+    extra_facts: str | None = None,
 ) -> None:
     """The "думаю" placeholder turns into the answer — so a spent quota has to land there too, not in a new message"""
     try:
         # the placeholder sits in the topic the question was asked in, and that topic is the conversation
         answer = await answer_question(
-            question, conversation_id=thinking.message_thread_id, asked_at=current_time(), images=images
+            question,
+            conversation_id=thinking.message_thread_id,
+            asked_at=current_time(),
+            images=images,
+            extra_facts=extra_facts,
         )
     except QuotaExhausted as exhausted:
         limit_reached = (

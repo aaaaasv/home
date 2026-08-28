@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- У топіку рослин можна просто спитати: «чому жовтіє листя Тігла?» — і відповідь враховує, як цю рослину
+  насправді поливали, у якому повітрі вона стоїть і хто востаннє її доглядав, а не переказує інтернет
+
 ## [0.5.0] - 2026-08-28
 
 - The delivery layer is now driven by tests: real updates go through the real dispatcher, so a handler that
