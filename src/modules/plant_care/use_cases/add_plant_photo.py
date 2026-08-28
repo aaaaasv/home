@@ -32,6 +32,7 @@ class AddPlantPhotoUseCase(BaseActorUseCase):
                     "telegram_file_unique_id": command.photo.file_unique_id,
                     "local_path": local_path,
                     "caption": command.photo.caption,
+                    "frame": command.frame.value,
                     "added_by_telegram_user_id": self.actor.telegram_user_id,
                     "taken_at": command.taken_at,
                 }

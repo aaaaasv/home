@@ -15,6 +15,7 @@ from src.common.constants import (
     PLANT_NOTES_MAX_LENGTH,
     PLANT_SPECIES_MAX_LENGTH,
     CareTaskType,
+    PlantPhotoFrame,
 )
 
 
@@ -99,6 +100,7 @@ class AddPlantPhotoCommand(BaseModel):
     plant_id: int
     photo: TelegramPhoto
     taken_at: datetime
+    frame: PlantPhotoFrame = PlantPhotoFrame.OVERVIEW
 
 
 class ArchivePlantCommand(BaseModel):

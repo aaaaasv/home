@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from src.common.constants import CareTaskType
+from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.common.exceptions import DoesNotExistError
 from src.modules.plant_care.commands import AddPlantPhotoCommand, TelegramPhoto
 from src.modules.plant_care.use_cases.add_plant_photo import AddPlantPhotoUseCase
@@ -34,6 +34,29 @@ class AddPlantPhotoTestCase(BaseIntegrationTestCase):
         self.assertEqual(photo.caption, "новий листок")
         self.assertEqual(photo.taken_at, FROZEN_NOW)
         self.assertEqual(self.photo_storage.saved_file_ids, ["file-abc"])
+
+    async def test_add_plant_photo_without_a_stated_frame_is_stored_as_an_overview(self):
+        command = AddPlantPhotoCommand(
+            plant_id=self.plant_id,
+            photo=TelegramPhoto(file_id="file-abc", file_unique_id="unique-abc", caption=None),
+            taken_at=FROZEN_NOW,
+        )
+
+        photo = await self.build_use_case()(command)
+
+        self.assertEqual(photo.frame, PlantPhotoFrame.OVERVIEW)
+
+    async def test_add_plant_photo_as_a_close_up_is_stored_as_a_detail(self):
+        command = AddPlantPhotoCommand(
+            plant_id=self.plant_id,
+            photo=TelegramPhoto(file_id="file-leaf", file_unique_id="unique-leaf", caption=None),
+            taken_at=FROZEN_NOW,
+            frame=PlantPhotoFrame.DETAIL,
+        )
+
+        photo = await self.build_use_case()(command)
+
+        self.assertEqual(photo.frame, PlantPhotoFrame.DETAIL)
 
     async def test_add_plant_photo_with_a_photo_schedule_moves_the_next_one_a_full_interval_away(self):
         await self.seed_care_schedule(

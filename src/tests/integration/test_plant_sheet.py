@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from src.common.constants import CareTaskType
+from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.modules.plant_care.commands import RecordCareEventCommand
 from src.modules.plant_care.use_cases.record_care_event import RecordCareEventUseCase
 from src.modules.plant_care.use_cases.retrieve_plant_sheet import RetrievePlantSheetUseCase
@@ -177,6 +177,31 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         self.assertIn("Tabula IV · зріст", page)
         self.assertIn("за 8 діб", page)
         self.assertIn('id="wipe"', page)
+
+    async def test_render_compares_the_overviews_and_leaves_the_close_ups_out_of_it(self):
+        await self.seed_plant_photo(
+            self.plant_id, taken_at=FROZEN_NOW - timedelta(days=9), frame=PlantPhotoFrame.OVERVIEW.value
+        )
+        await self.seed_plant_photo(
+            self.plant_id, taken_at=FROZEN_NOW - timedelta(days=1), frame=PlantPhotoFrame.OVERVIEW.value
+        )
+        # taken moments after the second general frame, so a naive "first against latest" would measure 8 days
+        # of growth between a whole plant and one leaf
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW, frame=PlantPhotoFrame.DETAIL.value)
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
+
+        self.assertIn("за 8 діб", page)
+
+    async def test_render_one_overview_and_a_close_up_offers_no_comparison_to_make(self):
+        await self.seed_plant_photo(
+            self.plant_id, taken_at=FROZEN_NOW - timedelta(days=1), frame=PlantPhotoFrame.OVERVIEW.value
+        )
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW, frame=PlantPhotoFrame.DETAIL.value)
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
+
+        self.assertNotIn("Tabula IV · зріст", page)
 
     async def test_render_a_single_plate_offers_no_comparison_to_make(self):
         await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=1))

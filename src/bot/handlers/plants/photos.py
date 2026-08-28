@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 
 from aiogram import F, Router
@@ -15,6 +16,7 @@ from src.bot.message_cleanup import (
     remember_transient_message,
     sweep_transient_messages,
 )
+from src.common.constants import PlantPhotoFrame
 from src.common.domain import Actor
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
@@ -28,6 +30,11 @@ from src.modules.plant_care.use_cases.review_plant_photo import ReviewPlantPhoto
 router = Router(name="photos")
 
 TIMELINE_PHOTO_LIMIT = 10
+# an album's frames land milliseconds apart; this is how long the session waits for another one
+ALBUM_SETTLE_SECONDS = 2.0
+
+# one open photo session per person per chat, kept here because an asyncio task cannot live in fsm data
+_open_sessions: dict[tuple[int, int], asyncio.Task] = {}
 
 
 class AddPhotoStates(StatesGroup):
@@ -65,11 +72,19 @@ async def add_photo(
     photo_storage: PhotoStorage,
     photo_analyst: PhotoAnalyst | None,
 ) -> None:
+    """
+    Saves one frame of a photo session, which may be a whole album.
+
+    the care instruction asks for a general frame and then close-ups of the leaves, in that order, so the first
+    frame of a session is the one growth is measured against and the rest are evidence. the state is deliberately
+    not cleared here: telegram delivers an album as separate messages, and clearing on the first would drop the
+    rest of it in silence.
+    """
     collected_data = await state.get_data()
-    await state.clear()
+    frames_saved = collected_data.get("frames_saved", 0)
+    plant_id = collected_data["plant_id"]
 
     largest_photo = message.photo[-1]
-    plant_id = collected_data["plant_id"]
     use_case = AddPlantPhotoUseCase(
         uow=uow_factory(), actor=actor, photo_storage=photo_storage, household_calendar=household_calendar
     )
@@ -82,12 +97,40 @@ async def add_photo(
                 caption=message.caption,
             ),
             taken_at=household_calendar.now(),
+            frame=PlantPhotoFrame.OVERVIEW if frames_saved == 0 else PlantPhotoFrame.DETAIL,
         )
     )
-    await _drop_due_card(message, collected_data.get("due_card_message_id"))
-    await sweep_transient_messages(message.bot, message.chat.id, collected_data)
-    await message.answer(messages.PHOTO_ADDED)
-    await _review_photo(message, plant_id, uow_factory, household_calendar, photo_analyst)
+    await state.update_data(frames_saved=frames_saved + 1)
+    _restart_session_timer(message, state, plant_id, collected_data, uow_factory, household_calendar, photo_analyst)
+
+
+def _restart_session_timer(
+    message: Message,
+    state: FSMContext,
+    plant_id: int,
+    collected_data: dict,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_analyst: PhotoAnalyst | None,
+) -> None:
+    # there is no "album finished" update, so the session closes a moment after frames stop arriving; each new
+    # frame pushes the deadline back, and a lone photo simply waits out one quiet interval
+    key = (message.chat.id, message.from_user.id)
+    pending = _open_sessions.pop(key, None)
+    if pending is not None:
+        pending.cancel()
+
+    async def close_when_quiet() -> None:
+        await asyncio.sleep(ALBUM_SETTLE_SECONDS)
+        _open_sessions.pop(key, None)
+        saved = (await state.get_data()).get("frames_saved", 1)
+        await state.clear()
+        await _drop_due_card(message, collected_data.get("due_card_message_id"))
+        await sweep_transient_messages(message.bot, message.chat.id, collected_data)
+        await message.answer(messages.PHOTO_ADDED if saved == 1 else messages.PHOTOS_ADDED.format(count=saved))
+        await _review_photo(message, plant_id, uow_factory, household_calendar, photo_analyst)
+
+    _open_sessions[key] = asyncio.create_task(close_when_quiet())
 
 
 async def _review_photo(
