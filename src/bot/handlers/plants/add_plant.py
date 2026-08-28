@@ -7,16 +7,19 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from src.bot.handlers.plants import messages
-from src.bot.handlers.plants.formatting import render_plant_identification
 from src.bot.handlers.plants.keyboards import (
     CUSTOM_INTERVAL_MARKER,
-    NewPlantIdentificationCallback,
     NewPlantIntervalCallback,
-    build_new_plant_identification_keyboard,
     build_new_plant_interval_keyboard,
 )
 from src.bot.handlers.plants.plant_list import send_plant_card
-from src.bot.message_cleanup import delete_quietly, remember_transient_message, replace_prompt, sweep_transient_messages
+from src.bot.message_cleanup import (
+    delete_message_quietly,
+    delete_quietly,
+    remember_transient_message,
+    replace_prompt,
+    sweep_transient_messages,
+)
 from src.common.constants import PLANT_NAME_MAX_LENGTH, CareTaskType
 from src.common.domain import Actor
 from src.common.household_calendar import HouseholdCalendar
@@ -34,7 +37,6 @@ router = Router(name="add_plant")
 class AddPlantStates(StatesGroup):
     name = State()
     photo = State()
-    identification = State()
     watering_interval = State()
     custom_watering_interval = State()
 
@@ -59,7 +61,15 @@ async def store_name(message: Message, state: FSMContext) -> None:
 
 
 @router.message(AddPlantStates.photo, F.photo)
-async def store_photo(message: Message, state: FSMContext, plant_identifier: PlantIdentifier | None = None) -> None:
+async def store_photo(
+    message: Message,
+    state: FSMContext,
+    actor: Actor,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_storage: PhotoStorage,
+    plant_identifier: PlantIdentifier | None = None,
+) -> None:
     largest_photo = message.photo[-1]
     await state.update_data(
         photo_file_id=largest_photo.file_id,
@@ -71,11 +81,20 @@ async def store_photo(message: Message, state: FSMContext, plant_identifier: Pla
         await _ask_watering_interval(message, state)
         return
 
-    await _offer_identification(message, state, plant_identifier, largest_photo.file_id)
+    await _identify_and_create(
+        message, state, plant_identifier, largest_photo.file_id, actor, uow_factory, household_calendar, photo_storage
+    )
 
 
-async def _offer_identification(
-    message: Message, state: FSMContext, plant_identifier: PlantIdentifier, file_id: str
+async def _identify_and_create(
+    message: Message,
+    state: FSMContext,
+    plant_identifier: PlantIdentifier,
+    file_id: str,
+    actor: Actor,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_storage: PhotoStorage,
 ) -> None:
     """
     Names the plant from its photo and offers the answer for confirmation.
@@ -93,44 +112,19 @@ async def _offer_identification(
         return
 
     await state.update_data(
-        suggested_species=identification.species,
-        suggested_watering_interval_days=identification.watering_interval_days,
-        suggested_care_notes=identification.care_notes,
+        species=identification.species,
+        care_notes=identification.care_notes,
     )
-    await state.set_state(AddPlantStates.identification)
-    await thinking.edit_text(
-        render_plant_identification(identification), reply_markup=build_new_plant_identification_keyboard()
-    )
-    await replace_prompt(state, thinking)
-
-
-@router.callback_query(AddPlantStates.identification, NewPlantIdentificationCallback.filter())
-async def store_identification(
-    callback: CallbackQuery,
-    callback_data: NewPlantIdentificationCallback,
-    state: FSMContext,
-    actor: Actor,
-    uow_factory: Callable[[], UnitOfWork],
-    household_calendar: HouseholdCalendar,
-    photo_storage: PhotoStorage,
-) -> None:
-    await callback.answer()
-    if not callback_data.accepted:
-        await _ask_watering_interval(callback.message, state)
+    await delete_message_quietly(message.bot, message.chat.id, thinking.message_id)
+    if identification.watering_interval_days is None:
+        # a name without a rhythm is not enough to make a plant, so the one open question is still asked
+        await _ask_watering_interval(message, state)
         return
 
-    collected_data = await state.get_data()
-    await state.update_data(
-        species=collected_data.get("suggested_species"),
-        watering_interval_days=collected_data.get("suggested_watering_interval_days"),
-        care_notes=collected_data.get("suggested_care_notes"),
+    await state.update_data(watering_interval_days=identification.watering_interval_days)
+    await _create_plant(
+        message, state, actor, uow_factory, household_calendar, photo_storage, note=messages.ADD_PLANT_FROM_PHOTO
     )
-    # with a rhythm in hand there is nothing left that a plant cannot exist without, so the card is made now
-    if collected_data.get("suggested_watering_interval_days") is not None:
-        await _create_plant(callback.message, state, actor, uow_factory, household_calendar, photo_storage)
-        return
-
-    await _ask_watering_interval(callback.message, state)
 
 
 @router.message(AddPlantStates.photo, Command("skip"))
@@ -191,6 +185,7 @@ async def _create_plant(
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
     photo_storage: PhotoStorage,
+    note: str | None = None,
 ) -> None:
     """
     Makes the plant the moment the wizard knows a name and a rhythm, which is everything it cannot invent.
@@ -220,6 +215,8 @@ async def _create_plant(
         )
     # the whole wizard collapses to the one thing worth keeping — the finished card
     await sweep_transient_messages(message.bot, message.chat.id, collected_data)
+    if note is not None:
+        await message.answer(note)
     await send_plant_card(message, card, household_calendar)
 
 

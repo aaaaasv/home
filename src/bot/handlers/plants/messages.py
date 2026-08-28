@@ -57,7 +57,7 @@ ADD_PLANT_ASK_CUSTOM_INTERVAL = (
     f"Раз на скільки днів поливати? Надішли число від {MINIMUM_CARE_INTERVAL_DAYS} до {MAXIMUM_CARE_INTERVAL_DAYS}."
 )
 ADD_PLANT_IDENTIFYING = "🔎 Дивлюсь, що це…"
-ADD_PLANT_IDENTIFICATION_INTRO = "Схоже на це:"
+ADD_PLANT_FROM_PHOTO = "🔎 Вид і ритм поливу впізнані з фото — перевір їх на картці й виправ, якщо не те."
 ADD_PLANT_IDENTIFICATION_UNSURE = "Не впізнаю за цим фото — розкажи сам."
 
 ADD_PLANT_EXPECTS_PHOTO = "Надішли саме фото або /skip."
