@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import func, select
 
-from src.infrastructure.db.models import RoomClimateAlert, RoomClimateReading
+from src.infrastructure.db.models import RoomClimateAlert, RoomClimateDay, RoomClimateReading
 from src.infrastructure.repositories.base import SQLAlchemyRepository
 
 
@@ -51,3 +51,24 @@ class RoomClimateAlertRepository(SQLAlchemyRepository[RoomClimateAlert]):
     async def retrieve_latest(self) -> RoomClimateAlert | None:
         result = await self.session.execute(select(RoomClimateAlert).order_by(RoomClimateAlert.id.desc()))
         return result.scalars().first()
+
+
+class RoomClimateDayRepository(SQLAlchemyRepository[RoomClimateDay]):
+    model = RoomClimateDay
+
+    async def save_day(self, day: date, summary: dict) -> None:
+        """One row per day, rewritten as the day fills — the last write of a day is the whole day."""
+        existing = await self.session.get(RoomClimateDay, day)
+        if existing is None:
+            self.session.add(RoomClimateDay(day=day, **summary))
+            return
+        for field, value in summary.items():
+            setattr(existing, field, value)
+
+    async def list_between(self, first_day: date, last_day: date) -> list[RoomClimateDay]:
+        result = await self.session.execute(
+            select(RoomClimateDay)
+            .where(RoomClimateDay.day >= first_day, RoomClimateDay.day <= last_day)
+            .order_by(RoomClimateDay.day)
+        )
+        return list(result.scalars().all())

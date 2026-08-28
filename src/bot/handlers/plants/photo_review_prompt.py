@@ -1,3 +1,6 @@
+from datetime import date
+
+from src.bot.formatting import GENITIVE_MONTH_NAMES
 from src.bot.handlers.plants.messages import CARE_TASK_LABELS
 from src.modules.plant_care.domain import PhotoReviewSchedule, PlantPhotoReviewContext
 
@@ -38,6 +41,11 @@ SYSTEM_PROMPT = """Ти досвідчений кімнатний рослинн
 - action: одна конкретна дія або перевірка. null, якщо нічого робити не треба."""
 
 
+def format_day(day: date) -> str:
+    """A date the model can read the season off, in the same words the family sees elsewhere."""
+    return f"{day.day} {GENITIVE_MONTH_NAMES[day.month - 1]} {day.year}"
+
+
 def describe_plant(context: PlantPhotoReviewContext) -> str:
     lines = [f"Рослина: {context.plant_name}"]
     if context.species:
@@ -51,6 +59,7 @@ def describe_plant(context: PlantPhotoReviewContext) -> str:
     room = _describe_room_climate(context)
     if room:
         lines.append(f"Зараз у кімнаті: {room}")
+    lines.extend(_describe_climate_between_photos(context))
 
     if context.schedules:
         lines.append("Догляд:")
@@ -59,6 +68,28 @@ def describe_plant(context: PlantPhotoReviewContext) -> str:
         lines.append("Догляд: розкладу нема")
 
     return "\n".join(lines)
+
+
+def _describe_climate_between_photos(context: PlantPhotoReviewContext) -> list[str]:
+    """
+    The air across the whole gap, not the instant the shutter fired.
+
+    a reading of 31% today explains nothing about a leaf that browned over six weeks; "22–41%, below what it
+    wants on 38 of 46 days" explains it exactly.
+    """
+    interval = context.climate_between_photos
+    if interval is None:
+        return []
+
+    lines = [
+        f"Повітря між знімками: {interval.minimum_temperature_celsius:.0f}–"
+        f"{interval.maximum_temperature_celsius:.0f} °C (сер. {interval.average_temperature_celsius:.0f}), "
+        f"вологість {interval.minimum_humidity_percent:.0f}–{interval.maximum_humidity_percent:.0f}% "
+        f"(сер. {interval.average_humidity_percent:.0f})"
+    ]
+    if interval.days_below_ideal_humidity:
+        lines.append(f"Сухіше за бажане: {interval.days_below_ideal_humidity} з {interval.days_recorded} днів")
+    return lines
 
 
 def _describe_ideal_conditions(context: PlantPhotoReviewContext) -> str:

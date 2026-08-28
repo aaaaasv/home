@@ -23,6 +23,10 @@ class HouseholdCalendar:
         # naive on purpose: it is compared to the naive digest time from the settings
         return moment.astimezone(self.timezone).time()
 
+    def start_of_day(self, day: date) -> datetime:
+        """Midnight of a household day as an instant — the boundary a day's readings are gathered from."""
+        return datetime.combine(day, time.min, tzinfo=self.timezone)
+
     def next_due_on(self, performed_at: datetime, interval_days: int) -> date:
         return self.local_date(performed_at) + timedelta(days=interval_days)
 

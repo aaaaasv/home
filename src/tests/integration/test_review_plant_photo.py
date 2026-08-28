@@ -101,6 +101,48 @@ class ReviewPlantPhotoTestCase(BaseIntegrationTestCase):
         self.assertIsNone(review)
         self.assertEqual(self.photo_analyst.reviewed_contexts, [])
 
+    async def test_review_plant_photo_passes_the_date_of_each_photo_so_the_season_is_known(self):
+        await self.seed_plant_photo(
+            plant_id=self.plant_id, local_path="photos/old.jpg", taken_at=FROZEN_NOW - timedelta(days=31)
+        )
+        await self.seed_plant_photo(plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW)
+
+        await self.build_use_case()(self.plant_id)
+
+        context = self.photo_analyst.reviewed_contexts[0]
+        self.assertEqual(context.previous_photo_taken_on, self.today - timedelta(days=31))
+        self.assertEqual(context.current_photo_taken_on, self.today)
+
+    async def test_review_plant_photo_summarises_the_air_across_the_whole_gap(self):
+        await self.seed_plant_photo(
+            plant_id=self.plant_id, local_path="photos/old.jpg", taken_at=FROZEN_NOW - timedelta(days=2)
+        )
+        await self.seed_plant_photo(plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW)
+        await self.seed_climate_day(self.today - timedelta(days=2), temperature=24.0, humidity=30.0)
+        await self.seed_climate_day(self.today - timedelta(days=1), temperature=28.0, humidity=50.0)
+        await self.seed_climate_day(self.today, temperature=26.0, humidity=34.0)
+
+        await self.build_use_case()(self.plant_id)
+
+        interval = self.photo_analyst.reviewed_contexts[0].climate_between_photos
+        self.assertEqual(interval.days_recorded, 3)
+        self.assertEqual(interval.minimum_temperature_celsius, 24.0)
+        self.assertEqual(interval.maximum_temperature_celsius, 28.0)
+        self.assertEqual(interval.average_temperature_celsius, 26.0)
+        self.assertEqual(interval.average_humidity_percent, 38.0)
+        # the plant wants 40% at least, so two of the three days were drier than it likes
+        self.assertEqual(interval.days_below_ideal_humidity, 2)
+
+    async def test_review_plant_photo_without_any_recorded_days_says_nothing_about_the_gap(self):
+        await self.seed_plant_photo(
+            plant_id=self.plant_id, local_path="photos/old.jpg", taken_at=FROZEN_NOW - timedelta(days=31)
+        )
+        await self.seed_plant_photo(plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW)
+
+        await self.build_use_case()(self.plant_id)
+
+        self.assertIsNone(self.photo_analyst.reviewed_contexts[0].climate_between_photos)
+
     async def test_review_plant_photo_passes_the_plant_profile_and_the_room_climate(self):
         await self.seed_room_climate_readings(
             humidity_percent=31.0,

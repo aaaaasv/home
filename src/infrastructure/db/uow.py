@@ -17,7 +17,11 @@ from src.infrastructure.repositories.plant_climate_alert import PlantClimateAler
 from src.infrastructure.repositories.plant_photo import PlantPhotoRepository
 from src.infrastructure.repositories.posted_message import PostedMessageRepository
 from src.infrastructure.repositories.price_check import PriceCheckRepository
-from src.infrastructure.repositories.room_climate import RoomClimateAlertRepository, RoomClimateReadingRepository
+from src.infrastructure.repositories.room_climate import (
+    RoomClimateAlertRepository,
+    RoomClimateDayRepository,
+    RoomClimateReadingRepository,
+)
 from src.infrastructure.repositories.shopping_item import ShoppingItemRepository
 
 
@@ -37,6 +41,7 @@ class UnitOfWork:
         self.family_members: FamilyMemberRepository | None = None
         self.room_climate_readings: RoomClimateReadingRepository | None = None
         self.room_climate_alerts: RoomClimateAlertRepository | None = None
+        self.room_climate_days: RoomClimateDayRepository | None = None
         self.plant_climate_alerts: PlantClimateAlertRepository | None = None
         self.air_conditioner_runs: AirConditionerRunRepository | None = None
         self.care_digest_deliveries: CareDigestDeliveryRepository | None = None
@@ -57,6 +62,7 @@ class UnitOfWork:
         self.family_members = FamilyMemberRepository(session=self.session)
         self.room_climate_readings = RoomClimateReadingRepository(session=self.session)
         self.room_climate_alerts = RoomClimateAlertRepository(session=self.session)
+        self.room_climate_days = RoomClimateDayRepository(session=self.session)
         self.plant_climate_alerts = PlantClimateAlertRepository(session=self.session)
         self.air_conditioner_runs = AirConditionerRunRepository(session=self.session)
         self.care_digest_deliveries = CareDigestDeliveryRepository(session=self.session)
