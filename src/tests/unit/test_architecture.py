@@ -71,6 +71,22 @@ class SchedulingTestCase(unittest.TestCase):
         self.assertEqual(schedulers, [])
 
 
+class BehaviourCoverageTestCase(unittest.TestCase):
+    """
+    Keeps at least one test driving updates through the real dispatcher.
+
+    the delivery layer went months with none, and the cost was invisible: a handler could take a parameter
+    nothing injects and 652 tests stayed green while the flow was dead in the group.
+    """
+
+    def test_some_test_drives_an_update_through_the_dispatcher(self):
+        drivers = sorted(
+            str(path) for path in pathlib.Path("src/tests").rglob("*.py") if "feed_update" in path.read_text()
+        )
+
+        self.assertNotEqual(drivers, [])
+
+
 class LayerBoundariesTestCase(unittest.TestCase):
     """
     Guards the two rules that would let the delivery layer collapse back into cross-module god-files.

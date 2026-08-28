@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- The delivery layer is now driven by tests: real updates go through the real dispatcher, so a handler that
+  asks for a dependency nothing injects fails a test instead of failing silently in the group.
+
 ### Added
 
 - Рослина заводиться з імені та фото. Бот упізнає вид за знімком, ставить ритм поливу й дописує кілька слів

@@ -43,10 +43,13 @@ class AllowedUsersMiddleware(BaseMiddleware):
 
 
 class FamilyRosterMiddleware(BaseMiddleware):
-    """Records each allowed member who writes, so the roster that lets a chore be tagged «Марта» fills itself"""
+    """
+    Records each allowed member who writes, so the roster that lets a chore be tagged «Марта» fills itself.
 
-    def __init__(self, uow_factory: Callable[[], UnitOfWork]):
-        self.uow_factory = uow_factory
+    the unit of work comes off the update rather than off the constructor, the same way every handler gets it.
+    a middleware holding its own factory would reach past whatever the caller injected, which is what kept the
+    delivery layer untestable.
+    """
 
     async def __call__(
         self,
@@ -56,7 +59,8 @@ class FamilyRosterMiddleware(BaseMiddleware):
     ) -> Any:
         actor: Actor | None = data.get("actor")
         if actor is not None:
-            member = await RecordFamilyMemberUseCase(uow=self.uow_factory())(actor.telegram_user_id, actor.display_name)
+            uow_factory: Callable[[], UnitOfWork] = data["uow_factory"]
+            member = await RecordFamilyMemberUseCase(uow=uow_factory())(actor.telegram_user_id, actor.display_name)
             # everything downstream denormalises the actor's name onto its records, so resolve the chosen
             # name here — otherwise history keeps whatever telegram happened to call them that day
             data["actor"] = Actor(telegram_user_id=actor.telegram_user_id, display_name=member.name)
