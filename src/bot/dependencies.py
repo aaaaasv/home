@@ -8,6 +8,7 @@ from src.bot.handlers.chores.board import ChoresBoard
 from src.bot.handlers.places.board import PlacesBoard
 from src.bot.handlers.plants.claude_photo_analyst import ClaudePhotoAnalyst
 from src.bot.handlers.plants.gemini_photo_analyst import GeminiPhotoAnalyst
+from src.bot.handlers.plants.gemini_plant_identifier import GeminiPlantIdentifier
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.handlers.shopping.board import ShoppingListBoard
@@ -37,6 +38,7 @@ from src.modules.assistant.services.language_model import LanguageModel
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
 from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 from src.modules.plant_care.services.photo_storage import NullPhotoStorage, PhotoStorage
+from src.modules.plant_care.services.plant_identifier import PlantIdentifier
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
 from src.modules.presence.services.presence_source import NullPresenceSource, PresenceSource
 from src.modules.room_climate.services.room_climate_sensor import NullRoomClimateSensor, RoomClimateSensor
@@ -144,6 +146,14 @@ def build_photo_analyst(settings: Settings) -> PhotoAnalyst | None:
     return None
 
 
+def build_plant_identifier(settings: Settings) -> PlantIdentifier | None:
+    # None rather than a null object, the same way the analyst is: the add-plant flow must know whether it can
+    # offer to name the plant at all, or should go straight to asking
+    if not settings.PLANT_IDENTIFICATION_ENABLED or not settings.GEMINI_API_KEY:
+        return None
+    return GeminiPlantIdentifier(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
+
+
 def build_presence_source(settings: Settings) -> PresenceSource:
     if not settings.PRESENCE_ENABLED or not settings.ROUTER_PASSWORD:
         return NullPresenceSource()
@@ -236,6 +246,7 @@ def build_workflow_data(
         "household_calendar": HouseholdCalendar(timezone=settings.timezone),
         "photo_storage": build_photo_storage(bot=bot, settings=settings),
         "photo_analyst": build_photo_analyst(settings),
+        "plant_identifier": build_plant_identifier(settings),
         "price_source": build_price_source(settings),
         "shopping_list_board": shopping_list_board,
         "places_board": places_board,

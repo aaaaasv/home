@@ -8,24 +8,29 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from src.bot.handlers.plants import messages
+from src.bot.handlers.plants.formatting import render_plant_identification
 from src.bot.handlers.plants.keyboards import (
     CUSTOM_INTERVAL_MARKER,
     UNKNOWN_LAST_WATERED_MARKER,
+    NewPlantIdentificationCallback,
     NewPlantIntervalCallback,
     NewPlantLastWateredCallback,
+    build_new_plant_identification_keyboard,
     build_new_plant_interval_keyboard,
     build_new_plant_last_watered_keyboard,
 )
 from src.bot.handlers.plants.plant_list import send_plant_card
-from src.bot.message_cleanup import delete_quietly, replace_prompt, sweep_transient_messages
-from src.common.constants import PLANT_NAME_MAX_LENGTH
+from src.bot.message_cleanup import delete_quietly, remember_transient_message, replace_prompt, sweep_transient_messages
+from src.common.constants import PLANT_NAME_MAX_LENGTH, CareTaskType
 from src.common.domain import Actor
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.plant_care.commands import CreatePlantCommand, TelegramPhoto
+from src.modules.plant_care.commands import CreatePlantCommand, SetCareInstructionsCommand, TelegramPhoto
 from src.modules.plant_care.services.care_input_parser import parse_interval_days
 from src.modules.plant_care.services.photo_storage import PhotoStorage
+from src.modules.plant_care.services.plant_identifier import PlantIdentifier
 from src.modules.plant_care.use_cases.create_plant import CreatePlantUseCase
+from src.modules.plant_care.use_cases.set_care_instructions import SetCareInstructionsUseCase
 
 router = Router(name="add_plant")
 
@@ -33,6 +38,7 @@ router = Router(name="add_plant")
 class AddPlantStates(StatesGroup):
     name = State()
     photo = State()
+    identification = State()
     species = State()
     location = State()
     watering_interval = State()
@@ -60,7 +66,7 @@ async def store_name(message: Message, state: FSMContext) -> None:
 
 
 @router.message(AddPlantStates.photo, F.photo)
-async def store_photo(message: Message, state: FSMContext) -> None:
+async def store_photo(message: Message, state: FSMContext, plant_identifier: PlantIdentifier | None = None) -> None:
     largest_photo = message.photo[-1]
     await state.update_data(
         photo_file_id=largest_photo.file_id,
@@ -68,7 +74,60 @@ async def store_photo(message: Message, state: FSMContext) -> None:
         photo_caption=message.caption,
     )
     await delete_quietly(message)
-    await _ask_species(message, state)
+    if plant_identifier is None:
+        await _ask_species(message, state)
+        return
+
+    await _offer_identification(message, state, plant_identifier, largest_photo.file_id)
+
+
+async def _offer_identification(
+    message: Message, state: FSMContext, plant_identifier: PlantIdentifier, file_id: str
+) -> None:
+    """
+    Names the plant from its photo and offers the answer for confirmation.
+
+    a refusal is a normal outcome, not a failure: a young cutting or a bad light genuinely cannot be named, and
+    saying so costs one message, while a confident wrong species would be copied into the card and believed.
+    """
+    thinking = await message.answer(messages.ADD_PLANT_IDENTIFYING)
+    downloaded = await message.bot.download(file_id)
+    identification = await plant_identifier.identify(downloaded.read())
+    if identification is None:
+        await thinking.edit_text(messages.ADD_PLANT_IDENTIFICATION_UNSURE)
+        await remember_transient_message(state, thinking)
+        await _ask_species(message, state)
+        return
+
+    await state.update_data(
+        suggested_species=identification.species,
+        suggested_watering_interval_days=identification.watering_interval_days,
+        suggested_care_notes=identification.care_notes,
+    )
+    await state.set_state(AddPlantStates.identification)
+    await thinking.edit_text(
+        render_plant_identification(identification), reply_markup=build_new_plant_identification_keyboard()
+    )
+    await replace_prompt(state, thinking)
+
+
+@router.callback_query(AddPlantStates.identification, NewPlantIdentificationCallback.filter())
+async def store_identification(
+    callback: CallbackQuery, callback_data: NewPlantIdentificationCallback, state: FSMContext
+) -> None:
+    await callback.answer()
+    if not callback_data.accepted:
+        await _ask_species(callback.message, state)
+        return
+
+    collected_data = await state.get_data()
+    await state.update_data(
+        species=collected_data.get("suggested_species"),
+        watering_interval_days=collected_data.get("suggested_watering_interval_days"),
+        care_notes=collected_data.get("suggested_care_notes"),
+    )
+    # the species is answered, so the flow resumes at the next thing a photo cannot tell: where it stands
+    await _ask_location(callback.message, state)
 
 
 @router.message(AddPlantStates.photo, Command("skip"))
@@ -99,13 +158,21 @@ async def store_species(message: Message, state: FSMContext) -> None:
 @router.message(AddPlantStates.location, Command("skip"))
 async def skip_location(message: Message, state: FSMContext) -> None:
     await delete_quietly(message)
-    await _ask_watering_interval(message, state)
+    await _ask_interval_unless_known(message, state)
 
 
 @router.message(AddPlantStates.location, F.text)
 async def store_location(message: Message, state: FSMContext) -> None:
     await state.update_data(location=message.text.strip())
     await delete_quietly(message)
+    await _ask_interval_unless_known(message, state)
+
+
+async def _ask_interval_unless_known(message: Message, state: FSMContext) -> None:
+    # an accepted identification already answered this, and asking again would undo the point of asking the model
+    if (await state.get_data()).get("watering_interval_days") is not None:
+        await _ask_last_watered(message, state)
+        return
     await _ask_watering_interval(message, state)
 
 
@@ -162,6 +229,11 @@ async def create_plant(
             last_watered_on=_resolve_last_watered_on(callback_data.days_ago, household_calendar),
         )
     )
+    care_notes = collected_data.get("care_notes")
+    if care_notes is not None:
+        await SetCareInstructionsUseCase(uow=uow_factory())(
+            SetCareInstructionsCommand(plant_id=card.id, task_type=CareTaskType.WATERING, instructions=care_notes)
+        )
     # the whole wizard collapses to the one thing worth keeping — the finished card
     await sweep_transient_messages(callback.message.bot, callback.message.chat.id, collected_data)
     await send_plant_card(callback.message, card, household_calendar)

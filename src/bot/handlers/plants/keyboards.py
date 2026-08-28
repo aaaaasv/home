@@ -85,6 +85,10 @@ class NewPlantIntervalCallback(CallbackData, prefix="new_interval"):
     interval_days: int
 
 
+class NewPlantIdentificationCallback(CallbackData, prefix="new_ident"):
+    accepted: bool
+
+
 class NewPlantLastWateredCallback(CallbackData, prefix="new_last_watered"):
     days_ago: int
 
@@ -392,3 +396,12 @@ def _plant_status_emoji(plant: PlantSummary) -> str:
     if most_urgent_schedule.is_due:
         return task_emoji(most_urgent_schedule.task_type)
     return PLANT_EMOJI
+
+
+def build_new_plant_identification_keyboard() -> InlineKeyboardMarkup:
+    """Accept the guess or ignore it — the family confirms before a machine's opinion becomes a card."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Так, це воно", callback_data=NewPlantIdentificationCallback(accepted=True))
+    builder.button(text="✏️ Введу сам", callback_data=NewPlantIdentificationCallback(accepted=False))
+    builder.adjust(1)
+    return builder.as_markup()

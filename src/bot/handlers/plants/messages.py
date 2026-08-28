@@ -59,6 +59,10 @@ ADD_PLANT_ASK_CUSTOM_INTERVAL = (
     f"Раз на скільки днів поливати? Надішли число від {MINIMUM_CARE_INTERVAL_DAYS} до {MAXIMUM_CARE_INTERVAL_DAYS}."
 )
 ADD_PLANT_ASK_LAST_WATERED = "Коли її востаннє поливали?"
+ADD_PLANT_IDENTIFYING = "🔎 Дивлюсь, що це…"
+ADD_PLANT_IDENTIFICATION_INTRO = "Схоже на це:"
+ADD_PLANT_IDENTIFICATION_UNSURE = "Не впізнаю за цим фото — розкажи сам."
+
 ADD_PLANT_EXPECTS_PHOTO = "Надішли саме фото або /skip."
 ADD_PLANT_EXPECTS_TEXT = "Надішли текст або /skip."
 

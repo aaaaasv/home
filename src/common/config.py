@@ -178,6 +178,9 @@ class Settings(BaseSettings):
 
     # every new plant photo is compared with the previous one by claude; off until an api key is in place
     PLANT_PHOTO_REVIEW_ENABLED: bool = False
+    # names an unfamiliar plant from the photo sent while adding it, so the species and the watering rhythm
+    # are confirmed rather than typed. shares the gemini key and its free-tier quota with the review above
+    PLANT_IDENTIFICATION_ENABLED: bool = False
     ANTHROPIC_API_KEY: str = ""
     PLANT_PHOTO_REVIEW_MODEL: str = "claude-opus-4-8"
 

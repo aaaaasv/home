@@ -5,6 +5,7 @@ from html import escape
 
 from src.bot.formatting import format_due, format_moment, pluralize_days
 from src.bot.handlers.plants.messages import (
+    ADD_PLANT_IDENTIFICATION_INTRO,
     CARE_RECORDED_CARD,
     CARE_TASK_ACTIONS,
     CARE_TASK_EMOJI,
@@ -29,6 +30,7 @@ from src.modules.plant_care.domain import (
     DueCareTask,
     PlantCard,
     PlantComfortChange,
+    PlantIdentification,
     PlantPhotoReview,
     PlantSummary,
 )
@@ -221,3 +223,16 @@ def render_schedule_remove_confirm(plant_name: str, schedule: CareScheduleDetail
     if schedule.instructions:
         return question + SCHEDULE_REMOVE_CONFIRM_INSTRUCTIONS
     return question
+
+
+def render_plant_identification(identification: PlantIdentification) -> str:
+    """What the model made of the photo, with every blank left visibly blank rather than filled with a guess."""
+    title = identification.common_name or identification.species
+    lines = [ADD_PLANT_IDENTIFICATION_INTRO, "", f"<b>{escape(title)}</b>"]
+    if identification.species is not None and identification.common_name is not None:
+        lines.append(f"<i>{escape(identification.species)}</i>")
+    if identification.watering_interval_days is not None:
+        lines.append(f"\n💧 поливати раз на {identification.watering_interval_days} дн.")
+    if identification.care_notes is not None:
+        lines.append(f"\n{escape(identification.care_notes)}")
+    return "\n".join(lines)
