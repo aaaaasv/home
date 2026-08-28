@@ -344,6 +344,20 @@ class ClimatePoint(DomainModel):
     relative_humidity_percent: float
 
 
+class PlantIdentification(DomainModel):
+    """
+    What a photo alone suggests about a plant nobody has catalogued yet.
+
+    every field is optional and nothing is ever saved from it unaided: a guess about a species is a guess, and
+    watering the wrong plant on the wrong rhythm is how one gets killed. the family confirms before it counts.
+    """
+
+    common_name: str | None
+    species: str | None
+    watering_interval_days: int | None
+    care_notes: str | None
+
+
 class PlantSheet(DomainModel):
     """One plant as a specimen sheet: what it is, where it came from, and how it has actually been kept."""
 

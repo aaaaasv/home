@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- The delivery layer is now driven by tests: real updates go through the real dispatcher, so a handler that
+  asks for a dependency nothing injects fails a test instead of failing silently in the group.
+
+### Added
+
+- Рослина заводиться з імені та фото. Бот упізнає вид за знімком, ставить ритм поливу й дописує кілька слів
+  про те, що саме цю рослину найчастіше вбиває, — і одразу показує готову картку. Не впізнав — так і каже,
+  а не вигадує
+
+### Fixed
+
+- Фото, кинуте в топік рослин просто так, більше не зникає мовчки — бот каже, якою кнопкою його додати
+
+### Changed
+
+- Майстер додавання рослини питає лише те, без чого рослини не існує. Вид, місце, «коли востаннє поливали»
+  й навіть підтвердження впізнаного більше не питаються: усе це видно на картці й там же редагується, а
+  перший полив записується її ж кнопкою. Було шість кроків — лишилось два
+
 ## [0.4.0] - 2026-08-28
 
 ### Added

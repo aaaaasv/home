@@ -169,6 +169,14 @@ async def reject_non_photo(message: Message) -> None:
     await message.answer(messages.ADD_PLANT_EXPECTS_PHOTO)
 
 
+# last of the photo handlers, so it only sees what no upload flow claimed: a photo dropped into the topic by
+# itself, or the tail of an album whose first frame already finished its flow. either way it must not vanish
+@router.message(F.photo)
+async def explain_a_stray_photo(message: Message) -> None:
+    """A photo nobody asked for used to disappear without a word, which reads exactly like the bot losing it."""
+    await message.answer(messages.STRAY_PHOTO)
+
+
 @router.callback_query(PlantCallback.filter(F.action == PlantAction.PHOTOS))
 async def show_photo_timeline(
     callback: CallbackQuery,

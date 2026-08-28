@@ -52,13 +52,13 @@ INVALID_INTERVAL = f"Потрібне число від {MINIMUM_CARE_INTERVAL_D
 ADD_PLANT_ASK_NAME = "Як назвемо рослину?"
 ADD_PLANT_NAME_TOO_LONG = "Задовга назва — до 64 символів."
 ADD_PLANT_ASK_PHOTO = "Надішли одне фото 📸\n\n/skip — пропустити"
-ADD_PLANT_ASK_SPECIES = "Що це за вид? Наприклад: <i>Monstera deliciosa</i>\n\n/skip — пропустити"
-ADD_PLANT_ASK_LOCATION = "Де вона стоїть? Наприклад: <i>спальня, підвіконня</i>\n\n/skip — пропустити"
 ADD_PLANT_ASK_INTERVAL = "Як часто поливати?"
 ADD_PLANT_ASK_CUSTOM_INTERVAL = (
     f"Раз на скільки днів поливати? Надішли число від {MINIMUM_CARE_INTERVAL_DAYS} до {MAXIMUM_CARE_INTERVAL_DAYS}."
 )
-ADD_PLANT_ASK_LAST_WATERED = "Коли її востаннє поливали?"
+ADD_PLANT_IDENTIFYING = "🔎 Дивлюсь, що це…"
+ADD_PLANT_IDENTIFICATION_UNSURE = "Не впізнаю за цим фото — розкажи сам."
+
 ADD_PLANT_EXPECTS_PHOTO = "Надішли саме фото або /skip."
 ADD_PLANT_EXPECTS_TEXT = "Надішли текст або /skip."
 
@@ -84,6 +84,8 @@ CARE_UNDONE_TOAST = "Запис скасовано"
 SCHEDULE_REMOVE_CONFIRM = "Прибрати {task} у «{plant}»?"
 SCHEDULE_REMOVE_CONFIRM_INSTRUCTIONS = "\n\n⚠️ Інструкція до цього догляду теж зникне."
 SCHEDULE_REMOVE_BUTTON = "Так, прибрати"
+
+STRAY_PHOTO = "Щоб фото лягло до рослини, натисни 📸 на її картці — /list."
 
 PHOTO_ADDED = "📸 Фото додано."
 PHOTOS_ADDED = "📸 Додано {count} кадри. Перший — для порівняння, решта в зібранні."
