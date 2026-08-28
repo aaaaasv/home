@@ -7,7 +7,7 @@ from src.bot.scheduling import SchedulerContext
 from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.plant_care.services.room_climate_sensor import NullRoomClimateSensor
+from src.modules.room_climate.services.room_climate_sensor import NullRoomClimateSensor
 from src.modules.weather.services.weather_provider import NullWeatherProvider
 from src.tests.fakes import ScriptedPriceSource
 from src.tests.integration.base import KYIV

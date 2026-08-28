@@ -167,6 +167,11 @@ src/vendor/                  vendored third-party code; read as a dependency, ne
   attributes.
 - **Handlers parse the update, call one use case, render the reply.** They hold no business logic.
   Dependencies reach them through aiogram's workflow data, the way `Depends` works in FastAPI.
+- **A module is named for what it is about, not for who asked for it first.** Room climate was born inside
+  `plant_care` because plants needed it, and then the air conditioner and the weather digest had to import
+  from the plants to read the air. It is `room_climate` now. Same rule for adapters: anything that talks to a
+  vendor — an HTTP client and the code that reads that vendor's payload shape — belongs in
+  `src/infrastructure/adapters/`, so a changed response stops there instead of reaching the domain.
 - **A module owns its own delivery code.** Rendering, keyboards, message text and scheduled jobs for a
   module belong in `src/bot/handlers/<name>/`, not in a shared file. `src/bot/formatting.py` and
   `messages.py` hold only genuinely cross-module primitives; `reminders.py` holds only the scheduler
@@ -180,7 +185,7 @@ src/vendor/                  vendored third-party code; read as a dependency, ne
   goes uncollected, if anything outside a `jobs.py` calls `add_job`, or if a shared delivery file starts
   importing from one module.
 - **Time**: everything is stored UTC through the `UtcDateTime` column type — SQLite keeps no offset, so it
-  is re-attached on read. A due date is a calendar day in the household timezone, and only `CareCalendar`
+  is re-attached on read. A due date is a calendar day in the household timezone, and only `HouseholdCalendar`
   may convert between the two.
 - **Integer primary keys, not UUIDs.** Telegram caps `callback_data` at 64 bytes; a UUID plus an action plus
   a task type does not fit. Every button payload is asserted under the cap.
@@ -283,7 +288,7 @@ Use `./venv/bin/python`, not the system interpreter — the system one lacks `ai
 - Tests use `unittest.IsolatedAsyncioTestCase` and class-based organization. No `conftest.py`, no pytest
   fixtures — infrastructure lives in base classes and `asyncSetUp`/`asyncTearDown`. Integration tests run
   against in-memory SQLite built from the models, seeded through the real Unit of Work with a frozen clock
-  (`FrozenCareCalendar`), so every due-date assertion is exact rather than relative to the wall clock
+  (`FrozenHouseholdCalendar`), so every due-date assertion is exact rather than relative to the wall clock
 - Fixtures never carry real identifiers — use the documentation-reserved ranges
 
 ## Error handling

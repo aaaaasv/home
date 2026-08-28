@@ -1,15 +1,10 @@
 from typing import Protocol
 
-from src.common.domain import DomainModel
-
-
-class RoomClimate(DomainModel):
-    temperature_celsius: float
-    relative_humidity_percent: float
+from src.modules.room_climate.domain import RoomClimate
 
 
 class RoomClimateSensor(Protocol):
-    """Reads the air the plants actually live in — returns None when the reading cannot be trusted"""
+    """Reads the air of the room — returns None when the reading cannot be trusted"""
 
     async def read(self) -> RoomClimate | None:
         ...

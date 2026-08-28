@@ -10,7 +10,8 @@ from src.bot.handlers.power.keyboards import build_outage_schedule_keyboard
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import OUTAGE_SCHEDULE_KIND, PostedMessageTracker
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.power.services.yasno_schedule_provider import OutageSchedule, YasnoScheduleProvider
+from src.modules.power.domain import OutageSchedule
+from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class OutageScheduleBoard:
         chat_id: int,
         power_topic: ForumTopicRegistry,
         uow_factory: Callable[[], UnitOfWork],
-        schedule_provider: YasnoScheduleProvider,
+        schedule_provider: OutageScheduleProvider,
         timezone: tzinfo,
     ):
         self.bot = bot

@@ -9,7 +9,7 @@ from aiogram.types import ForumTopic as TelegramForumTopic
 from src.common.household_calendar import HouseholdCalendar
 from src.modules.assistant.services.language_model import ConversationTurn, QuotaExhausted
 from src.modules.plant_care.domain import PlantPhotoReview, PlantPhotoReviewContext
-from src.modules.plant_care.services.room_climate_sensor import RoomClimate
+from src.modules.room_climate.domain import RoomClimate
 from src.modules.shopping.domain import TrackedProduct
 from src.modules.transit.domain import RealtimeSnapshot, RouteShape
 

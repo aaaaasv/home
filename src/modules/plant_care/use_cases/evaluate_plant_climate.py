@@ -7,7 +7,7 @@ from src.common.use_case import BaseUseCase
 from src.infrastructure.db.models import Plant, RoomClimateReading
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.domain import ClimateProblem, PlantComfortChange
-from src.modules.plant_care.services.room_climate_sensor import RoomClimateSensor
+from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
 
 
 class EvaluatePlantClimateUseCase(BaseUseCase):

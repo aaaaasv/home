@@ -9,3 +9,6 @@ photos/
 *.db
 .env
 backups/
+*.key
+*.password
+home-docs/
