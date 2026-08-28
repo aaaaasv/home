@@ -52,13 +52,10 @@ INVALID_INTERVAL = f"Потрібне число від {MINIMUM_CARE_INTERVAL_D
 ADD_PLANT_ASK_NAME = "Як назвемо рослину?"
 ADD_PLANT_NAME_TOO_LONG = "Задовга назва — до 64 символів."
 ADD_PLANT_ASK_PHOTO = "Надішли одне фото 📸\n\n/skip — пропустити"
-ADD_PLANT_ASK_SPECIES = "Що це за вид? Наприклад: <i>Monstera deliciosa</i>\n\n/skip — пропустити"
-ADD_PLANT_ASK_LOCATION = "Де вона стоїть? Наприклад: <i>спальня, підвіконня</i>\n\n/skip — пропустити"
 ADD_PLANT_ASK_INTERVAL = "Як часто поливати?"
 ADD_PLANT_ASK_CUSTOM_INTERVAL = (
     f"Раз на скільки днів поливати? Надішли число від {MINIMUM_CARE_INTERVAL_DAYS} до {MAXIMUM_CARE_INTERVAL_DAYS}."
 )
-ADD_PLANT_ASK_LAST_WATERED = "Коли її востаннє поливали?"
 ADD_PLANT_IDENTIFYING = "🔎 Дивлюсь, що це…"
 ADD_PLANT_IDENTIFICATION_INTRO = "Схоже на це:"
 ADD_PLANT_IDENTIFICATION_UNSURE = "Не впізнаю за цим фото — розкажи сам."

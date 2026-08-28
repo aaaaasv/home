@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from datetime import date, timedelta
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -11,13 +10,10 @@ from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.formatting import render_plant_identification
 from src.bot.handlers.plants.keyboards import (
     CUSTOM_INTERVAL_MARKER,
-    UNKNOWN_LAST_WATERED_MARKER,
     NewPlantIdentificationCallback,
     NewPlantIntervalCallback,
-    NewPlantLastWateredCallback,
     build_new_plant_identification_keyboard,
     build_new_plant_interval_keyboard,
-    build_new_plant_last_watered_keyboard,
 )
 from src.bot.handlers.plants.plant_list import send_plant_card
 from src.bot.message_cleanup import delete_quietly, remember_transient_message, replace_prompt, sweep_transient_messages
@@ -39,11 +35,8 @@ class AddPlantStates(StatesGroup):
     name = State()
     photo = State()
     identification = State()
-    species = State()
-    location = State()
     watering_interval = State()
     custom_watering_interval = State()
-    last_watered = State()
 
 
 @router.message(Command("add"))
@@ -75,7 +68,7 @@ async def store_photo(message: Message, state: FSMContext, plant_identifier: Pla
     )
     await delete_quietly(message)
     if plant_identifier is None:
-        await _ask_species(message, state)
+        await _ask_watering_interval(message, state)
         return
 
     await _offer_identification(message, state, plant_identifier, largest_photo.file_id)
@@ -96,7 +89,7 @@ async def _offer_identification(
     if identification is None:
         await thinking.edit_text(messages.ADD_PLANT_IDENTIFICATION_UNSURE)
         await remember_transient_message(state, thinking)
-        await _ask_species(message, state)
+        await _ask_watering_interval(message, state)
         return
 
     await state.update_data(
@@ -113,11 +106,17 @@ async def _offer_identification(
 
 @router.callback_query(AddPlantStates.identification, NewPlantIdentificationCallback.filter())
 async def store_identification(
-    callback: CallbackQuery, callback_data: NewPlantIdentificationCallback, state: FSMContext
+    callback: CallbackQuery,
+    callback_data: NewPlantIdentificationCallback,
+    state: FSMContext,
+    actor: Actor,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_storage: PhotoStorage,
 ) -> None:
     await callback.answer()
     if not callback_data.accepted:
-        await _ask_species(callback.message, state)
+        await _ask_watering_interval(callback.message, state)
         return
 
     collected_data = await state.get_data()
@@ -126,14 +125,18 @@ async def store_identification(
         watering_interval_days=collected_data.get("suggested_watering_interval_days"),
         care_notes=collected_data.get("suggested_care_notes"),
     )
-    # the species is answered, so the flow resumes at the next thing a photo cannot tell: where it stands
-    await _ask_location(callback.message, state)
+    # with a rhythm in hand there is nothing left that a plant cannot exist without, so the card is made now
+    if collected_data.get("suggested_watering_interval_days") is not None:
+        await _create_plant(callback.message, state, actor, uow_factory, household_calendar, photo_storage)
+        return
+
+    await _ask_watering_interval(callback.message, state)
 
 
 @router.message(AddPlantStates.photo, Command("skip"))
 async def skip_photo(message: Message, state: FSMContext) -> None:
     await delete_quietly(message)
-    await _ask_species(message, state)
+    await _ask_watering_interval(message, state)
 
 
 @router.message(AddPlantStates.photo)
@@ -142,43 +145,15 @@ async def reject_non_photo(message: Message, state: FSMContext) -> None:
     await _ask(message, state, messages.ADD_PLANT_EXPECTS_PHOTO)
 
 
-@router.message(AddPlantStates.species, Command("skip"))
-async def skip_species(message: Message, state: FSMContext) -> None:
-    await delete_quietly(message)
-    await _ask_location(message, state)
-
-
-@router.message(AddPlantStates.species, F.text)
-async def store_species(message: Message, state: FSMContext) -> None:
-    await state.update_data(species=message.text.strip())
-    await delete_quietly(message)
-    await _ask_location(message, state)
-
-
-@router.message(AddPlantStates.location, Command("skip"))
-async def skip_location(message: Message, state: FSMContext) -> None:
-    await delete_quietly(message)
-    await _ask_interval_unless_known(message, state)
-
-
-@router.message(AddPlantStates.location, F.text)
-async def store_location(message: Message, state: FSMContext) -> None:
-    await state.update_data(location=message.text.strip())
-    await delete_quietly(message)
-    await _ask_interval_unless_known(message, state)
-
-
-async def _ask_interval_unless_known(message: Message, state: FSMContext) -> None:
-    # an accepted identification already answered this, and asking again would undo the point of asking the model
-    if (await state.get_data()).get("watering_interval_days") is not None:
-        await _ask_last_watered(message, state)
-        return
-    await _ask_watering_interval(message, state)
-
-
 @router.callback_query(AddPlantStates.watering_interval, NewPlantIntervalCallback.filter())
 async def store_watering_interval(
-    callback: CallbackQuery, callback_data: NewPlantIntervalCallback, state: FSMContext
+    callback: CallbackQuery,
+    callback_data: NewPlantIntervalCallback,
+    state: FSMContext,
+    actor: Actor,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_storage: PhotoStorage,
 ) -> None:
     await callback.answer()
     if callback_data.interval_days == CUSTOM_INTERVAL_MARKER:
@@ -187,11 +162,18 @@ async def store_watering_interval(
         return
 
     await state.update_data(watering_interval_days=callback_data.interval_days)
-    await _ask_last_watered(callback.message, state)
+    await _create_plant(callback.message, state, actor, uow_factory, household_calendar, photo_storage)
 
 
 @router.message(AddPlantStates.custom_watering_interval, F.text)
-async def store_custom_watering_interval(message: Message, state: FSMContext) -> None:
+async def store_custom_watering_interval(
+    message: Message,
+    state: FSMContext,
+    actor: Actor,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_storage: PhotoStorage,
+) -> None:
     interval_days = parse_interval_days(message.text)
     await delete_quietly(message)
     if interval_days is None:
@@ -199,20 +181,24 @@ async def store_custom_watering_interval(message: Message, state: FSMContext) ->
         return
 
     await state.update_data(watering_interval_days=interval_days)
-    await _ask_last_watered(message, state)
+    await _create_plant(message, state, actor, uow_factory, household_calendar, photo_storage)
 
 
-@router.callback_query(AddPlantStates.last_watered, NewPlantLastWateredCallback.filter())
-async def create_plant(
-    callback: CallbackQuery,
-    callback_data: NewPlantLastWateredCallback,
+async def _create_plant(
+    message: Message,
     state: FSMContext,
     actor: Actor,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
     photo_storage: PhotoStorage,
 ) -> None:
-    await callback.answer()
+    """
+    Makes the plant the moment the wizard knows a name and a rhythm, which is everything it cannot invent.
+
+    the species, the place and the notes are whatever the photo gave — all three are edited on the finished
+    card, so none of them is worth a question. the first watering is not asked either: a new plant comes out
+    due today, and the card carries a «полито» button for the case where it was watered on the way home.
+    """
     collected_data = await state.get_data()
     await state.clear()
 
@@ -223,10 +209,8 @@ async def create_plant(
         CreatePlantCommand(
             name=collected_data["name"],
             species=collected_data.get("species"),
-            location=collected_data.get("location"),
             photo=_build_photo(collected_data),
             watering_interval_days=collected_data["watering_interval_days"],
-            last_watered_on=_resolve_last_watered_on(callback_data.days_ago, household_calendar),
         )
     )
     care_notes = collected_data.get("care_notes")
@@ -235,8 +219,8 @@ async def create_plant(
             SetCareInstructionsCommand(plant_id=card.id, task_type=CareTaskType.WATERING, instructions=care_notes)
         )
     # the whole wizard collapses to the one thing worth keeping — the finished card
-    await sweep_transient_messages(callback.message.bot, callback.message.chat.id, collected_data)
-    await send_plant_card(callback.message, card, household_calendar)
+    await sweep_transient_messages(message.bot, message.chat.id, collected_data)
+    await send_plant_card(message, card, household_calendar)
 
 
 async def _ask(message: Message, state: FSMContext, text: str) -> None:
@@ -249,27 +233,9 @@ async def _ask_photo(message: Message, state: FSMContext) -> None:
     await _ask(message, state, messages.ADD_PLANT_ASK_PHOTO)
 
 
-async def _ask_species(message: Message, state: FSMContext) -> None:
-    await state.set_state(AddPlantStates.species)
-    await _ask(message, state, messages.ADD_PLANT_ASK_SPECIES)
-
-
-async def _ask_location(message: Message, state: FSMContext) -> None:
-    await state.set_state(AddPlantStates.location)
-    await _ask(message, state, messages.ADD_PLANT_ASK_LOCATION)
-
-
 async def _ask_watering_interval(message: Message, state: FSMContext) -> None:
     await state.set_state(AddPlantStates.watering_interval)
     prompt = await message.answer(messages.ADD_PLANT_ASK_INTERVAL, reply_markup=build_new_plant_interval_keyboard())
-    await replace_prompt(state, prompt)
-
-
-async def _ask_last_watered(message: Message, state: FSMContext) -> None:
-    await state.set_state(AddPlantStates.last_watered)
-    prompt = await message.answer(
-        messages.ADD_PLANT_ASK_LAST_WATERED, reply_markup=build_new_plant_last_watered_keyboard()
-    )
     await replace_prompt(state, prompt)
 
 
@@ -281,9 +247,3 @@ def _build_photo(collected_data: dict) -> TelegramPhoto | None:
         file_unique_id=collected_data["photo_file_unique_id"],
         caption=collected_data.get("photo_caption"),
     )
-
-
-def _resolve_last_watered_on(days_ago: int, household_calendar: HouseholdCalendar) -> date | None:
-    if days_ago == UNKNOWN_LAST_WATERED_MARKER:
-        return None
-    return household_calendar.today() - timedelta(days=days_ago)
