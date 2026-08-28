@@ -37,8 +37,14 @@ class AnswerQuestionUseCase:
         conversation_id: int,
         asked_at: datetime,
         images: Sequence[ImageAttachment] = (),
+        extra_facts: str | None = None,
     ) -> str | None:
         facts = await self.knowledge_source.gather()
+        # a caller that knows more than the facts file — the plants topic knows this collection's own history —
+        # adds it here rather than keeping a second model client of its own
+        if extra_facts is not None:
+            facts = f"{facts}\n\n{extra_facts}"
+
         # the facts belong in the system instruction, not in a turn: they are reread every time and would otherwise
         # pile up once per remembered question
         system_instruction = f"{GROUNDING_INSTRUCTION}\n\nФакти про дім:\n{facts}"

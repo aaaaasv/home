@@ -46,6 +46,8 @@ PLANT_EMOJI = "🪴"
 NO_PLANTS = "Поки що жодної рослини. Додай першу: /add"
 NOTHING_DUE = "✨ Сьогодні все доглянуто."
 NO_HISTORY = "Історія порожня."
+PLANT_QUESTION_THINKING = "🌱 Дивлюсь у записи…"
+
 NO_PHOTOS = "У цієї рослини ще немає фото."
 INVALID_INTERVAL = f"Потрібне число від {MINIMUM_CARE_INTERVAL_DAYS} до {MAXIMUM_CARE_INTERVAL_DAYS}."
 
