@@ -59,5 +59,8 @@ class AddPlantFlowTestCase(BaseBehaviourTestCase):
 
         await self.feed(message_update("Монстера", update_id=3))
 
-        # nothing answers plain text outside a flow in the plants topic, so a cancelled wizard stays cancelled
+        # a cancelled wizard does not take the next word as a name; without a model configured the question
+        # handler that now owns plain text here says nothing either
         self.assertEqual(self.session.sent_texts(), [])
+        async with self.uow as uow:
+            self.assertEqual(await uow.plants.list_active(), [])
