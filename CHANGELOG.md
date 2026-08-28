@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-28
+
 - The delivery layer is now driven by tests: real updates go through the real dispatcher, so a handler that
   asks for a dependency nothing injects fails a test instead of failing silently in the group.
 
