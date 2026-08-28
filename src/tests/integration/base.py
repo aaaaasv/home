@@ -67,6 +67,20 @@ class BaseIntegrationTestCase(unittest.IsolatedAsyncioTestCase):
             await uow.session.flush()
             return photo.id
 
+    async def seed_climate_day(self, day, temperature: float, humidity: float) -> None:
+        async with self.uow as uow:
+            await uow.room_climate_days.save_day(
+                day,
+                {
+                    "minimum_temperature_celsius": temperature,
+                    "maximum_temperature_celsius": temperature,
+                    "average_temperature_celsius": temperature,
+                    "minimum_humidity_percent": humidity,
+                    "maximum_humidity_percent": humidity,
+                    "average_humidity_percent": humidity,
+                },
+            )
+
     async def seed_room_climate_readings(
         self,
         humidity_percent: float,

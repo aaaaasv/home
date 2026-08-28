@@ -101,6 +101,26 @@ class PlantPhoto(Base):
     created_at = Column(UtcDateTime, default=current_time, nullable=False)
 
 
+class RoomClimateDay(Base):
+    """
+    One row per household day, folded from that day's raw readings before they are pruned.
+
+    the raw table keeps two days and then throws the rest away, which is right — it exists to notice a plant
+    is uncomfortable now. but a photo taken six weeks after the last one is judged against what the air did
+    over those six weeks, and that is 365 rows a year rather than half a million.
+    """
+
+    __tablename__ = "room_climate_days"
+
+    day = Column(Date, primary_key=True, autoincrement=False)
+    minimum_temperature_celsius = Column(Float, nullable=False)
+    maximum_temperature_celsius = Column(Float, nullable=False)
+    average_temperature_celsius = Column(Float, nullable=False)
+    minimum_humidity_percent = Column(Float, nullable=False)
+    maximum_humidity_percent = Column(Float, nullable=False)
+    average_humidity_percent = Column(Float, nullable=False)
+
+
 class CareDigestDelivery(Base):
     """The day the care digest was last sent — a periodic job sends it once even if the pi was down at digest time"""
 

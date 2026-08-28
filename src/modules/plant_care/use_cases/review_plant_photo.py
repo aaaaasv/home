@@ -1,10 +1,17 @@
+from statistics import mean
+
 from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.common.exceptions import DoesNotExistError
 from src.common.household_calendar import HouseholdCalendar
 from src.common.use_case import BaseUseCase
-from src.infrastructure.db.models import CareSchedule, Plant, PlantPhoto, RoomClimateReading
+from src.infrastructure.db.models import CareSchedule, Plant, PlantPhoto, RoomClimateDay, RoomClimateReading
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.plant_care.domain import PhotoReviewSchedule, PlantPhotoReview, PlantPhotoReviewContext
+from src.modules.plant_care.domain import (
+    ClimateInterval,
+    PhotoReviewSchedule,
+    PlantPhotoReview,
+    PlantPhotoReviewContext,
+)
 from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 
 
@@ -23,8 +30,15 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
             photos = await uow.plant_photos.list_by_plant_id(plant_id)
             schedules = await uow.care_schedules.list_by_plant_id(plant_id)
             room_climate = await uow.room_climate_readings.retrieve_latest()
+            current, previous = self._comparable_pair(photos)
+            climate_days = []
+            if current is not None and previous is not None:
+                climate_days = await uow.room_climate_days.list_between(
+                    self.household_calendar.local_date(previous.taken_at),
+                    self.household_calendar.local_date(current.taken_at),
+                )
 
-        context = self._build_context(plant, photos, schedules, room_climate)
+        context = self._build_context(plant, photos, schedules, room_climate, climate_days)
         if context is None:
             return None
 
@@ -36,19 +50,11 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
         photos: list[PlantPhoto],
         schedules: list[CareSchedule],
         room_climate: RoomClimateReading | None,
+        climate_days: list[RoomClimateDay],
     ) -> PlantPhotoReviewContext | None:
-        # only general frames are comparable: judging a close-up of one leaf against last month's whole-plant
-        # shot would report changes that are only a change of distance
-        overviews = [photo for photo in photos if photo.frame == PlantPhotoFrame.OVERVIEW.value]
-        if not overviews:
+        current, previous = self._comparable_pair(photos)
+        if current is None:
             return None
-
-        current = overviews[-1]
-        # a photo whose download failed has no local copy, and there is nothing to send without one
-        if current.local_path is None:
-            return None
-
-        previous = next((photo for photo in reversed(overviews[:-1]) if photo.local_path is not None), None)
         return PlantPhotoReviewContext(
             plant_name=plant.name,
             species=plant.species,
@@ -66,8 +72,46 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
                 if schedule.task_type != CareTaskType.PHOTO
             ],
             current_photo_path=current.local_path,
+            current_photo_taken_on=self.household_calendar.local_date(current.taken_at),
             previous_photo_path=previous.local_path if previous else None,
+            previous_photo_taken_on=self.household_calendar.local_date(previous.taken_at) if previous else None,
             days_since_previous_photo=self._days_between(previous, current) if previous else None,
+            climate_between_photos=self._summarise_climate(climate_days, plant.ideal_humidity_min_percent),
+        )
+
+    def _comparable_pair(self, photos: list[PlantPhoto]) -> tuple[PlantPhoto | None, PlantPhoto | None]:
+        """
+        The newest general frame and the one before it.
+
+        only general frames are comparable: judging a close-up of one leaf against last month's whole-plant shot
+        would report changes that are only a change of distance. a photo whose download failed has no local copy
+        and there is nothing to send without one.
+        """
+        overviews = [photo for photo in photos if photo.frame == PlantPhotoFrame.OVERVIEW.value]
+        if not overviews or overviews[-1].local_path is None:
+            return None, None
+        current = overviews[-1]
+        previous = next((photo for photo in reversed(overviews[:-1]) if photo.local_path is not None), None)
+        return current, previous
+
+    def _summarise_climate(
+        self, climate_days: list[RoomClimateDay], ideal_humidity_min_percent: float | None
+    ) -> ClimateInterval | None:
+        """The span and the middle of the air between two photos, plus how much of it the plant disliked."""
+        if not climate_days:
+            return None
+        below = None
+        if ideal_humidity_min_percent is not None:
+            below = sum(1 for day in climate_days if day.average_humidity_percent < ideal_humidity_min_percent)
+        return ClimateInterval(
+            days_recorded=len(climate_days),
+            minimum_temperature_celsius=min(day.minimum_temperature_celsius for day in climate_days),
+            maximum_temperature_celsius=max(day.maximum_temperature_celsius for day in climate_days),
+            average_temperature_celsius=mean(day.average_temperature_celsius for day in climate_days),
+            minimum_humidity_percent=min(day.minimum_humidity_percent for day in climate_days),
+            maximum_humidity_percent=max(day.maximum_humidity_percent for day in climate_days),
+            average_humidity_percent=mean(day.average_humidity_percent for day in climate_days),
+            days_below_ideal_humidity=below,
         )
 
     def _describe_schedule(self, schedule: CareSchedule, current: PlantPhoto) -> PhotoReviewSchedule:

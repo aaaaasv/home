@@ -280,6 +280,24 @@ class PhotoReviewSchedule(DomainModel):
     days_since_last_performed: int | None
 
 
+class ClimateInterval(DomainModel):
+    """
+    What the air did between two photos, folded from the daily summaries.
+
+    the reading at the moment a photo is taken says almost nothing about why a leaf browned over six weeks.
+    the span, the middle of it, and how many of those days sat below what the plant wants — those do.
+    """
+
+    days_recorded: int
+    minimum_temperature_celsius: float
+    maximum_temperature_celsius: float
+    average_temperature_celsius: float
+    minimum_humidity_percent: float
+    maximum_humidity_percent: float
+    average_humidity_percent: float
+    days_below_ideal_humidity: int | None
+
+
 class PlantPhotoReviewContext(DomainModel):
     """Everything the bot knows about a plant at the moment its photo was taken"""
 
@@ -294,8 +312,11 @@ class PlantPhotoReviewContext(DomainModel):
     room_humidity_percent: float | None
     schedules: list[PhotoReviewSchedule]
     current_photo_path: str
+    current_photo_taken_on: date
     previous_photo_path: str | None
+    previous_photo_taken_on: date | None
     days_since_previous_photo: int | None
+    climate_between_photos: ClimateInterval | None = None
 
 
 class PlantPhotoReview(DomainModel):

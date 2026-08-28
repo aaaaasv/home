@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 from src.bot.handlers.plants.gemini_photo_analyst import RESPONSE_FORMAT_INSTRUCTION, build_review_parts, parse_review
@@ -24,7 +25,9 @@ def make_context(
         room_humidity_percent=39.0,
         schedules=[PhotoReviewSchedule(task_type=CareTaskType.WATERING, interval_days=7, days_since_last_performed=3)],
         current_photo_path=current_photo_path,
+        current_photo_taken_on=date(2026, 8, 28),
         previous_photo_path=previous_photo_path,
+        previous_photo_taken_on=date(2026, 7, 13) if previous_photo_path else None,
         days_since_previous_photo=days_since_previous_photo,
     )
 
@@ -72,7 +75,7 @@ class BuildReviewPartsTestCase(unittest.TestCase):
 
         self.assertIn(SYSTEM_PROMPT, parts[0]["text"])
         self.assertIn(RESPONSE_FORMAT_INSTRUCTION, parts[0]["text"])
-        self.assertEqual(parts[1]["text"], "Фото рослини (порівнювати поки нема з чим):")
+        self.assertEqual(parts[1]["text"], "Фото рослини — 28 серпня 2026 (порівнювати поки нема з чим):")
         self.assertEqual(parts[2], {"inline_data": {"mime_type": "image/jpeg", "data": "AAEC"}})
         self.assertIn("Рослина: Кактус", parts[3]["text"])
 
@@ -89,7 +92,8 @@ class BuildReviewPartsTestCase(unittest.TestCase):
                 )
             )
 
-        self.assertEqual(parts[1]["text"], "Попереднє фото (5 дн. тому):")
+        # the date, not only the gap: without it the model cannot tell november dormancy from a may problem
+        self.assertEqual(parts[1]["text"], "Попереднє фото — 13 липня 2026:")
         self.assertEqual(parts[2], {"inline_data": {"mime_type": "image/jpeg", "data": "AA=="}})
-        self.assertEqual(parts[3]["text"], "Нове фото (щойно):")
+        self.assertEqual(parts[3]["text"], "Нове фото — 28 серпня 2026, через 5 дн.:")
         self.assertEqual(parts[4], {"inline_data": {"mime_type": "image/jpeg", "data": "AQ=="}})

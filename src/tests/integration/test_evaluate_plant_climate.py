@@ -26,6 +26,7 @@ class EvaluatePlantClimateTestCase(BaseIntegrationTestCase):
         return EvaluatePlantClimateUseCase(
             uow=self.uow,
             sensor=FixedRoomClimateSensor(climate),
+            household_calendar=self.household_calendar,
             alert_window_hours=ALERT_WINDOW_HOURS,
             temperature_hysteresis_celsius=TEMPERATURE_HYSTERESIS_CELSIUS,
             humidity_hysteresis_percent=HUMIDITY_HYSTERESIS_PERCENT,
@@ -50,6 +51,29 @@ class EvaluatePlantClimateTestCase(BaseIntegrationTestCase):
             ideal_humidity_min_percent=50.0,
             ideal_humidity_max_percent=70.0,
         )
+
+    async def test_evaluate_plant_climate_folds_the_day_into_a_summary_that_outlives_the_raw_readings(self):
+        """The raw table keeps two days; a photo six weeks old is judged against this row, not against those."""
+        await self.build_use_case(temperature=25.0, humidity=44.0)()
+
+        async with self.uow as uow:
+            days = await uow.room_climate_days.list_between(self.today, self.today)
+
+        self.assertEqual([day.day for day in days], [self.today])
+        self.assertEqual(days[0].average_temperature_celsius, 25.0)
+        self.assertEqual(days[0].average_humidity_percent, 44.0)
+
+    async def test_evaluate_plant_climate_rewrites_the_day_as_more_readings_arrive(self):
+        await self.build_use_case(temperature=20.0, humidity=40.0)()
+
+        await self.build_use_case(temperature=30.0, humidity=60.0)()
+
+        async with self.uow as uow:
+            days = await uow.room_climate_days.list_between(self.today, self.today)
+        self.assertEqual(len(days), 1)
+        self.assertEqual(days[0].minimum_temperature_celsius, 20.0)
+        self.assertEqual(days[0].maximum_temperature_celsius, 30.0)
+        self.assertEqual(days[0].average_temperature_celsius, 25.0)
 
     async def test_evaluate_plant_climate_without_a_sensor_reports_nothing(self):
         await self.seed_plant_wanting_humidity()
