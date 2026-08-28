@@ -85,13 +85,6 @@ class NewPlantIntervalCallback(CallbackData, prefix="new_interval"):
     interval_days: int
 
 
-class NewPlantLastWateredCallback(CallbackData, prefix="new_last_watered"):
-    days_ago: int
-
-
-UNKNOWN_LAST_WATERED_MARKER = -1
-
-
 class CareCard(NamedTuple):
     photo_file_id: str | None
     caption: str
@@ -356,18 +349,6 @@ def build_new_plant_interval_keyboard() -> InlineKeyboardMarkup:
         )
     builder.button(
         text="✏️ свій інтервал", callback_data=NewPlantIntervalCallback(interval_days=CUSTOM_INTERVAL_MARKER)
-    )
-    builder.adjust(2)
-    return builder.as_markup()
-
-
-def build_new_plant_last_watered_keyboard() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(text="Сьогодні", callback_data=NewPlantLastWateredCallback(days_ago=0))
-    builder.button(text="Вчора", callback_data=NewPlantLastWateredCallback(days_ago=1))
-    builder.button(
-        text="Не пам'ятаю",
-        callback_data=NewPlantLastWateredCallback(days_ago=UNKNOWN_LAST_WATERED_MARKER),
     )
     builder.adjust(2)
     return builder.as_markup()

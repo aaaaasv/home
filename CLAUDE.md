@@ -285,6 +285,11 @@ Use `./venv/bin/python`, not the system interpreter — the system one lacks `ai
   (`str(context.exception) == "..."`), not a substring
 - Be explicit, not defensive, in assertions. Assert exact values and exact lists; a test that tolerates
   partial matches hides regressions
+- **Handler behaviour is tested by feeding updates to the real dispatcher** (`src/tests/behaviour/`). The
+  dispatcher is built **once per process** — `build_dispatcher` attaches filters to module-level routers, so a
+  second call stacks duplicates onto the same globals — and each test lays its own database, storage and
+  boards over it through `feed_update`'s keyword arguments, which override the dispatcher's workflow data.
+  Without such a test a handler can take a parameter nothing injects and the whole suite stays green.
 - Tests use `unittest.IsolatedAsyncioTestCase` and class-based organization. No `conftest.py`, no pytest
   fixtures — infrastructure lives in base classes and `asyncSetUp`/`asyncTearDown`. Integration tests run
   against in-memory SQLite built from the models, seeded through the real Unit of Work with a frozen clock

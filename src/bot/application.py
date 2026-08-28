@@ -30,7 +30,6 @@ from src.bot.handlers.weather.board import WeatherDigestBoard
 from src.bot.middlewares import AllowedUsersMiddleware, FamilyRosterMiddleware
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.config import Settings
-from src.infrastructure.db.uow import UnitOfWork
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
 from src.modules.power.services.ecoflow_station import EcoFlowStation
@@ -90,7 +89,7 @@ def build_dispatcher(
     )
     dispatcher.update.outer_middleware(AllowedUsersMiddleware(settings.allowed_telegram_user_ids))
     # after the allowlist has set the actor, remember who wrote — the roster that tags a chore to a person by name
-    dispatcher.message.middleware(FamilyRosterMiddleware(UnitOfWork))
+    dispatcher.message.middleware(FamilyRosterMiddleware())
 
     # the topic is what tells one module's plain text and /add from another's
     plants.router.message.filter(InModuleTopic(care_topic))
