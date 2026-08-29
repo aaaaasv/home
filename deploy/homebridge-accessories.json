@@ -45,7 +45,7 @@
     "accessory": "mqttthing",
     "type": "temperatureSensor",
     "_comment_name": "named for where the sensor physically is — the shelf beside the router, not a room. see HOM-59",
-    "name": "Полиця · температура",
+    "name": "Температура полиці",
     "url": "mqtt://127.0.0.1:1883",
     "topics": {
       "getOnline": "home-bot/room-climate/available",
@@ -57,7 +57,7 @@
   {
     "accessory": "mqttthing",
     "type": "humiditySensor",
-    "name": "Полиця · вологість",
+    "name": "Вологість полиці",
     "url": "mqtt://127.0.0.1:1883",
     "topics": {
       "getOnline": "home-bot/room-climate/available",
