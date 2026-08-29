@@ -16,6 +16,8 @@ import aiomqtt
 
 from src.common.config import Settings
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
+from src.modules.power.services.ecoflow_station import EcoFlowStation
+from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,8 @@ class MqttContext:
 
     settings: Settings
     air_conditioner: AirConditioner | None = None
+    ecoflow_station: EcoFlowStation | None = None
+    room_climate_sensor: RoomClimateSensor | None = None
 
 
 class ListenerRegistrar(Protocol):

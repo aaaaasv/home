@@ -1,0 +1,69 @@
+[
+  {
+    "accessory": "mqttthing",
+    "type": "thermostat",
+    "name": "Кондиціонер",
+    "_comment_url": "the broker listens on loopback only, and homebridge runs on the host network",
+    "url": "mqtt://127.0.0.1:1883",
+    "topics": {
+      "getOnline": "home-bot/air-conditioner/available",
+      "getCurrentHeatingCoolingState": "home-bot/air-conditioner/current-state",
+      "getTargetHeatingCoolingState": "home-bot/air-conditioner/target-state",
+      "setTargetHeatingCoolingState": "home-bot/air-conditioner/set/target-state",
+      "getCurrentTemperature": "home-bot/air-conditioner/current-temperature",
+      "getTargetTemperature": "home-bot/air-conditioner/target-temperature",
+      "setTargetTemperature": "home-bot/air-conditioner/set/target-temperature"
+    },
+    "_comment_online": "false arrives either from the bot on its way out or from the broker when the bot dies, and either way the tile says 'no response' instead of showing an hour-old reading",
+    "onlineValue": "true",
+    "offlineValue": "false",
+    "_comment_states": "off, heat, cool, auto — the order homekit expects them in",
+    "heatingCoolingStateValues": ["off", "heat", "cool", "auto"],
+    "_comment_bounds": "the same bounds the bot's own card offers, so the dial cannot ask for what the unit refuses",
+    "minTemperature": 16,
+    "maxTemperature": 30
+  },
+  {
+    "accessory": "mqttthing",
+    "type": "contactSensor",
+    "name": "Світло",
+    "url": "mqtt://127.0.0.1:1883",
+    "_comment_type": "homekit has no service meaning 'mains present', and a contact sensor is what everyone uses for it: contact detected = the grid is up. it can trigger a notification, which is the whole point",
+    "topics": {
+      "getOnline": "home-bot/power/available",
+      "getContactSensorState": "home-bot/power/mains",
+      "getBatteryLevel": "home-bot/power/battery",
+      "getStatusLowBattery": "home-bot/power/battery-low",
+      "getChargingState": "home-bot/power/charging"
+    },
+    "onValue": "true",
+    "offValue": "false",
+    "onlineValue": "true",
+    "offlineValue": "false"
+  },
+  {
+    "accessory": "mqttthing",
+    "type": "temperatureSensor",
+    "_comment_name": "named for where the sensor physically is — the shelf beside the router, not a room. see HOM-59",
+    "name": "Полиця · температура",
+    "url": "mqtt://127.0.0.1:1883",
+    "topics": {
+      "getOnline": "home-bot/room-climate/available",
+      "getCurrentTemperature": "home-bot/room-climate/temperature"
+    },
+    "onlineValue": "true",
+    "offlineValue": "false"
+  },
+  {
+    "accessory": "mqttthing",
+    "type": "humiditySensor",
+    "name": "Полиця · вологість",
+    "url": "mqtt://127.0.0.1:1883",
+    "topics": {
+      "getOnline": "home-bot/room-climate/available",
+      "getCurrentRelativeHumidity": "home-bot/room-climate/humidity"
+    },
+    "onlineValue": "true",
+    "offlineValue": "false"
+  }
+]
