@@ -20,12 +20,15 @@ from src.bot.handlers.power.messages import (
     POWER_ECOFLOW_TIME_LEFT,
     POWER_ECOFLOW_TIME_TO_FULL,
     POWER_ECOFLOW_TITLE,
+    POWER_MAINS_LOST,
+    POWER_MAINS_LOST_NO_ESTIMATE,
+    POWER_MAINS_RESTORED,
     POWER_SCHEDULE_AS_OF,
     POWER_SCHEDULE_EMERGENCY_NOTE,
     POWER_SCHEDULE_INTERVAL,
     POWER_SCHEDULE_TITLE,
 )
-from src.modules.power.domain import EcoFlowState, OutageSchedule, OutageScheduleStatus
+from src.modules.power.domain import EcoFlowState, GridState, OutageSchedule, OutageScheduleStatus
 from src.modules.power.services.conservation import ConservationAdvisory, ConservationKind, ConservationLevel
 
 
@@ -60,6 +63,16 @@ def _format_runtime(minutes: int) -> str:
     if hours:
         return f"{hours} год"
     return f"{remaining_minutes} хв"
+
+
+def render_mains_change(grid: GridState, state: EcoFlowState) -> str:
+    """What the family reads when the lights go out, and when they come back."""
+    battery = round(state.battery_percent)
+    if grid is GridState.ON_GRID:
+        return POWER_MAINS_RESTORED.format(battery=battery)
+    if state.remaining_minutes is None:
+        return POWER_MAINS_LOST_NO_ESTIMATE.format(battery=battery)
+    return POWER_MAINS_LOST.format(battery=battery, duration=_format_runtime(state.remaining_minutes))
 
 
 def render_outage_schedule(schedule: OutageSchedule, generated_at: datetime) -> str:

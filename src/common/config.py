@@ -150,6 +150,11 @@ class Settings(BaseSettings):
     ECOFLOW_POLL_MINUTES: int = 10
     # the link must stay down at least this long before the station counts as shelved, so a brief ble drop or a
     # restart caught mid-reconnect cannot falsely trip conservation (the manual /conserve toggle is instant)
+    # the grid is watched far more often than the storage regime: this is the one message worth being early
+    ECOFLOW_MAINS_CHECK_MINUTES: int = 1
+    # a change must hold for this many readings before it is announced — one reading is a blip, and this
+    # message wakes the family
+    ECOFLOW_MAINS_CONFIRMATIONS: int = 2
     ECOFLOW_CONSERVED_AFTER_MINUTES: int = 20
     # the conservation card is re-evaluated this often while the station is shelved — day-based advisories change
     # slowly, but a few-hourly cadence surfaces "just shelved" guidance without waiting for the next morning
