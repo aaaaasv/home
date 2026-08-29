@@ -23,12 +23,13 @@ from src.bot.handlers.power.messages import (
     POWER_MAINS_LOST,
     POWER_MAINS_LOST_NO_ESTIMATE,
     POWER_MAINS_RESTORED,
+    POWER_OUTAGE_SHORTFALL,
     POWER_SCHEDULE_AS_OF,
     POWER_SCHEDULE_EMERGENCY_NOTE,
     POWER_SCHEDULE_INTERVAL,
     POWER_SCHEDULE_TITLE,
 )
-from src.modules.power.domain import EcoFlowState, GridState, OutageSchedule, OutageScheduleStatus
+from src.modules.power.domain import EcoFlowState, GridState, OutageForecast, OutageSchedule, OutageScheduleStatus
 from src.modules.power.services.conservation import ConservationAdvisory, ConservationKind, ConservationLevel
 
 
@@ -73,6 +74,15 @@ def render_mains_change(grid: GridState, state: EcoFlowState) -> str:
     if state.remaining_minutes is None:
         return POWER_MAINS_LOST_NO_ESTIMATE.format(battery=battery)
     return POWER_MAINS_LOST.format(battery=battery, duration=_format_runtime(state.remaining_minutes))
+
+
+def render_outage_forecast(forecast: OutageForecast) -> str:
+    """The one sentence this feature exists for: the deadline, and the gap the family has to close."""
+    return POWER_OUTAGE_SHORTFALL.format(
+        runs_out=forecast.runs_out_at.strftime("%H:%M"),
+        returns=forecast.power_returns_at.strftime("%H:%M"),
+        shortfall=_format_runtime(round(forecast.shortfall.total_seconds() / 60)),
+    )
 
 
 def render_outage_schedule(schedule: OutageSchedule, generated_at: datetime) -> str:
