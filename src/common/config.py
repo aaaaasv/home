@@ -155,6 +155,8 @@ class Settings(BaseSettings):
     # a change must hold for this many readings before it is announced — one reading is a blip, and this
     # message wakes the family
     ECOFLOW_MAINS_CONFIRMATIONS: int = 2
+    # the runtime estimate swings with the fridge cycling, so asking every minute would only add noise
+    ECOFLOW_FORECAST_CHECK_MINUTES: int = 5
     ECOFLOW_CONSERVED_AFTER_MINUTES: int = 20
     # the conservation card is re-evaluated this often while the station is shelved — day-based advisories change
     # slowly, but a few-hourly cadence surfaces "just shelved" guidance without waiting for the next morning

@@ -8,17 +8,19 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from src.bot.handlers.power.formatting import render_mains_change
+from src.bot.handlers.power.formatting import render_mains_change, render_outage_forecast
 from src.bot.handlers.power.messages import POWER_OUTAGE_EMERGENCY, POWER_OUTAGE_SOON
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND, OUTAGE_PING_KIND, PostedMessageTracker
 from src.common.config import Settings
+from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.domain import OutageSchedule, OutageScheduleStatus
 from src.modules.power.mains_monitor import MainsMonitor
+from src.modules.power.outage_forecast import forecast_outage
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.power.use_cases.track_conservation import TrackConservationUseCase
@@ -96,6 +98,68 @@ class MainsWatchJob:
             disable_notification=False,
         )
         logger.info("Announced the grid going %s", grid.value)
+
+
+class OutageForecastJob:
+    """
+    Says one thing, once per outage: that the battery will not last until the light is scheduled to return.
+
+    it never announces good news. "you reach" is a fact worth nothing at the moment it is true and worth
+    less every minute after, and a push that speaks on every outage is a push the family mutes.
+
+    the schedule is remembered rather than re-fetched, because the moment this question matters is the moment
+    the internet may be gone too — and a forecast that only works while the grid is up forecasts nothing.
+    """
+
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        power_topic: ForumTopicRegistry,
+        ecoflow_station: EcoFlowStation,
+        schedule_provider: OutageScheduleProvider,
+        household_calendar: HouseholdCalendar,
+    ):
+        self.bot = bot
+        self.chat_id = chat_id
+        self.power_topic = power_topic
+        self.ecoflow_station = ecoflow_station
+        self.schedule_provider = schedule_provider
+        self.household_calendar = household_calendar
+        self._last_schedule: OutageSchedule | None = None
+        self._warned = False
+
+    async def __call__(self) -> None:
+        # the schedule counts minutes from local midnight, so the comparison has to happen in local time
+        calendar = self.household_calendar
+        moment = calendar.now().astimezone(calendar.timezone)
+        state = await self.ecoflow_station.read_state()
+        forecast = forecast_outage(state, await self._schedule(moment), moment)
+
+        if forecast is None:
+            # the grid is back, or the question cannot be answered — either way the next outage is a fresh one
+            self._warned = False
+            return
+        if forecast.reaches or self._warned:
+            return
+
+        self._warned = True
+        await self.bot.send_message(
+            chat_id=self.chat_id,
+            message_thread_id=await self.power_topic.resolve(),
+            text=render_outage_forecast(forecast),
+            # there is a deadline in this message, so it is worth interrupting for
+            disable_notification=False,
+        )
+        logger.info("Warned that the battery falls %s short of the scheduled return", forecast.shortfall)
+
+    async def _schedule(self, moment: datetime) -> OutageSchedule | None:
+        schedule = await self.schedule_provider.fetch_today()
+        if schedule is not None:
+            self._last_schedule = schedule
+        if self._last_schedule is not None and self._last_schedule.day == moment.date():
+            return self._last_schedule
+        return None
 
 
 class YasnoScheduleJob:
@@ -210,6 +274,23 @@ def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContex
         id="ecoflow_poll",
         replace_existing=True,
     )
+    # the forecast needs both the station and the schedule, so it registers only where the schedule exists too
+    if context.power_topic is not None and context.schedule_provider is not None:
+        outage_forecast_job = OutageForecastJob(
+            bot=context.bot,
+            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+            power_topic=context.power_topic,
+            ecoflow_station=context.ecoflow_station,
+            schedule_provider=context.schedule_provider,
+            household_calendar=context.household_calendar,
+        )
+        scheduler.add_job(
+            outage_forecast_job.__call__,
+            trigger=IntervalTrigger(minutes=settings.ECOFLOW_FORECAST_CHECK_MINUTES),
+            id="ecoflow_outage_forecast",
+            replace_existing=True,
+        )
+
     # the grid is watched on its own, far tighter cadence: this is the one message worth being early, and the
     # read is cheap because the ble link is already held open
     if context.power_topic is not None:
