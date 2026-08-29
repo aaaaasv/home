@@ -151,6 +151,7 @@ async def run() -> None:
     # ⚡ світло: ecoflow (ble) and the yasno schedule share the topic — stand it up if either is on. the station
     # hold a reading cache, so one instance is shared by the /eco card and the poll job
     ecoflow_station = build_ecoflow_station(settings)
+    room_climate_sensor = build_room_climate_sensor(settings)
     # the unit serves one client at a time, so the button handlers and the runtime poll must share one instance —
     # its lock only serialises binds that go through the same object
     air_conditioner = build_air_conditioner(settings)
@@ -243,7 +244,7 @@ async def run() -> None:
             care_topic=care_topic,
             shopping_topic=shopping_topic,
             chores_topic=chores_topic,
-            room_climate_sensor=build_room_climate_sensor(settings),
+            room_climate_sensor=room_climate_sensor,
             price_source=build_price_source(settings),
             weather_topic=weather_topic,
             weather_digest_board=weather_digest_board,
@@ -289,7 +290,14 @@ async def run() -> None:
     # homebridge and, later, zigbee2mqtt meet the bot here rather than inside it
     mqtt_surface = None
     if settings.MQTT_ENABLED:
-        mqtt_surface = build_mqtt_surface(MqttContext(settings=settings, air_conditioner=air_conditioner))
+        mqtt_surface = build_mqtt_surface(
+            MqttContext(
+                settings=settings,
+                air_conditioner=air_conditioner,
+                ecoflow_station=ecoflow_station,
+                room_climate_sensor=room_climate_sensor,
+            )
+        )
         await mqtt_surface.start()
 
     # the specimen sheets share this loop with polling and the scheduler, the way everything else here does

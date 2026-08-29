@@ -16,6 +16,8 @@ import aiomqtt
 
 from src.common.config import Settings
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
+from src.modules.power.services.ecoflow_station import EcoFlowStation
+from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,8 @@ class MqttContext:
 
     settings: Settings
     air_conditioner: AirConditioner | None = None
+    ecoflow_station: EcoFlowStation | None = None
+    room_climate_sensor: RoomClimateSensor | None = None
 
 
 class ListenerRegistrar(Protocol):
@@ -196,9 +200,13 @@ class MqttSurface:
         await self._publish(client, readings)
 
     async def _receive(self, client: BrokerClient, topic: str, payload: bytes) -> None:
-        handle = self._commands.get(topic.removeprefix(f"{self.topic_prefix}/"))
+        suffix = topic.removeprefix(f"{self.topic_prefix}/")
+        handle = self._commands.get(suffix)
         if handle is None:
             return
+
+        # the only way something outside telegram moves real hardware, so it leaves a trace like any other
+        logger.info("MQTT command %s = %s", suffix, payload.decode())
         try:
             readings = await handle(payload.decode())
         except Exception:
