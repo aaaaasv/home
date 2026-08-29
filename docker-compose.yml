@@ -20,6 +20,33 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # the zigbee coordinator's software half. it owns the usb dongle, forms the mesh and publishes every
+  # device onto the same broker the bot already uses — deliberately not home assistant, which would add a
+  # second interface the family would have to learn
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:latest
+    container_name: zigbee2mqtt
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      TZ: ${TIMEZONE:-Europe/Kyiv}
+    ports:
+      - "${ZIGBEE_FRONTEND_PORT:-8099}:8099"
+    volumes:
+      - ./data/zigbee2mqtt:/app/data
+      # udev lets the container resolve the stable by-id path the device is mapped from
+      - /run/udev:/run/udev:ro
+    devices:
+      # the by-id path, never /dev/ttyUSB0: that number moves the moment anything else is plugged in
+      - "${ZIGBEE_ADAPTER_PATH:?set the dongle by-id path in .env}:/dev/ttyACM0"
+    group_add:
+      - "${DIALOUT_GROUP_ID:-20}"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # the apple bridge. it reads what the bot publishes and shows it as an ordinary accessory on a phone —
   # a tile, the control centre, siri. it makes no decisions of its own: everything it sends back is a tap
   homebridge:

@@ -1,0 +1,31 @@
+# Zigbee2MQTT 2.x. Copied to data/zigbee2mqtt/configuration.yaml on first deploy; after that Z2M owns the
+# file and writes paired devices into it, so edit it there, not here.
+#
+# Deliberately not Home Assistant: the bot is the interface layer, and a second one the family would have to
+# learn breaks that. Z2M gives an MQTT surface and nothing else, which is exactly what is wanted.
+
+mqtt:
+  base_topic: zigbee2mqtt
+  # the compose network, not loopback: this container is not on the host network
+  server: mqtt://mosquitto:1883
+
+serial:
+  # the container side of the by-id device mapped in docker-compose.yml
+  port: /dev/ttyACM0
+  adapter: zstack
+
+advanced:
+  # MEASURED, not guessed — 2026-08-29, with the dongle itself. The usual advice is 15/20/25 because wi-fi
+  # sits on 1/6/11; here it sits on 3 and 11, and channel 15 measured 75% busy against this channel's 14%.
+  # Changing it after devices are paired means physically resetting every battery device, so it is decided
+  # once and recorded in docs/smart-home-roadmap.md.
+  channel: 25
+  transmit_power: 20
+
+frontend:
+  enabled: true
+  port: 8099
+
+# joining is opened by hand, for the minutes it takes, and never left on
+availability:
+  enabled: true
