@@ -4,10 +4,15 @@ import pathlib
 import unittest
 
 from src.bot.reminders import JOB_REGISTRARS
+from src.mqtt.app import LISTENER_REGISTRARS
 
 HANDLERS_ROOT = pathlib.Path("src/bot/handlers")
 DELIVERY_ROOT = pathlib.Path("src/bot")
 DOMAIN_ROOT = pathlib.Path("src/modules")
+MQTT_ROOT = pathlib.Path("src/mqtt")
+
+# the mqtt surface has its own composition root, for the same reason the scheduler does
+MQTT_ASSEMBLY = {"__init__", "app", "surface"}
 
 # the composition root is allowed to know every module — that is its whole job. every other shared delivery file
 # must stay module-blind, or adding a module means editing it and the four god-files grow back
@@ -69,6 +74,25 @@ class SchedulingTestCase(unittest.TestCase):
         )
 
         self.assertEqual(schedulers, [])
+
+
+class MqttSurfaceTestCase(unittest.TestCase):
+    """
+    Keeps the broker an assembly point, the way the scheduler already is.
+
+    a module file that nobody collects is an accessory that silently never appears — and unlike a missing
+    telegram message, nobody notices, because a tile that was never created is not a tile that broke.
+    """
+
+    def test_every_module_that_speaks_mqtt_is_collected_by_the_surface(self):
+        modules_on_the_broker = sorted(path.stem for path in MQTT_ROOT.glob("*.py") if path.stem not in MQTT_ASSEMBLY)
+
+        registrars = {
+            getattr(importlib.import_module(f"src.mqtt.{module}"), "register_listeners", None)
+            for module in modules_on_the_broker
+        }
+
+        self.assertEqual(registrars, set(LISTENER_REGISTRARS))
 
 
 class BehaviourCoverageTestCase(unittest.TestCase):
