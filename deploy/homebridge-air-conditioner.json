@@ -1,0 +1,24 @@
+{
+  "accessory": "mqttthing",
+  "type": "thermostat",
+  "name": "Кондиціонер",
+  "_comment_url": "the broker publishes on loopback only, and homebridge runs on the host network",
+  "url": "mqtt://127.0.0.1:1883",
+  "topics": {
+    "getOnline": "home-bot/air-conditioner/available",
+    "getCurrentHeatingCoolingState": "home-bot/air-conditioner/current-state",
+    "getTargetHeatingCoolingState": "home-bot/air-conditioner/target-state",
+    "setTargetHeatingCoolingState": "home-bot/air-conditioner/set/target-state",
+    "getCurrentTemperature": "home-bot/air-conditioner/current-temperature",
+    "getTargetTemperature": "home-bot/air-conditioner/target-temperature",
+    "setTargetTemperature": "home-bot/air-conditioner/set/target-temperature"
+  },
+  "_comment_online": "false arrives either from the bot on its way out or from the broker when the bot dies, and either way the tile says 'no response' instead of showing an hour-old reading",
+  "onlineValue": "true",
+  "offlineValue": "false",
+  "_comment_states": "off, heat, cool, auto — in that order, which is the order homekit expects them",
+  "heatingCoolingStateValues": ["off", "heat", "cool", "auto"],
+  "_comment_bounds": "the same bounds the bot's own card offers, so the dial cannot ask for what the unit refuses",
+  "minTemperature": 16,
+  "maxTemperature": 30
+}

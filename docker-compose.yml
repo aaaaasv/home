@@ -20,6 +20,28 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # the apple bridge. it reads what the bot publishes and shows it as an ordinary accessory on a phone —
+  # a tile, the control centre, siri. it makes no decisions of its own: everything it sends back is a tap
+  homebridge:
+    image: homebridge/homebridge:latest
+    container_name: homebridge
+    # homekit is discovered over mdns/bonjour, and that does not cross a docker bridge network. on the
+    # default network the iphone simply never finds this bridge, and nothing anywhere reports an error
+    network_mode: host
+    environment:
+      TZ: ${TIMEZONE:-Europe/Kyiv}
+      PUID: ${HOST_UID:-1000}
+      PGID: ${HOST_GID:-1000}
+      HOMEBRIDGE_CONFIG_UI_PORT: 8581
+    volumes:
+      - ./data/homebridge:/homebridge
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   bot:
     # no build here on purpose: the pi runs a published image and never compiles. use
     # docker-compose.local.yml to build on this machine instead
