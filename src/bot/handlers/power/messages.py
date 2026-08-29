@@ -32,6 +32,14 @@ POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>\n\nDelta 2 трима�
 POWER_MAINS_LOST_NO_ESTIMATE = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%"
 POWER_MAINS_RESTORED = "💡 <b>Світло є</b>\n\nDelta 2 — {battery}%, заряджається"
 
+# said once per outage, and only when the answer is bad: "you reach" is not worth a notification, and a
+# push that speaks every time gets the whole group muted
+POWER_OUTAGE_SHORTFALL = (
+    "🪫 <b>Не дотягне до світла</b>\n\n"
+    "Батарея сяде о {runs_out}, а світло за графіком о {returns}.\n"
+    "Бракує {shortfall} — варто зняти зайве навантаження."
+)
+
 # /conserve — the storage-regime control card. a rare, once-in-months action, so it earns its own command rather
 # than a button that hangs on every /eco card
 POWER_CONSERVATION_IN_USE = "▶️ <b>Delta 2</b> — у користуванні"

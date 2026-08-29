@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 
 from src.common.domain import DomainModel
@@ -85,6 +85,14 @@ class OutageSchedule:
         """Whether the group is scheduled off at the given local wall-clock moment (meaningful for moment on day)"""
         return any(interval.contains_minute(_minute_of_day(moment)) for interval in self.off_intervals)
 
+    def current_off_interval(self, moment: datetime) -> OutageInterval | None:
+        """The off-period this local moment falls inside — the one whose end is when the light comes back."""
+        minute_of_day = _minute_of_day(moment)
+        for interval in self.off_intervals:
+            if interval.contains_minute(minute_of_day):
+                return interval
+        return None
+
     def next_off_interval(self, moment: datetime) -> OutageInterval | None:
         """The first off-period that starts strictly after the given local moment — feeds the pre-outage ping"""
         minute_of_day = _minute_of_day(moment)
@@ -108,3 +116,20 @@ def _minutes_to_time(minutes: int) -> time:
 
 def _minute_of_day(moment: datetime) -> int:
     return moment.hour * 60 + moment.minute
+
+
+@dataclass(frozen=True)
+class OutageForecast:
+    """How the station's remaining runtime compares with the hour the schedule promises the light back."""
+
+    runs_out_at: datetime
+    power_returns_at: datetime
+
+    @property
+    def shortfall(self) -> timedelta:
+        """How long the family would sit in the dark — zero or less when the battery reaches."""
+        return self.power_returns_at - self.runs_out_at
+
+    @property
+    def reaches(self) -> bool:
+        return self.shortfall <= timedelta(0)
