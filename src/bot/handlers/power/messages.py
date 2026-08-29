@@ -26,6 +26,12 @@ POWER_ECOFLOW_BUTTON_REFRESH = "🔄 Оновити"
 # shown the instant a slow ble button is tapped, so it does not feel dead during the ~15s round-trip
 POWER_ECOFLOW_WORKING_TOAST = "🔄 читаю Delta 2…"
 
+# the two messages the whole of layer 1 exists to send. they are rare by nature, so both ping — a silent
+# "світло зникло" would be read hours later, and the second one is the message the family actually waits for
+POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%, лишилось ~{duration}"
+POWER_MAINS_LOST_NO_ESTIMATE = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%"
+POWER_MAINS_RESTORED = "💡 <b>Світло є</b>\n\nDelta 2 — {battery}%, заряджається"
+
 # /conserve — the storage-regime control card. a rare, once-in-months action, so it earns its own command rather
 # than a button that hangs on every /eco card
 POWER_CONSERVATION_IN_USE = "▶️ <b>Delta 2</b> — у користуванні"

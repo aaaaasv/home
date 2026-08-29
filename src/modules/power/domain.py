@@ -5,6 +5,14 @@ from enum import StrEnum
 from src.common.domain import DomainModel
 
 
+class GridState(StrEnum):
+    """What the station's numbers say about the wall socket — UNKNOWN when they cannot say."""
+
+    ON_GRID = "on_grid"
+    ON_BATTERY = "on_battery"
+    UNKNOWN = "unknown"
+
+
 class EcoFlowState(DomainModel):
     """A Delta 2 snapshot read over local ble — as_of stamps when, since it may be a cached reading"""
 

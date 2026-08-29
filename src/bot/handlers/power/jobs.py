@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from src.bot.handlers.power.formatting import render_mains_change
 from src.bot.handlers.power.messages import POWER_OUTAGE_EMERGENCY, POWER_OUTAGE_SOON
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.scheduling import SchedulerContext
@@ -17,6 +18,7 @@ from src.common.config import Settings
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.domain import OutageSchedule, OutageScheduleStatus
+from src.modules.power.mains_monitor import MainsMonitor
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.power.use_cases.track_conservation import TrackConservationUseCase
@@ -55,6 +57,45 @@ class EcoFlowPollJob:
         await TrackConservationUseCase(
             uow=self.uow_factory(), now=datetime.now(self.timezone), conserved_after=self.conserved_after
         )(state)
+
+
+class MainsWatchJob:
+    """
+    Watches the wall socket through the station and speaks twice per outage: when it goes, and when it returns.
+
+    this is the message the whole of layer 1 is built for, and the second half is the one the family waits for.
+    it stays silent whenever the station cannot answer — shelved, unreachable, or simply idle and full — because
+    a guess here reads exactly like a blackout.
+    """
+
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        power_topic: ForumTopicRegistry,
+        ecoflow_station: EcoFlowStation,
+        settings: Settings,
+    ):
+        self.bot = bot
+        self.chat_id = chat_id
+        self.power_topic = power_topic
+        self.ecoflow_station = ecoflow_station
+        self.monitor = MainsMonitor(confirmations=settings.ECOFLOW_MAINS_CONFIRMATIONS)
+
+    async def __call__(self) -> None:
+        state = await self.ecoflow_station.read_state()
+        grid = self.monitor.update(state)
+        if grid is None or state is None:
+            return
+
+        await self.bot.send_message(
+            chat_id=self.chat_id,
+            message_thread_id=await self.power_topic.resolve(),
+            text=render_mains_change(grid, state),
+            # the one push in this house that must arrive the moment it is sent
+            disable_notification=False,
+        )
+        logger.info("Announced the grid going %s", grid.value)
 
 
 class YasnoScheduleJob:
@@ -169,6 +210,23 @@ def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContex
         id="ecoflow_poll",
         replace_existing=True,
     )
+    # the grid is watched on its own, far tighter cadence: this is the one message worth being early, and the
+    # read is cheap because the ble link is already held open
+    if context.power_topic is not None:
+        mains_watch_job = MainsWatchJob(
+            bot=context.bot,
+            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+            power_topic=context.power_topic,
+            ecoflow_station=context.ecoflow_station,
+            settings=settings,
+        )
+        scheduler.add_job(
+            mains_watch_job.__call__,
+            trigger=IntervalTrigger(minutes=settings.ECOFLOW_MAINS_CHECK_MINUTES),
+            id="ecoflow_mains_watch",
+            replace_existing=True,
+        )
+
     # the conservation regime rides on those same ble reads — its card only speaks while the station is shelved
     if context.conservation_board is not None:
         scheduler.add_job(

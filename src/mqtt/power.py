@@ -7,7 +7,8 @@ questions are always asked together.
 import logging
 from collections.abc import Mapping
 
-from src.modules.power.domain import EcoFlowState
+from src.modules.power.domain import EcoFlowState, GridState
+from src.modules.power.mains_monitor import classify_grid
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.mqtt.surface import MqttContext, MqttSurface
 
@@ -25,17 +26,20 @@ LOW_BATTERY_PERCENT = 20
 
 def render_state(state: EcoFlowState | None) -> dict[str, str]:
     """Turn one Delta 2 reading into the topics a contact sensor with a battery expects."""
-    if state is None:
-        # the station is off, stored or out of ble range: say nothing about the grid rather than guess
+    grid = classify_grid(state)
+    if state is None or grid is GridState.UNKNOWN:
+        # off, shelved, out of ble range — or idle and full, which reads exactly like an outage and must not
+        # be published as one. a tile saying "no response" is honest; a tile saying "світло зникло" is not
         return {AVAILABLE: "false"}
 
+    on_grid = grid is GridState.ON_GRID
     return {
         AVAILABLE: "true",
-        MAINS: str(state.on_mains).lower(),
+        MAINS: str(on_grid).lower(),
         BATTERY: str(round(state.battery_percent)),
         # low only matters while the grid is down: 20% sitting in storage is not an alarm, 20% mid-outage is
-        BATTERY_LOW: str(not state.on_mains and state.battery_percent < LOW_BATTERY_PERCENT).lower(),
-        CHARGING: str(state.on_mains and state.ac_input_power > 0).lower(),
+        BATTERY_LOW: str(not on_grid and state.battery_percent < LOW_BATTERY_PERCENT).lower(),
+        CHARGING: str(on_grid).lower(),
     }
 
 
