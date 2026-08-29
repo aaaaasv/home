@@ -1,4 +1,25 @@
 services:
+  # the household message broker. the bot publishes the air conditioner here as a thermostat, homebridge
+  # turns that into a tile on a phone, and zigbee2mqtt will join the same broker when the dongle goes in
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    # the same host user as the bot, so ./data stays one ownership and the backup can read all of it
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    # loopback only: homebridge runs on the host network and reaches 127.0.0.1, the bot reaches
+    # `mosquitto` over this compose network, and nothing on the lan can subscribe to the house
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./deploy/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./data/mosquitto:/mosquitto/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   bot:
     # no build here on purpose: the pi runs a published image and never compiles. use
     # docker-compose.local.yml to build on this machine instead
@@ -30,6 +51,8 @@ services:
     group_add:
       - "${I2C_GROUP_ID:-994}"
       - "${BLUETOOTH_GROUP_ID:-108}"
+    depends_on:
+      - mosquitto
     restart: unless-stopped
     logging:
       driver: json-file
