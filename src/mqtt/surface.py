@@ -130,6 +130,21 @@ class MqttSurface:
         except asyncio.CancelledError:
             pass
         self._connection = None
+        await self._say_farewell()
+
+    async def _say_farewell(self) -> None:
+        """Say it on the way out, because the broker only says it for us when the connection breaks."""
+        # a deploy is a clean disconnect, so without this a tile would keep showing the last reading —
+        # healthy and an hour old — for the whole restart
+        if self._farewell is None:
+            return
+
+        suffix, payload = self._farewell
+        try:
+            async with self.client_factory(self) as client:
+                await client.publish(self.topic(suffix), payload.encode(), qos=1, retain=True)
+        except aiomqtt.MqttError as error:
+            logger.warning("Could not announce the mqtt farewell (%s); the broker will do it instead", error)
 
     async def _serve(self) -> None:
         while True:
@@ -137,8 +152,10 @@ class MqttSurface:
                 await self.serve_one_connection()
             except aiomqtt.MqttError as error:
                 # the broker being down is an ordinary condition here, not a reason to take the bot with it
-                logger.warning("MQTT connection lost (%s), retrying in %ss", error, self.reconnect_seconds)
-                await asyncio.sleep(self.reconnect_seconds)
+                logger.warning("MQTT connection lost (%s)", error)
+            # whatever ended the connection, wait before dialling again: a broker that closes the stream
+            # without an error would otherwise be reconnected to in a tight loop
+            await asyncio.sleep(self.reconnect_seconds)
 
     async def serve_one_connection(self) -> None:
         """Hold one connection until the broker drops it — reconnecting is the caller's business."""

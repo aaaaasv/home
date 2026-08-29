@@ -291,6 +291,15 @@ class AnnounceMqttLossTestCase(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(farewell, ("air-conditioner/available", "false"))
 
+    async def test_stopping_the_surface_marks_the_unit_unavailable_before_the_connection_closes(self):
+        broker = FakeBroker()
+        surface = build_surface(broker, RecordingAirConditioner(build_state()), build_settings())
+        await surface.start()
+
+        await surface.stop()
+
+        self.assertEqual(broker.published[-1], (f"{PREFIX}/air-conditioner/available", "false"))
+
     async def test_claiming_the_farewell_message_twice_fails_rather_than_taking_it_from_the_first_module(self):
         surface = build_surface(FakeBroker(), RecordingAirConditioner(build_state()), build_settings())
 
