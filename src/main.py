@@ -37,6 +37,8 @@ from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.config import Settings, get_settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
+from src.mqtt.app import build_mqtt_surface
+from src.mqtt.surface import MqttContext
 from src.web.app import build_web_app, start_web_app
 
 logger = logging.getLogger(__name__)
@@ -284,6 +286,12 @@ async def run() -> None:
     scheduler.start()
     logger.info("Digest scheduled at %s %s", settings.DAILY_DIGEST_TIME, settings.TIMEZONE)
 
+    # homebridge and, later, zigbee2mqtt meet the bot here rather than inside it
+    mqtt_surface = None
+    if settings.MQTT_ENABLED:
+        mqtt_surface = build_mqtt_surface(MqttContext(settings=settings, air_conditioner=air_conditioner))
+        await mqtt_surface.start()
+
     # the specimen sheets share this loop with polling and the scheduler, the way everything else here does
     web_runner = None
     if settings.WEB_ENABLED:
@@ -294,6 +302,8 @@ async def run() -> None:
     try:
         await dispatcher.start_polling(bot)
     finally:
+        if mqtt_surface is not None:
+            await mqtt_surface.stop()
         if web_runner is not None:
             await web_runner.cleanup()
         scheduler.shutdown(wait=False)

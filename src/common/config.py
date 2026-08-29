@@ -34,6 +34,19 @@ class Settings(BaseSettings):
     # a latch on the action button, not a lock — it stops an accidental tap, nothing more
     WEB_ACTOR_NAME: str = ""
 
+    # the mqtt broker on the pi: how the house talks to anything that is not telegram. homebridge reads it
+    # to put the air conditioner on a phone, zigbee2mqtt will write devices into it, and the bot stays the
+    # only place decisions are made — what arrives here is a tap, never an automation
+    MQTT_ENABLED: bool = False
+    MQTT_HOST: str = "mosquitto"
+    MQTT_PORT: int = 1883
+    MQTT_USERNAME: str = ""
+    MQTT_PASSWORD: str = ""
+    # every topic this bot owns hangs under it, so one subscription shows the whole surface
+    MQTT_TOPIC_PREFIX: str = "home-bot"
+    # a tile that lags a minute behind reality reads as broken, and the unit is polled locally anyway
+    MQTT_PUBLISH_INTERVAL_SECONDS: int = 30
+
     # what the bot calls itself where it signs something — an annotation on a plant sheet, say.
     # a name, not a brand: set it to whatever the household actually calls the thing
     BOT_DISPLAY_NAME: str = "bot"

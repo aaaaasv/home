@@ -18,6 +18,8 @@ dependencies = [
     "aiohttp>=3.9.0",
     "greeclimate>=3.0.0",
     "asusrouter>=1.21.0",
+    # the mqtt surface: homebridge and zigbee2mqtt both meet the bot on the broker
+    "aiomqtt>=2.3.0",
     "anthropic>=0.69.0",
     "dukpy>=0.5.0",
     # ecoflow delta 2 over local ble (vendored eflib)
