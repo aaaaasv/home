@@ -25,13 +25,14 @@ class RetrievePlantSheetUseCase(BaseUseCase):
 
     async def __call__(self, reference: str) -> PlantSheet:
         """Reference is the slug a tag carries, or a plain id for anything written before slugs existed."""
+        # an archived plant still has a sheet: the tag on its pot, and any link already shared, must keep working
         today = self.household_calendar.today()
         since = self.household_calendar.now() - timedelta(hours=CLIMATE_WINDOW_HOURS)
 
         async with self.uow as uow:
-            plant = await uow.plants.retrieve_active_by_slug(reference)
+            plant = await uow.plants.retrieve_by_slug(reference)
             if plant is None and reference.isdigit():
-                plant = await uow.plants.retrieve_active(int(reference))
+                plant = await uow.plants.retrieve(int(reference))
             if plant is None:
                 raise DoesNotExistError(f"Plant {reference} not found")
             plant_id = plant.id

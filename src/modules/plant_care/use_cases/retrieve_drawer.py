@@ -14,10 +14,11 @@ def by_ukrainian_alphabet(name: str) -> list[int]:
 
 class RetrieveDrawerUseCase(BaseUseCase):
     """
-    Every living plant as a folder in a drawer.
+    Every plant the household has kept as a folder in a drawer, the archived ones among them.
 
     a tag on a pot opens one sheet, and until this existed that sheet was the whole collection as far as a
-    guest could tell — this is the index that lets them reach the other four.
+    guest could tell — this is the index that lets them reach the other four. a plant that died stays in the
+    drawer because a herbarium is a record, not an inventory: it is filed among the rest and marked as gone.
     """
 
     def __init__(self, uow: UnitOfWork, household_calendar: HouseholdCalendar):
@@ -28,7 +29,7 @@ class RetrieveDrawerUseCase(BaseUseCase):
         today = self.household_calendar.today()
 
         async with self.uow as uow:
-            plants = await uow.plants.list_active()
+            plants = await uow.plants.list_all()
             plant_ids = [plant.id for plant in plants]
             schedules = await uow.care_schedules.list_by_plant_ids(plant_ids)
             cover_photo_ids = await uow.plant_photos.latest_ids(plant_ids)

@@ -341,6 +341,7 @@ class DrawerEntry(DomainModel):
     cover_photo_id: int | None
     age_days: int
     days_until_watering: int | None
+    is_archived: bool
 
     @property
     def reference(self) -> str:
@@ -355,7 +356,11 @@ class DrawerEntry(DomainModel):
             species=plant.species,
             cover_photo_id=cover_photo_id,
             age_days=max((today - plant.created_at.date()).days, 0),
-            days_until_watering=(watering.next_due_on - today).days if watering else None,
+            # an archived plant keeps its schedules as a record of how it was kept, but nothing is due for it
+            days_until_watering=(
+                None if plant.is_archived else (watering.next_due_on - today).days if watering else None
+            ),
+            is_archived=plant.is_archived,
         )
 
 
@@ -394,6 +399,7 @@ class PlantSheet(DomainModel):
     toxicity: str | None
     created_at: datetime
     age_days: int
+    is_archived: bool
     ideal_temperature_min_celsius: float | None
     ideal_temperature_max_celsius: float | None
     ideal_humidity_min_percent: float | None
@@ -434,6 +440,7 @@ class PlantSheet(DomainModel):
             toxicity=plant.toxicity,
             created_at=plant.created_at,
             age_days=max((today - plant.created_at.date()).days, 0),
+            is_archived=plant.is_archived,
             ideal_temperature_min_celsius=plant.ideal_temperature_min_celsius,
             ideal_temperature_max_celsius=plant.ideal_temperature_max_celsius,
             ideal_humidity_min_percent=plant.ideal_humidity_min_percent,
