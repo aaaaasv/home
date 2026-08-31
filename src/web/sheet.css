@@ -416,3 +416,8 @@ body.gone #lightbox-img{filter:grayscale(1) contrast(1.06) brightness(.98)}
   border-bottom:1px solid var(--ink-ghost); font-family:var(--type); font-size:10px; letter-spacing:.1em;
   color:var(--ink-mid); text-transform:uppercase}
 .gone-band b{font-family:var(--plaque); font-size:12px; letter-spacing:.24em; color:var(--ink)}
+.lineage .rows li{display:block; padding:7px 0; border-bottom:1px dotted var(--sheet-deep); font-size:14px}
+.lineage .rows li:last-child{border-bottom:0}
+.lineage .rows b{font-family:var(--type); font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-ghost); margin-right:9px}
+.lineage .rows a{color:var(--green); text-decoration-thickness:1px; text-underline-offset:3px}

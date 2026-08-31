@@ -44,6 +44,11 @@ class Plant(Base):
     toxicity = Column(String(160), nullable=True)
     added_by_telegram_user_id = Column(BigInteger, nullable=False)
     is_archived = Column(Boolean, nullable=False, default=False, server_default="0")
+    # the day the plant stopped being one — a calendar day in the household timezone, like a due date
+    archived_on = Column(Date, nullable=True)
+    # the plant this one was taken from as a cutting, so a sheet can point at what came after it. a plain
+    # integer, not a foreign key: sqlite cannot add a constraint to an existing table without rebuilding it
+    propagated_from_plant_id = Column(Integer, nullable=True)
     created_at = Column(UtcDateTime, default=current_time, nullable=False)
     updated_at = Column(UtcDateTime, default=current_time, onupdate=current_time, nullable=False)
 

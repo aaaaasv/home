@@ -1,7 +1,8 @@
 from datetime import timedelta
 
 from src.common.constants import CareTaskType, PlantPhotoFrame
-from src.modules.plant_care.commands import RecordCareEventCommand
+from src.modules.plant_care.commands import ArchivePlantCommand, RecordCareEventCommand
+from src.modules.plant_care.use_cases.archive_plant import ArchivePlantUseCase
 from src.modules.plant_care.use_cases.record_care_event import RecordCareEventUseCase
 from src.modules.plant_care.use_cases.retrieve_plant_sheet import RetrievePlantSheetUseCase
 from src.tests.factories import OWNER, PARTNER
@@ -322,7 +323,6 @@ class ArchivedPlantSheetTestCase(BaseIntegrationTestCase):
             name="Ізабелла",
             slug="izabella",
             species="Schefflera arboricola",
-            is_archived=True,
             created_at=FROZEN_NOW - timedelta(days=49),
         )
         await self.seed_care_schedule(
@@ -331,6 +331,9 @@ class ArchivedPlantSheetTestCase(BaseIntegrationTestCase):
             interval_days=8,
             next_due_on=self.today + timedelta(days=3),
             instructions="Поливай, лише коли верхні 2–3 см підсохли.",
+        )
+        await ArchivePlantUseCase(uow=self.uow, household_calendar=self.household_calendar)(
+            ArchivePlantCommand(plant_id=self.plant_id)
         )
 
     def sheet(self, reference: str):
@@ -354,7 +357,6 @@ class ArchivedPlantSheetTestCase(BaseIntegrationTestCase):
 
         self.assertIn('<article class="sheet gone">', page)
         self.assertIn('<body class="gone">', page)
-        self.assertIn("<b>Olim</b> більше не з нами · аркуш і весь запис догляду лишаються", page)
 
     async def test_render_plant_sheet_of_an_archived_plant_offers_no_way_to_record_care(self):
         page = self.render(await self.sheet("izabella"))
@@ -362,16 +364,35 @@ class ArchivedPlantSheetTestCase(BaseIntegrationTestCase):
         self.assertNotIn('<form method="post"', page)
         self.assertNotIn('<details class="do">', page)
 
-    async def test_render_plant_sheet_of_an_archived_plant_names_no_next_due_date(self):
+    async def test_render_plant_sheet_of_an_archived_plant_drops_everything_about_the_present(self):
+        """The regimen, the room's air right now and the climate plate all speak about a plant still here."""
         page = self.render(await self.sheet("izabella"))
 
-        self.assertNotIn('<span class="state">', page)
-        self.assertIn("Як цю рослину доглядали, поки вона була з нами.", page)
+        self.assertNotIn("Regimen · розпис догляду", page)
+        self.assertNotIn('<section class="readings">', page)
+        self.assertNotIn("Аклімат", page)
 
-    async def test_render_plant_sheet_of_an_archived_plant_keeps_the_regimen_it_was_kept_on(self):
+    async def test_render_plant_sheet_of_an_archived_plant_keeps_its_history(self):
+        # the diary only opens from four events on, which is the whole point of keeping it after the plant is gone
+        for days_ago in (40, 30, 20, 10):
+            await self.seed_care_event(
+                self.plant_id, task_type=CareTaskType.WATERING, performed_at=FROZEN_NOW - timedelta(days=days_ago)
+            )
+
         page = self.render(await self.sheet("izabella"))
 
-        self.assertIn("раз на 8 дн.", page)
+        self.assertIn("Diarium", page)
+
+    async def test_render_plant_sheet_of_an_archived_plant_states_the_day_it_ended(self):
+        page = self.render(await self.sheet("izabella"))
+
+        self.assertIn(f"<b>Olim</b> {roman_date(FROZEN_NOW - timedelta(days=49))} — {roman_date(self.today)}", page)
+        self.assertIn("<dt>Кінець</dt>", page)
+
+    async def test_an_archived_plant_stops_ageing_on_the_day_it_ended(self):
+        sheet = await self.sheet("izabella")
+
+        self.assertEqual((sheet.archived_on, sheet.age_days), (self.today, 49))
 
     async def test_render_plant_sheet_of_a_living_plant_is_left_unmarked(self):
         living_id = await self.seed_plant(name="Тігл", slug="tihl", created_at=FROZEN_NOW - timedelta(days=10))
@@ -396,3 +417,20 @@ class ArchivedPlantSheetTestCase(BaseIntegrationTestCase):
             archived = await uow.plants.retrieve_by_slug("izabella")
 
         self.assertEqual((active, archived.name), (None, "Ізабелла"))
+
+    async def test_the_sheet_of_a_plant_that_gave_a_cutting_links_to_it_and_back(self):
+        child_id = await self.seed_plant(
+            name="Ізабелла II", slug="izabella-ii", propagated_from_plant_id=self.plant_id, created_at=FROZEN_NOW
+        )
+
+        parent_page = self.render(await self.sheet("izabella"))
+        child_page = self.render(await self.sheet("izabella-ii"))
+
+        self.assertIn('<b>Живець дав</b> <a href="/p/izabella-ii">Ізабелла II</a>', parent_page)
+        self.assertIn('<b>Живець від</b> <a href="/p/izabella">Ізабелла</a>', child_page)
+        self.assertEqual(child_id, (await self.sheet("izabella")).offspring[0].id)
+
+    async def test_a_sheet_with_no_lineage_shows_no_propago_block(self):
+        page = self.render(await self.sheet("izabella"))
+
+        self.assertNotIn("Propago", page)

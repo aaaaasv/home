@@ -107,13 +107,17 @@ class ArchivePlantTestCase(BaseIntegrationTestCase):
     async def test_archive_plant_removes_it_from_the_list(self):
         plant_id = await self.seed_plant(name="Монстера")
 
-        plant_name = await ArchivePlantUseCase(uow=self.uow)(ArchivePlantCommand(plant_id=plant_id))
+        plant_name = await ArchivePlantUseCase(uow=self.uow, household_calendar=self.household_calendar)(
+            ArchivePlantCommand(plant_id=plant_id)
+        )
 
         self.assertEqual(plant_name, "Монстера")
         self.assertEqual(await ListPlantsUseCase(uow=self.uow, household_calendar=self.household_calendar)(), [])
 
     async def test_archive_plant_for_a_missing_plant_raises_does_not_exist(self):
         with self.assertRaises(DoesNotExistError) as context:
-            await ArchivePlantUseCase(uow=self.uow)(ArchivePlantCommand(plant_id=999))
+            await ArchivePlantUseCase(uow=self.uow, household_calendar=self.household_calendar)(
+                ArchivePlantCommand(plant_id=999)
+            )
 
         self.assertEqual(str(context.exception), "Plant 999 not found")

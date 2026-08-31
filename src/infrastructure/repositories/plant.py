@@ -47,6 +47,13 @@ class PlantRepository(SQLAlchemyRepository[Plant]):
         result = await self.session.execute(select(Plant).where(Plant.slug == slug))
         return result.scalars().first()
 
+    async def list_offspring(self, plant_id: int) -> list[Plant]:
+        """The cuttings taken from this plant, archived ones included — a lineage keeps its dead."""
+        result = await self.session.execute(
+            select(Plant).where(Plant.propagated_from_plant_id == plant_id).order_by(Plant.created_at)
+        )
+        return list(result.scalars().all())
+
     async def list_slugs(self) -> set[str]:
         result = await self.session.execute(select(Plant.slug).where(Plant.slug.is_not(None)))
         return set(result.scalars().all())
