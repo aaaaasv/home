@@ -45,6 +45,10 @@ class RetrievePlantSheetUseCase(BaseUseCase):
             climate = await uow.room_climate_readings.list_hourly_averages(since)
             latest_climate = await uow.room_climate_readings.retrieve_latest()
             current_names = await uow.family_members.map_current_names()
+            parent = (
+                await uow.plants.retrieve(plant.propagated_from_plant_id) if plant.propagated_from_plant_id else None
+            )
+            offspring = await uow.plants.list_offspring(plant_id)
 
         return PlantSheet.from_models(
             plant=plant,
@@ -57,4 +61,6 @@ class RetrievePlantSheetUseCase(BaseUseCase):
             latest_climate=latest_climate,
             today=today,
             current_names=current_names,
+            parent=parent,
+            offspring=offspring,
         )

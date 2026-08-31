@@ -331,6 +331,27 @@ class CarerTally(DomainModel):
     count: int
 
 
+def plant_age_days(plant, today: date) -> int:
+    """How long the plant has been in the house — counted to the day it ended, if it has."""
+    return max(((plant.archived_on or today) - plant.created_at.date()).days, 0)
+
+
+class PlantLink(DomainModel):
+    """Another plant this one points at — enough to name it and reach its sheet, nothing more."""
+
+    id: int
+    name: str
+    slug: str | None
+
+    @property
+    def reference(self) -> str:
+        return self.slug or str(self.id)
+
+    @classmethod
+    def from_plant(cls, plant) -> "PlantLink":
+        return cls(id=plant.id, name=plant.name, slug=plant.slug)
+
+
 class DrawerEntry(DomainModel):
     """One folder in the card catalogue — enough to recognise a plant without opening its sheet."""
 
@@ -355,7 +376,7 @@ class DrawerEntry(DomainModel):
             name=plant.name,
             species=plant.species,
             cover_photo_id=cover_photo_id,
-            age_days=max((today - plant.created_at.date()).days, 0),
+            age_days=plant_age_days(plant, today),
             # an archived plant keeps its schedules as a record of how it was kept, but nothing is due for it
             days_until_watering=(
                 None if plant.is_archived else (watering.next_due_on - today).days if watering else None
@@ -400,6 +421,9 @@ class PlantSheet(DomainModel):
     created_at: datetime
     age_days: int
     is_archived: bool
+    archived_on: date | None
+    propagated_from: PlantLink | None
+    offspring: list[PlantLink]
     ideal_temperature_min_celsius: float | None
     ideal_temperature_max_celsius: float | None
     ideal_humidity_min_percent: float | None
@@ -424,7 +448,19 @@ class PlantSheet(DomainModel):
 
     @classmethod
     def from_models(
-        cls, plant, schedules, recent_events, photos, carers, waterings, climate, latest_climate, today, current_names
+        cls,
+        plant,
+        schedules,
+        recent_events,
+        photos,
+        carers,
+        waterings,
+        climate,
+        latest_climate,
+        today,
+        current_names,
+        parent=None,
+        offspring=(),
     ):
         gaps = [round((later - earlier).total_seconds() / 86400, 1) for earlier, later in zip(waterings, waterings[1:])]
         return cls(
@@ -439,8 +475,11 @@ class PlantSheet(DomainModel):
             substrate=plant.substrate,
             toxicity=plant.toxicity,
             created_at=plant.created_at,
-            age_days=max((today - plant.created_at.date()).days, 0),
+            age_days=plant_age_days(plant, today),
             is_archived=plant.is_archived,
+            archived_on=plant.archived_on,
+            propagated_from=PlantLink.from_plant(parent) if parent else None,
+            offspring=[PlantLink.from_plant(child) for child in offspring],
             ideal_temperature_min_celsius=plant.ideal_temperature_min_celsius,
             ideal_temperature_max_celsius=plant.ideal_temperature_max_celsius,
             ideal_humidity_min_percent=plant.ideal_humidity_min_percent,

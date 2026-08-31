@@ -18,5 +18,6 @@ class RestorePlantUseCase(BaseUseCase):
             if await uow.plants.retrieve_active_by_name(plant.name) is not None:
                 raise AlreadyExistsError(f"An active plant named '{plant.name}' already exists")
 
-            await uow.plants.update(command.plant_id, {"is_archived": False})
+            # the end date goes with it: a plant that is back never ended
+            await uow.plants.update(command.plant_id, {"is_archived": False, "archived_on": None})
             return plant.name
