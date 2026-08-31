@@ -50,6 +50,7 @@ FAVICON = (
 
 TASK_NAMES = {
     CareTaskType.WATERING: "Полив",
+    CareTaskType.WATER_CHANGE: "Зміна води",
     CareTaskType.FERTILIZING: "Підживлення",
     CareTaskType.REPOTTING: "Пересадка",
     CareTaskType.FLUSH: "Промивання",
@@ -58,6 +59,7 @@ TASK_NAMES = {
 }
 PAST_TASK_NAMES = {
     CareTaskType.WATERING: "Полито",
+    CareTaskType.WATER_CHANGE: "Воду змінено",
     CareTaskType.FERTILIZING: "Підживлено",
     CareTaskType.FLUSH: "Промито",
     CareTaskType.ROTATING: "Повернуто",
@@ -69,6 +71,7 @@ ACTIONABLE_TASKS = frozenset(TASK_NAMES) - {CareTaskType.PHOTO}
 # the order a person thinks about care in, not the order the enum happens to declare
 REGIMEN_ORDER = (
     CareTaskType.WATERING,
+    CareTaskType.WATER_CHANGE,
     CareTaskType.FERTILIZING,
     CareTaskType.FLUSH,
     CareTaskType.ROTATING,

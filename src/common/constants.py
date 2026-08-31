@@ -11,6 +11,8 @@ class ErrorCode(StrEnum):
 
 class CareTaskType(StrEnum):
     WATERING = "watering"
+    # a cutting rooting in a glass is not watered — its water is changed, and stale water is what rots it
+    WATER_CHANGE = "water_change"
     FERTILIZING = "fertilizing"
     # leaching the pot with plain water to wash out fertilizer salts — its own reminder, not a step inside feeding
     FLUSH = "flush"
