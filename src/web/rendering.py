@@ -182,6 +182,10 @@ def _climate_plate(points: list[ClimatePoint], humidity_floor: float | None) -> 
 def _label(sheet: PlantSheet) -> str:
     rows = [
         ("Надійшов", f"{roman_date(sheet.created_at)} · {sheet.age_days} діб у домі"),
+    ]
+    if sheet.archived_on:
+        rows.append(("Кінець", roman_date(sheet.archived_on)))
+    rows += [
         ("Походження", _blank(sheet.provenance)),
         ("Локалітет", _blank(sheet.location)),
         ("Субстрат", _blank(sheet.substrate)),
@@ -253,13 +257,13 @@ def _regimen(sheet: PlantSheet) -> str:
         else:
             done = "ще не робили"
         buttons = ""
-        if schedule.instructions and not sheet.is_archived:
+        if schedule.instructions:
             # aria-expanded starts true and the note is visible; the script hides it and takes over the toggle
             buttons += (
                 f'<button class="info" type="button" aria-expanded="true" '
                 f'aria-controls="note-{task.value}">Деталі</button>'
             )
-        if task in ACTIONABLE_TASKS and not sheet.is_archived:
+        if task in ACTIONABLE_TASKS:
             verb = PAST_TASK_NAMES.get(task, name)
             buttons += (
                 f'<details class="do"><summary>{escape(verb)}</summary>'
@@ -268,14 +272,11 @@ def _regimen(sheet: PlantSheet) -> str:
             )
         note = (
             f'<div class="note" id="note-{task.value}">{escape(schedule.instructions)}</div>'
-            if schedule.instructions and not sheet.is_archived
+            if schedule.instructions
             else ""
         )
-        # a due date for a plant that is gone would be the one lie on the sheet
-        upcoming = (
-            "" if sheet.is_archived else f'<span class="state">далі {roman_date(schedule.next_due_on)} · {state}</span>'
-        )
-        late_mark = ' class="late"' if late and not sheet.is_archived else ""
+        upcoming = f'<span class="state">далі {roman_date(schedule.next_due_on)} · {state}</span>'
+        late_mark = ' class="late"' if late else ""
         rows.append(
             f"<li{late_mark}>"
             f'<span class="what">{escape(name)}</span>'
@@ -284,14 +285,9 @@ def _regimen(sheet: PlantSheet) -> str:
             f"{upcoming}"
             f'<span class="deed">{buttons}</span>{note}</li>'
         )
-    subtitle = (
-        "Як цю рослину доглядали, поки вона була з нами."
-        if sheet.is_archived
-        else "Що, як часто, коли востаннє й ким. Червоне — прострочено."
-    )
     return (
         f'<section class="plate-block regimen"><h3>Regimen · розпис догляду</h3>'
-        f'<p class="sub">{subtitle}</p>'
+        f'<p class="sub">Що, як часто, коли востаннє й ким. Червоне — прострочено.</p>'
         f'<ol class="rows">{"".join(rows)}</ol></section>'
     )
 
@@ -432,7 +428,8 @@ def render_drawer(entries: list[DrawerEntry], photo_url, bot_name: str) -> str:
             if entry.cover_photo_id
             else '<div class="cover vacant">без знімка</div>'
         )
-        due = '<span class="gone">більше не з нами</span>' if entry.is_archived else ""
+        # a grey photograph says it without a caption; a label under every dead plant reads as nagging
+        due = ""
         if entry.days_until_watering is not None:
             days = entry.days_until_watering
             if days < 0:
@@ -468,6 +465,22 @@ def render_drawer(entries: list[DrawerEntry], photo_url, bot_name: str) -> str:
 <main class="drawer">{"".join(files)}</main>
 </body>
 </html>"""
+
+
+def _lineage(sheet: PlantSheet) -> str:
+    """What this plant was taken from and what was taken from it — the one thing that outlives it."""
+    rows = []
+    if sheet.propagated_from:
+        parent = sheet.propagated_from
+        rows.append(f'<li><b>Живець від</b> <a href="/p/{parent.reference}">{escape(parent.name)}</a></li>')
+    for child in sheet.offspring:
+        rows.append(f'<li><b>Живець дав</b> <a href="/p/{child.reference}">{escape(child.name)}</a></li>')
+    if not rows:
+        return ""
+    return (
+        f'<section class="plate-block lineage"><h3>Propago · походження</h3>'
+        f'<ol class="rows">{"".join(rows)}</ol></section>'
+    )
 
 
 def render_plant_sheet(
@@ -533,12 +546,19 @@ def render_plant_sheet(
     )
     watering = sheet.watering
     rhythm = _rhythm_plate(sheet.watering_gaps_days, watering.interval_days) if watering else ""
-    # "olim" is how a herbarium says "formerly" — the sheet stays, the plant does not
-    gone = (
-        '<p class="gone-band"><b>Olim</b> більше не з нами · аркуш і весь запис догляду лишаються</p>'
+    # the room's air and the care ahead belong to a plant that is still here; the history stays either way
+    present = (
+        ""
         if sheet.is_archived
-        else ""
+        else (
+            f'<section class="readings">{temperature_gauge}{humidity_gauge}</section>'
+            f"{_regimen(sheet)}"
+            f"{_climate_plate(sheet.climate, sheet.ideal_humidity_min_percent)}"
+        )
     )
+    # "olim" is how a herbarium says "formerly" — the sheet stays, the plant does not
+    span = f"{roman_date(sheet.created_at)} — {roman_date(sheet.archived_on)}" if sheet.archived_on else ""
+    gone = f'<p class="gone-band"><b>Olim</b> {span}</p>' if sheet.is_archived else ""
     return f"""<!doctype html>
 <html lang="uk">
 <head>
@@ -569,14 +589,10 @@ def render_plant_sheet(
       {gone}
     </div>
     {collection}
-    <section class="readings">
-      {temperature_gauge}
-      {humidity_gauge}
-    </section>
-    {_regimen(sheet)}
+    {present}
+    {_lineage(sheet)}
     {compare}
     {rhythm}
-    {_climate_plate(sheet.climate, sheet.ideal_humidity_min_percent)}
     {_carers(sheet)}
     {_diarium(sheet)}
     <div class="lower{' with-packet' if packet else ''}">

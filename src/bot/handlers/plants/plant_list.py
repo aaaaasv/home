@@ -94,9 +94,14 @@ async def confirm_archiving(
 
 @router.callback_query(PlantCallback.filter(F.action == PlantAction.ARCHIVE_CONFIRM))
 async def archive_plant(
-    callback: CallbackQuery, callback_data: PlantCallback, uow_factory: Callable[[], UnitOfWork]
+    callback: CallbackQuery,
+    callback_data: PlantCallback,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
 ) -> None:
-    plant_name = await ArchivePlantUseCase(uow=uow_factory())(ArchivePlantCommand(plant_id=callback_data.plant_id))
+    plant_name = await ArchivePlantUseCase(uow=uow_factory(), household_calendar=household_calendar)(
+        ArchivePlantCommand(plant_id=callback_data.plant_id)
+    )
     await callback.answer()
     # the archive is otherwise a one-way door: nothing else in the bot can bring a plant back
     await callback.message.answer(

@@ -13,7 +13,9 @@ class RestorePlantTestCase(BaseIntegrationTestCase):
         self.plant_id = await self.seed_plant(name="Кактус")
 
     async def archive(self) -> None:
-        await ArchivePlantUseCase(uow=self.uow)(ArchivePlantCommand(plant_id=self.plant_id))
+        await ArchivePlantUseCase(uow=self.uow, household_calendar=self.household_calendar)(
+            ArchivePlantCommand(plant_id=self.plant_id)
+        )
 
     async def restore(self, plant_id: int | None = None) -> str:
         return await RestorePlantUseCase(uow=self.uow)(RestorePlantCommand(plant_id=plant_id or self.plant_id))

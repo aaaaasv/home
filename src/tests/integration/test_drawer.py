@@ -137,13 +137,12 @@ class DrawerArchivedPlantTestCase(BaseIntegrationTestCase):
 
         self.assertEqual([(entry.name, entry.days_until_watering) for entry in entries], [("Ізабелла", None)])
 
-    async def test_render_drawer_greys_an_archived_folder_and_marks_it_instead_of_a_due_day(self):
+    async def test_render_drawer_greys_an_archived_folder_and_gives_it_no_due_day(self):
         await self.seed_archived("Ізабелла", "izabella")
 
         page = render_drawer(await self.drawer(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
 
         self.assertIn('<a class="file gone" href="/p/izabella"', page)
-        self.assertIn('<span class="gone">більше не з нами</span>', page)
         self.assertNotIn("полив за", page)
 
     async def test_render_drawer_leaves_a_living_folder_unmarked(self):
@@ -152,4 +151,4 @@ class DrawerArchivedPlantTestCase(BaseIntegrationTestCase):
         page = render_drawer(await self.drawer(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
 
         self.assertIn('<a class="file" href="/p/tihl"', page)
-        self.assertNotIn("більше не з нами", page)
+        self.assertNotIn('class="file gone"', page)
