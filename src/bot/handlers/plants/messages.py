@@ -13,6 +13,7 @@ from src.common.constants import (
 
 CARE_TASK_LABELS: dict[CareTaskType, str] = {
     CareTaskType.WATERING: "полив",
+    CareTaskType.WATER_CHANGE: "зміна води",
     CareTaskType.FERTILIZING: "добриво",
     CareTaskType.FLUSH: "промивання",
     CareTaskType.REPOTTING: "пересадка",
@@ -22,6 +23,7 @@ CARE_TASK_LABELS: dict[CareTaskType, str] = {
 
 CARE_TASK_EMOJI: dict[CareTaskType, str] = {
     CareTaskType.WATERING: "💧",
+    CareTaskType.WATER_CHANGE: "💦",
     CareTaskType.FERTILIZING: "🌱",
     CareTaskType.FLUSH: "🚿",
     CareTaskType.REPOTTING: "🪴",
@@ -32,6 +34,7 @@ CARE_TASK_EMOJI: dict[CareTaskType, str] = {
 # on a button the label must read as a done action — the impersonal -но/-то form (як «Збережено»), not the noun
 CARE_TASK_ACTIONS: dict[CareTaskType, str] = {
     CareTaskType.WATERING: "полито",
+    CareTaskType.WATER_CHANGE: "воду змінено",
     CareTaskType.FERTILIZING: "підживлено",
     CareTaskType.FLUSH: "промито",
     CareTaskType.REPOTTING: "пересаджено",
