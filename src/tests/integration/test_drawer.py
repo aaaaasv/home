@@ -94,3 +94,62 @@ class DrawerTestCase(BaseIntegrationTestCase):
 
         # codepoint order would put Ізабелла first, because і (U+0406) sits below а (U+0410)
         self.assertEqual([entry.name for entry in entries], ["Амазонка", "Ізабелла", "Ялинка"])
+
+
+class DrawerArchivedPlantTestCase(BaseIntegrationTestCase):
+    """
+    A plant that died stays in the drawer.
+
+    the herbarium is a record, not an inventory: removing the sheet would erase the care history that is the
+    whole reason it exists, and the tag on the pot would start answering 404.
+    """
+
+    def drawer(self):
+        return RetrieveDrawerUseCase(uow=self.uow, household_calendar=self.household_calendar)()
+
+    async def seed_archived(self, name: str, slug: str) -> int:
+        plant_id = await self.seed_plant(
+            name=name, slug=slug, is_archived=True, created_at=FROZEN_NOW - timedelta(days=30)
+        )
+        await self.seed_care_schedule(
+            plant_id=plant_id,
+            task_type=CareTaskType.WATERING,
+            interval_days=8,
+            next_due_on=self.today + timedelta(days=2),
+        )
+        return plant_id
+
+    async def test_drawer_files_an_archived_plant_among_the_living_ones_alphabetically(self):
+        await self.seed_plant(name="Тігл", slug="tihl", created_at=FROZEN_NOW - timedelta(days=30))
+        await self.seed_archived("Ізабелла", "izabella")
+
+        entries = await self.drawer()
+
+        self.assertEqual(
+            [(entry.name, entry.is_archived) for entry in entries],
+            [("Ізабелла", True), ("Тігл", False)],
+        )
+
+    async def test_drawer_entry_for_an_archived_plant_reports_no_watering_although_its_schedule_remains(self):
+        await self.seed_archived("Ізабелла", "izabella")
+
+        entries = await self.drawer()
+
+        self.assertEqual([(entry.name, entry.days_until_watering) for entry in entries], [("Ізабелла", None)])
+
+    async def test_render_drawer_greys_an_archived_folder_and_marks_it_instead_of_a_due_day(self):
+        await self.seed_archived("Ізабелла", "izabella")
+
+        page = render_drawer(await self.drawer(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
+
+        self.assertIn('<a class="file gone" href="/p/izabella"', page)
+        self.assertIn('<span class="gone">більше не з нами</span>', page)
+        self.assertNotIn("полив за", page)
+
+    async def test_render_drawer_leaves_a_living_folder_unmarked(self):
+        await self.seed_plant(name="Тігл", slug="tihl", created_at=FROZEN_NOW)
+
+        page = render_drawer(await self.drawer(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
+
+        self.assertIn('<a class="file" href="/p/tihl"', page)
+        self.assertNotIn("більше не з нами", page)
