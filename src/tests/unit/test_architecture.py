@@ -3,8 +3,11 @@ import importlib
 import pathlib
 import unittest
 
+from src.bot.handlers.plants.messages import CARE_TASK_ACTIONS, CARE_TASK_EMOJI, CARE_TASK_LABELS
 from src.bot.reminders import JOB_REGISTRARS
+from src.common.constants import CareTaskType
 from src.mqtt.app import LISTENER_REGISTRARS
+from src.web.rendering import PAST_TASK_NAMES, REGIMEN_ORDER, TASK_NAMES
 
 HANDLERS_ROOT = pathlib.Path("src/bot/handlers")
 DELIVERY_ROOT = pathlib.Path("src/bot")
@@ -145,3 +148,37 @@ class LayerBoundariesTestCase(unittest.TestCase):
         }
 
         self.assertEqual(offenders, {})
+
+
+class CareTaskTypeCoverageTestCase(unittest.TestCase):
+    """
+    Every care task must be nameable everywhere it can appear.
+
+    the dictionaries that name a task are plain literals in two delivery layers, so adding a task type and
+    forgetting one of them raises KeyError only when that task first comes due — which is a reminder night,
+    not a test run.
+    """
+
+    def test_every_care_task_type_has_a_name_an_emoji_and_a_done_form_in_telegram(self):
+        missing = {
+            name: sorted(task.value for task in CareTaskType if task not in mapping)
+            for name, mapping in (
+                ("CARE_TASK_LABELS", CARE_TASK_LABELS),
+                ("CARE_TASK_EMOJI", CARE_TASK_EMOJI),
+                ("CARE_TASK_ACTIONS", CARE_TASK_ACTIONS),
+            )
+        }
+
+        self.assertEqual(missing, {"CARE_TASK_LABELS": [], "CARE_TASK_EMOJI": [], "CARE_TASK_ACTIONS": []})
+
+    def test_every_care_task_type_has_a_name_a_past_form_and_a_place_in_the_herbarium_regimen(self):
+        missing = {
+            name: sorted(task.value for task in CareTaskType if task not in mapping)
+            for name, mapping in (
+                ("TASK_NAMES", TASK_NAMES),
+                ("PAST_TASK_NAMES", PAST_TASK_NAMES),
+                ("REGIMEN_ORDER", REGIMEN_ORDER),
+            )
+        }
+
+        self.assertEqual(missing, {"TASK_NAMES": [], "PAST_TASK_NAMES": [], "REGIMEN_ORDER": []})
