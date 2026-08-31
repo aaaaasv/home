@@ -306,3 +306,93 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
 
         self.assertIn('<div class="lower with-packet">', page)
         self.assertIn("Взято живцем від сусідки", page)
+
+
+class ArchivedPlantSheetTestCase(BaseIntegrationTestCase):
+    """
+    The sheet outlives the plant, which is the point of a herbarium.
+
+    what changes is what the sheet may claim: the regimen becomes a record of how it was kept, never a due
+    date or a button, because a plant that is gone cannot be watered.
+    """
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.plant_id = await self.seed_plant(
+            name="Ізабелла",
+            slug="izabella",
+            species="Schefflera arboricola",
+            is_archived=True,
+            created_at=FROZEN_NOW - timedelta(days=49),
+        )
+        await self.seed_care_schedule(
+            plant_id=self.plant_id,
+            task_type=CareTaskType.WATERING,
+            interval_days=8,
+            next_due_on=self.today + timedelta(days=3),
+            instructions="Поливай, лише коли верхні 2–3 см підсохли.",
+        )
+
+    def sheet(self, reference: str):
+        return RetrievePlantSheetUseCase(uow=self.uow, household_calendar=self.household_calendar)(reference)
+
+    def render(self, sheet):
+        return render_plant_sheet(sheet, lambda photo_id: f"/photo/{photo_id}", "Домовик", ())
+
+    async def test_retrieve_plant_sheet_by_slug_still_finds_an_archived_plant(self):
+        sheet = await self.sheet("izabella")
+
+        self.assertEqual((sheet.name, sheet.is_archived), ("Ізабелла", True))
+
+    async def test_retrieve_plant_sheet_by_numeric_id_still_finds_an_archived_plant(self):
+        sheet = await self.sheet(str(self.plant_id))
+
+        self.assertEqual((sheet.name, sheet.is_archived), ("Ізабелла", True))
+
+    async def test_render_plant_sheet_of_an_archived_plant_marks_the_sheet_and_the_body(self):
+        page = self.render(await self.sheet("izabella"))
+
+        self.assertIn('<article class="sheet gone">', page)
+        self.assertIn('<body class="gone">', page)
+        self.assertIn("<b>Olim</b> більше не з нами · аркуш і весь запис догляду лишаються", page)
+
+    async def test_render_plant_sheet_of_an_archived_plant_offers_no_way_to_record_care(self):
+        page = self.render(await self.sheet("izabella"))
+
+        self.assertNotIn('<form method="post"', page)
+        self.assertNotIn('<details class="do">', page)
+
+    async def test_render_plant_sheet_of_an_archived_plant_names_no_next_due_date(self):
+        page = self.render(await self.sheet("izabella"))
+
+        self.assertNotIn('<span class="state">', page)
+        self.assertIn("Як цю рослину доглядали, поки вона була з нами.", page)
+
+    async def test_render_plant_sheet_of_an_archived_plant_keeps_the_regimen_it_was_kept_on(self):
+        page = self.render(await self.sheet("izabella"))
+
+        self.assertIn("раз на 8 дн.", page)
+
+    async def test_render_plant_sheet_of_a_living_plant_is_left_unmarked(self):
+        living_id = await self.seed_plant(name="Тігл", slug="tihl", created_at=FROZEN_NOW - timedelta(days=10))
+        await self.seed_care_schedule(
+            plant_id=living_id,
+            task_type=CareTaskType.WATERING,
+            interval_days=6,
+            next_due_on=self.today + timedelta(days=1),
+        )
+
+        page = self.render(await self.sheet("tihl"))
+
+        self.assertIn('<article class="sheet">', page)
+        self.assertIn("<body>", page)
+        self.assertNotIn("більше не з нами", page)
+        self.assertIn('<span class="state">', page)
+
+    async def test_the_active_lookups_still_refuse_an_archived_plant_so_no_care_can_be_recorded_for_it(self):
+        """The web POST route resolves the plant through retrieve_active_by_slug — this is what stops it."""
+        async with self.uow as uow:
+            active = await uow.plants.retrieve_active_by_slug("izabella")
+            archived = await uow.plants.retrieve_by_slug("izabella")
+
+        self.assertEqual((active, archived.name), (None, "Ізабелла"))

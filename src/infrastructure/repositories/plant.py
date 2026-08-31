@@ -11,6 +11,11 @@ class PlantRepository(SQLAlchemyRepository[Plant]):
         result = await self.session.execute(select(Plant).where(Plant.is_archived.is_(False)).order_by(Plant.name))
         return list(result.scalars().all())
 
+    async def list_all(self) -> list[Plant]:
+        """Every plant the household has ever kept, the archived ones included — the herbarium shows its dead."""
+        result = await self.session.execute(select(Plant).order_by(Plant.name))
+        return list(result.scalars().all())
+
     async def list_active_with_climate_range(self) -> list[Plant]:
         result = await self.session.execute(
             select(Plant)
@@ -35,6 +40,11 @@ class PlantRepository(SQLAlchemyRepository[Plant]):
 
     async def retrieve_active_by_slug(self, slug: str) -> Plant | None:
         result = await self.session.execute(select(Plant).where(Plant.slug == slug, Plant.is_archived.is_(False)))
+        return result.scalars().first()
+
+    async def retrieve_by_slug(self, slug: str) -> Plant | None:
+        """Unlike retrieve_active_by_slug this still finds an archived plant, because its sheet outlives it."""
+        result = await self.session.execute(select(Plant).where(Plant.slug == slug))
         return result.scalars().first()
 
     async def list_slugs(self) -> set[str]:

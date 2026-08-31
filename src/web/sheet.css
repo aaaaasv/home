@@ -399,3 +399,20 @@ body{
 /* ── colophon ─────────────────────────────────────────────── */
 .colophon{max-width:830px; margin:clamp(16px,3vw,22px) auto 0; text-align:center; font-family:var(--type);
   font-size:10px; letter-spacing:.2em; color:rgba(235,226,204,.34)}
+
+/* ── a plant that is gone ─────────────────────────────────────────────────────
+   it stays filed among the living, because a herbarium keeps what it has held.
+   the photograph is what says so first: colour is for what is still growing */
+.file.gone .cover img,
+.sheet.gone .mount img,
+.sheet.gone .strip img,
+.sheet.gone .compare img,
+body.gone #lightbox-img{filter:grayscale(1) contrast(1.06) brightness(.98)}
+.file.gone .cover{box-shadow:2px 3px 0 rgba(40,32,25,.1)}
+.file.gone h2,.file.gone .vern{color:var(--ink-mid)}
+.file .gone{display:inline-block; margin-top:7px; font-family:var(--type); font-size:10px;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-ghost)}
+.gone-band{margin:12px auto 0; max-width:34ch; padding:7px 12px; border-top:1px solid var(--ink-ghost);
+  border-bottom:1px solid var(--ink-ghost); font-family:var(--type); font-size:10px; letter-spacing:.1em;
+  color:var(--ink-mid); text-transform:uppercase}
+.gone-band b{font-family:var(--plaque); font-size:12px; letter-spacing:.24em; color:var(--ink)}

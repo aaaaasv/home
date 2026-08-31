@@ -250,13 +250,13 @@ def _regimen(sheet: PlantSheet) -> str:
         else:
             done = "ще не робили"
         buttons = ""
-        if schedule.instructions:
+        if schedule.instructions and not sheet.is_archived:
             # aria-expanded starts true and the note is visible; the script hides it and takes over the toggle
             buttons += (
                 f'<button class="info" type="button" aria-expanded="true" '
                 f'aria-controls="note-{task.value}">Деталі</button>'
             )
-        if task in ACTIONABLE_TASKS:
+        if task in ACTIONABLE_TASKS and not sheet.is_archived:
             verb = PAST_TASK_NAMES.get(task, name)
             buttons += (
                 f'<details class="do"><summary>{escape(verb)}</summary>'
@@ -265,21 +265,30 @@ def _regimen(sheet: PlantSheet) -> str:
             )
         note = (
             f'<div class="note" id="note-{task.value}">{escape(schedule.instructions)}</div>'
-            if schedule.instructions
+            if schedule.instructions and not sheet.is_archived
             else ""
         )
-        late_mark = ' class="late"' if late else ""
+        # a due date for a plant that is gone would be the one lie on the sheet
+        upcoming = (
+            "" if sheet.is_archived else f'<span class="state">далі {roman_date(schedule.next_due_on)} · {state}</span>'
+        )
+        late_mark = ' class="late"' if late and not sheet.is_archived else ""
         rows.append(
             f"<li{late_mark}>"
             f'<span class="what">{escape(name)}</span>'
             f'<span class="every">раз на {schedule.interval_days} дн.</span>'
             f'<span class="when">{done}</span>'
-            f'<span class="state">далі {roman_date(schedule.next_due_on)} · {state}</span>'
+            f"{upcoming}"
             f'<span class="deed">{buttons}</span>{note}</li>'
         )
+    subtitle = (
+        "Як цю рослину доглядали, поки вона була з нами."
+        if sheet.is_archived
+        else "Що, як часто, коли востаннє й ким. Червоне — прострочено."
+    )
     return (
         f'<section class="plate-block regimen"><h3>Regimen · розпис догляду</h3>'
-        f'<p class="sub">Що, як часто, коли востаннє й ким. Червоне — прострочено.</p>'
+        f'<p class="sub">{subtitle}</p>'
         f'<ol class="rows">{"".join(rows)}</ol></section>'
     )
 
@@ -420,7 +429,7 @@ def render_drawer(entries: list[DrawerEntry], photo_url, bot_name: str) -> str:
             if entry.cover_photo_id
             else '<div class="cover vacant">без знімка</div>'
         )
-        due = ""
+        due = '<span class="gone">більше не з нами</span>' if entry.is_archived else ""
         if entry.days_until_watering is not None:
             days = entry.days_until_watering
             if days < 0:
@@ -431,7 +440,8 @@ def render_drawer(entries: list[DrawerEntry], photo_url, bot_name: str) -> str:
                 text, urgent = f"полив за {days} дн.", False
             due = f'<span class="due{" now" if urgent else ""}">{text}</span>'
         files.append(
-            f'<a class="file" href="/p/{entry.reference}" data-tab="{escape(entry.name)}">{cover}'
+            f'<a class="file{" gone" if entry.is_archived else ""}" href="/p/{entry.reference}"'
+            f' data-tab="{escape(entry.name)}">{cover}'
             f"<div><h2>{escape(entry.species or entry.name)}</h2>"
             f'<p class="vern">{escape(entry.name)}</p>'
             f'<p class="meta">{entry.age_days} діб у домі</p>{due}</div></a>'
@@ -520,6 +530,12 @@ def render_plant_sheet(
     )
     watering = sheet.watering
     rhythm = _rhythm_plate(sheet.watering_gaps_days, watering.interval_days) if watering else ""
+    # "olim" is how a herbarium says "formerly" — the sheet stays, the plant does not
+    gone = (
+        '<p class="gone-band"><b>Olim</b> більше не з нами · аркуш і весь запис догляду лишаються</p>'
+        if sheet.is_archived
+        else ""
+    )
     return f"""<!doctype html>
 <html lang="uk">
 <head>
@@ -532,12 +548,12 @@ def render_plant_sheet(
 <link rel="stylesheet" href="{GOOGLE_FONTS_URL}">
 <style>{STYLESHEET}</style>
 </head>
-<body>
+<body{' class="gone"' if sheet.is_archived else ''}>
 <p class="drawer-tag"><span>{escape(sheet.species or "Hortus")}</span><span>Hortus Domesticus · HD</span></p>
 {_tabs(drawer, sheet.id)}
 <div class="folder">
   {'' if drawer else f'<span class="tab here">{escape(sheet.name)}</span>'}
-  <article class="sheet">
+  <article class="sheet{' gone' if sheet.is_archived else ''}">
     <div class="calib"><div class="swatches">{swatches}</div><div class="ruler"></div></div>
     <header class="head"><div><h1>Hortus Domesticus</h1><p>Домашній гербарій</p></div>
       <div class="barcode"><div class="bars"></div><small>HD {sheet.id:06d}</small></div></header>
@@ -547,6 +563,7 @@ def render_plant_sheet(
       <h2>{escape(sheet.species or sheet.name)}</h2>
       <p class="vern">домашнє ім'я — <b>{escape(sheet.name)}</b></p>
       {f'<p class="range">Природний ареал: <b>{escape(sheet.native_range)}</b></p>' if sheet.native_range else ""}
+      {gone}
     </div>
     {collection}
     <section class="readings">
