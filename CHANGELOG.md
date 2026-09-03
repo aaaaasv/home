@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-09-03
+
 ### Виправлено
 
 - Ранковий дайджест більше не виходить без погоди. Він публікується рівно о восьмій, а саме о рівній
