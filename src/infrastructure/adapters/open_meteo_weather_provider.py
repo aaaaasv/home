@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 REQUEST_TIMEOUT_SECONDS = 15
+# open-meteo sheds load on the hour and the half hour, and the morning digest fires at exactly 08:00 — one bad
+# second was losing the whole day's weather, because the overnight cache is long past WEATHER_RECENT_MAX_AGE
+FETCH_ATTEMPTS = 3
+RETRY_DELAY_SECONDS = 5
 # the outdoor weather barely moves minute to minute, so /ac buttons reuse the last fetch instead of blocking on a
 # fresh network call — the live fetch happens only when the card is first opened (or the digest refreshes)
 WEATHER_RECENT_MAX_AGE_SECONDS = 1800
@@ -45,13 +49,8 @@ class OpenMeteoWeatherProvider:
         self._cached_at: datetime | None = None
 
     async def fetch(self) -> WeatherReport | None:
-        try:
-            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                forecast = await self._get_json(session, FORECAST_URL, self._forecast_parameters())
-                air_quality = await self._get_json(session, AIR_QUALITY_URL, self._air_quality_parameters())
-        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-            logger.warning("Weather fetch failed: %r", error)
+        forecast, air_quality = await self._fetch_payloads()
+        if forecast is None or air_quality is None:
             return None
 
         report = parse_weather_report(forecast, air_quality, datetime.now(ZoneInfo(self.timezone_name)).hour)
@@ -59,6 +58,23 @@ class OpenMeteoWeatherProvider:
             self._cached_report = report
             self._cached_at = current_time()
         return report
+
+    async def _fetch_payloads(self) -> tuple[dict | None, dict | None]:
+        """Both payloads, retried past a transient refusal so a single bad second does not cost the digest."""
+        for attempt in range(1, FETCH_ATTEMPTS + 1):
+            try:
+                timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    forecast = await self._get_json(session, FORECAST_URL, self._forecast_parameters())
+                    air_quality = await self._get_json(session, AIR_QUALITY_URL, self._air_quality_parameters())
+                return forecast, air_quality
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                if attempt == FETCH_ATTEMPTS:
+                    logger.warning("Weather fetch failed after %d attempts: %r", FETCH_ATTEMPTS, error)
+                    return None, None
+                logger.info("Weather fetch attempt %d of %d failed, retrying: %r", attempt, FETCH_ATTEMPTS, error)
+                await asyncio.sleep(RETRY_DELAY_SECONDS)
+        return None, None
 
     def recent(self) -> WeatherReport | None:
         if self._cached_report is None or self._cached_at is None:
