@@ -1,6 +1,10 @@
 import unittest
 from datetime import timedelta
+from unittest import mock
 
+import aiohttp
+
+import src.infrastructure.adapters.open_meteo_weather_provider as open_meteo
 from src.common.time import current_time
 from src.infrastructure.adapters.open_meteo_weather_provider import (
     WEATHER_RECENT_MAX_AGE_SECONDS,
@@ -185,3 +189,100 @@ class RecentWeatherCacheTestCase(unittest.TestCase):
         provider._cached_at = current_time() - timedelta(seconds=WEATHER_RECENT_MAX_AGE_SECONDS + 60)
 
         self.assertIsNone(provider.recent())
+
+
+class StubResponse:
+    def __init__(self, payload: dict):
+        self._payload = payload
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        return False
+
+    def raise_for_status(self) -> None:
+        return None
+
+    async def json(self) -> dict:
+        return self._payload
+
+
+class StubSession:
+    """One aiohttp session whose every call either raises the queued error or returns the queued payload."""
+
+    def __init__(self, outcomes: list):
+        self.outcomes = outcomes
+        self.calls = 0
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        return False
+
+    def get(self, url, params=None):
+        self.calls += 1
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return StubResponse(outcome)
+
+
+class FetchRetryTestCase(unittest.IsolatedAsyncioTestCase):
+    """
+    A transient refusal must not cost the whole day's weather.
+
+    open-meteo sheds load on the hour, and the morning digest fires at exactly 08:00. Before the retry every
+    single morning card went out without weather, because the overnight cache is far past its max age and one
+    failed request was the end of it.
+    """
+
+    def build_provider(self, outcomes: list) -> tuple[OpenMeteoWeatherProvider, StubSession]:
+        provider = OpenMeteoWeatherProvider(latitude=50.45, longitude=30.52, timezone_name="Europe/Kyiv")
+        session = StubSession(outcomes)
+        return provider, session
+
+    async def test_fetch_retries_past_a_single_refusal_and_returns_the_report(self):
+        forecast = {
+            "current": {"temperature_2m": 21.0, "apparent_temperature": 21.0, "relative_humidity_2m": 50},
+            "daily": {"uv_index_max": [4.0]},
+            "hourly": build_hourly([0] * 24),
+        }
+        air_quality = {"current": {"european_aqi": 20, "pm2_5": 5.0}, "hourly": {}}
+        provider, session = self.build_provider([aiohttp.ClientError("503"), forecast, air_quality])
+
+        with mock.patch.object(aiohttp, "ClientSession", return_value=session), mock.patch.object(
+            open_meteo, "RETRY_DELAY_SECONDS", 0
+        ):
+            report = await provider.fetch()
+
+        self.assertIsNotNone(report)
+        self.assertEqual(session.calls, 3)
+
+    async def test_fetch_gives_up_after_the_configured_number_of_attempts(self):
+        outcomes = [aiohttp.ClientError("503") for _ in range(open_meteo.FETCH_ATTEMPTS)]
+        provider, session = self.build_provider(outcomes)
+
+        with mock.patch.object(aiohttp, "ClientSession", return_value=session), mock.patch.object(
+            open_meteo, "RETRY_DELAY_SECONDS", 0
+        ):
+            report = await provider.fetch()
+
+        self.assertIsNone(report)
+        self.assertEqual(session.calls, open_meteo.FETCH_ATTEMPTS)
+
+    async def test_fetch_makes_no_second_attempt_when_the_first_one_answers(self):
+        forecast = {
+            "current": {"temperature_2m": 21.0, "apparent_temperature": 21.0, "relative_humidity_2m": 50},
+            "daily": {"uv_index_max": [4.0]},
+            "hourly": build_hourly([0] * 24),
+        }
+        air_quality = {"current": {"european_aqi": 20, "pm2_5": 5.0}, "hourly": {}}
+        provider, session = self.build_provider([forecast, air_quality])
+
+        with mock.patch.object(aiohttp, "ClientSession", return_value=session):
+            report = await provider.fetch()
+
+        self.assertIsNotNone(report)
+        self.assertEqual(session.calls, 2)
