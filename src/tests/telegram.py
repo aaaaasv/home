@@ -5,7 +5,7 @@ from typing import Any
 from aiogram import Bot
 from aiogram.client.session.base import BaseSession
 from aiogram.methods import TelegramMethod
-from aiogram.types import CallbackQuery, Chat, Message, Update, User
+from aiogram.types import CallbackQuery, Chat, Message, PhotoSize, Update, User
 
 TOKEN = "8000000000:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 CHAT_ID = -1002000000000
@@ -76,6 +76,13 @@ def build_message(text: str, message_id: int = 1, from_bot: bool = False, topic:
 
 def message_update(text: str, update_id: int = 1, topic: int = PLANTS_TOPIC) -> Update:
     return Update(update_id=update_id, message=build_message(text, message_id=update_id, topic=topic))
+
+
+def photo_update(unique_id: str, update_id: int = 1, topic: int = PLANTS_TOPIC) -> Update:
+    """One frame of an album — telegram delivers each as its own update, which is the whole point here."""
+    message = build_message("", message_id=update_id, topic=topic)
+    photo = PhotoSize(file_id=f"file-{unique_id}", file_unique_id=unique_id, width=1280, height=960)
+    return Update(update_id=update_id, message=message.model_copy(update={"text": None, "photo": [photo]}))
 
 
 def callback_update(data: str, update_id: int = 1, message_id: int = 1) -> Update:
