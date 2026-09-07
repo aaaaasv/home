@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-09-07
+
 ### Виправлено
 
 - Коли на рослину надсилають кілька фото одразу, зберігаються всі. Раніше з альбому виживав лише один
