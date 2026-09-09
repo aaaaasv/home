@@ -49,6 +49,24 @@ class UpsState(DomainModel):
     as_of: datetime
 
 
+class MediaServerState(DomainModel):
+    """
+    What the media server's own battery says about itself, as its agent publishes it.
+
+    `charge_percent` is reported and shown, but it is never what the runtime is computed from. the pack is
+    capped at 60% by `battery-charge-limit.service` and under a standing cap `energy_full` never gets the full
+    cycle it would need to recalibrate — the kernel reads 64% against it while the cap is 60. energy over
+    watts is a direct measurement with no such denominator in it.
+    """
+
+    on_mains: bool
+    is_charging: bool
+    charge_percent: float
+    energy_watt_hours: float
+    power_watts: float
+    as_of: datetime
+
+
 class ReserveLayer(StrEnum):
     """The four things that have to outlive a blackout, in the order the board lists them."""
 
@@ -81,6 +99,8 @@ class ReserveRow:
 
     layer: ReserveLayer
     standing: ReserveStanding
+    # what the layer says about its own charge — the router has no way to say anything at all
+    charge_percent: int | None = None
     # time left on battery, or time to full while charging — only where something measures it
     remaining: timedelta | None = None
     # how long it has been running on its own battery, for the layers where that is all anyone can say

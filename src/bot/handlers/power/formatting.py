@@ -39,6 +39,7 @@ from src.bot.handlers.power.messages import (
     POWER_RESERVE_LAYER_ROUTER,
     POWER_RESERVE_LAYER_STATION,
     POWER_RESERVE_ROW,
+    POWER_RESERVE_ROW_WITH_CHARGE,
     POWER_RESERVE_TITLE_ON_BATTERY,
     POWER_RESERVE_TITLE_ON_BATTERY_UNTIMED,
     POWER_RESERVE_TITLE_ON_GRID,
@@ -146,7 +147,11 @@ def _render_reserve_title(reserve: Reserve) -> str:
 
 
 def _render_reserve_row(row: ReserveRow) -> str:
-    return POWER_RESERVE_ROW.format(layer=RESERVE_LAYER_LABELS[row.layer], standing=_render_reserve_standing(row))
+    layer = RESERVE_LAYER_LABELS[row.layer]
+    standing = _render_reserve_standing(row)
+    if row.charge_percent is None:
+        return POWER_RESERVE_ROW.format(layer=layer, standing=standing)
+    return POWER_RESERVE_ROW_WITH_CHARGE.format(layer=layer, charge=row.charge_percent, standing=standing)
 
 
 def _render_reserve_standing(row: ReserveRow) -> str:

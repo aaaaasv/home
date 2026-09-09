@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from src.bot.handlers.power.formatting import render_reserve_board
-from src.modules.power.domain import EcoFlowState, GridState, ReserveLayer, ReserveStanding, UpsState
+from src.modules.power.domain import EcoFlowState, GridState, MediaServerState, ReserveLayer, ReserveStanding, UpsState
 from src.modules.power.reserve import ElapsedClock, build_reserve
 
 NOW = datetime(2026, 9, 9, 12, 40, tzinfo=timezone.utc)
@@ -41,8 +41,28 @@ def idle_station(**overrides) -> EcoFlowState:
     return station(ac_input_power=0, ac_output_power=0, on_mains=False, remaining_minutes=None, **overrides)
 
 
-def hat(mains_present: bool, battery_volts: float = 4.199) -> UpsState:
-    return UpsState(mains_present=mains_present, battery_volts=battery_volts, battery_percent=99.1, as_of=NOW)
+def hat(mains_present: bool, battery_volts: float = 4.199, battery_percent: float = 99.1) -> UpsState:
+    return UpsState(
+        mains_present=mains_present, battery_volts=battery_volts, battery_percent=battery_percent, as_of=NOW
+    )
+
+
+def laptop(**overrides) -> MediaServerState:
+    defaults = dict(
+        on_mains=True,
+        is_charging=False,
+        charge_percent=64.0,
+        energy_watt_hours=20.194,
+        power_watts=0.0,
+        as_of=NOW,
+    )
+    defaults.update(overrides)
+    return MediaServerState(**defaults)
+
+
+def discharging_laptop(**overrides) -> MediaServerState:
+    defaults = {"on_mains": False, "is_charging": False, "energy_watt_hours": 20.194, "power_watts": 10.0}
+    return laptop(**{**defaults, **overrides})
 
 
 def row_of(reserve, layer: ReserveLayer):
@@ -63,6 +83,7 @@ class BuildReserveStationRowTestCase(unittest.TestCase):
             station=charging_station(),
             ups=hat(mains_present=True),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -77,6 +98,7 @@ class BuildReserveStationRowTestCase(unittest.TestCase):
             station=discharging_station(),
             ups=hat(mains_present=False),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=timedelta(minutes=40),
             socket_dead_for=timedelta(minutes=40),
         )
@@ -91,6 +113,7 @@ class BuildReserveStationRowTestCase(unittest.TestCase):
             station=idle_station(),
             ups=hat(mains_present=True),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -105,6 +128,7 @@ class BuildReserveStationRowTestCase(unittest.TestCase):
             station=None,
             ups=hat(mains_present=True),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -128,6 +152,7 @@ class BuildReservePiRowTestCase(unittest.TestCase):
             station=charging_station(),
             ups=hat(mains_present=True, battery_volts=4.199),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -142,6 +167,7 @@ class BuildReservePiRowTestCase(unittest.TestCase):
             station=charging_station(),
             ups=hat(mains_present=True, battery_volts=3.95),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -156,6 +182,7 @@ class BuildReservePiRowTestCase(unittest.TestCase):
             station=discharging_station(),
             ups=hat(mains_present=False),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=timedelta(minutes=40),
             socket_dead_for=timedelta(minutes=40),
         )
@@ -170,6 +197,7 @@ class BuildReservePiRowTestCase(unittest.TestCase):
             station=charging_station(),
             ups=None,
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -193,6 +221,7 @@ class BuildReserveRouterRowTestCase(unittest.TestCase):
             station=charging_station(),
             ups=hat(mains_present=True),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -207,6 +236,7 @@ class BuildReserveRouterRowTestCase(unittest.TestCase):
             station=discharging_station(),
             ups=hat(mains_present=False),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=timedelta(minutes=40),
             socket_dead_for=timedelta(minutes=40),
         )
@@ -221,6 +251,7 @@ class BuildReserveRouterRowTestCase(unittest.TestCase):
             station=discharging_station(),
             ups=None,
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=timedelta(minutes=40),
             socket_dead_for=None,
         )
@@ -235,6 +266,7 @@ class BuildReserveRouterRowTestCase(unittest.TestCase):
             station=discharging_station(),
             ups=hat(mains_present=False),
             router_alive=False,
+            media_server=laptop(),
             on_battery_for=timedelta(minutes=40),
             socket_dead_for=timedelta(minutes=40),
         )
@@ -258,6 +290,7 @@ class BuildReserveTwoClocksTestCase(unittest.TestCase):
             station=discharging_station(),
             ups=hat(mains_present=True, battery_volts=3.95),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=timedelta(minutes=40),
             socket_dead_for=None,
         )
@@ -275,6 +308,7 @@ class BuildReserveTwoClocksTestCase(unittest.TestCase):
             station=charging_station(),
             ups=hat(mains_present=True),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=timedelta(minutes=40),
             socket_dead_for=None,
         )
@@ -318,15 +352,137 @@ class ElapsedClockTestCase(unittest.TestCase):
         self.assertEqual(elapsed, timedelta(minutes=5))
 
 
-class RenderReserveBoardTestCase(unittest.TestCase):
-    """One heading for the grid, one line per layer, and every one of those lines in the same unit: time."""
+class BuildReserveMediaServerRowTestCase(unittest.TestCase):
+    """
+    The only layer that can give both numbers honestly — the kernel counts watt-hours and watts for its own pack.
 
-    def test_render_on_battery_reports_every_layer_in_hours(self):
+    the runtime comes from energy over power and never from the percent, because a standing 60% charge cap
+    keeps `energy_full` from ever recalibrating: on 09.09.2026 the kernel read 64% against a 60% ceiling.
+    """
+
+    def test_build_reserve_with_a_laptop_sitting_at_its_charge_cap_shows_it_full(self):
+        reserve = build_reserve(
+            grid=GridState.ON_GRID,
+            station=charging_station(),
+            ups=hat(mains_present=True),
+            router_alive=True,
+            media_server=laptop(on_mains=True, is_charging=False),
+            on_battery_for=None,
+            socket_dead_for=None,
+        )
+
+        row = row_of(reserve, ReserveLayer.MEDIA_SERVER)
+
+        self.assertEqual((row.standing, row.charge_percent), (ReserveStanding.FULL, 64))
+
+    def test_build_reserve_with_a_laptop_filling_shows_it_charging(self):
+        reserve = build_reserve(
+            grid=GridState.ON_GRID,
+            station=charging_station(),
+            ups=hat(mains_present=True),
+            router_alive=True,
+            media_server=laptop(on_mains=True, is_charging=True),
+            on_battery_for=None,
+            socket_dead_for=None,
+        )
+
+        row = row_of(reserve, ReserveLayer.MEDIA_SERVER)
+
+        self.assertEqual(row.standing, ReserveStanding.CHARGING)
+
+    def test_build_reserve_with_a_discharging_laptop_divides_its_watt_hours_by_its_watts(self):
         reserve = build_reserve(
             grid=GridState.ON_BATTERY,
             station=discharging_station(),
             ups=hat(mains_present=False),
             router_alive=True,
+            media_server=discharging_laptop(energy_watt_hours=20.0, power_watts=10.0),
+            on_battery_for=timedelta(minutes=40),
+            socket_dead_for=timedelta(minutes=40),
+        )
+
+        row = row_of(reserve, ReserveLayer.MEDIA_SERVER)
+
+        self.assertEqual((row.standing, row.remaining), (ReserveStanding.HOLDING, timedelta(hours=2)))
+
+    def test_build_reserve_with_a_laptop_drawing_nothing_off_mains_reports_no_runtime_rather_than_forever(self):
+        reserve = build_reserve(
+            grid=GridState.ON_BATTERY,
+            station=discharging_station(),
+            ups=hat(mains_present=False),
+            router_alive=True,
+            media_server=discharging_laptop(power_watts=0.0),
+            on_battery_for=timedelta(minutes=40),
+            socket_dead_for=timedelta(minutes=40),
+        )
+
+        row = row_of(reserve, ReserveLayer.MEDIA_SERVER)
+
+        self.assertEqual(
+            (row.standing, row.remaining, row.holding_for),
+            (ReserveStanding.HOLDING_UNMEASURED, None, timedelta(minutes=40)),
+        )
+
+    def test_build_reserve_with_a_laptop_that_is_off_shows_it_unreachable(self):
+        reserve = build_reserve(
+            grid=GridState.ON_BATTERY,
+            station=discharging_station(),
+            ups=hat(mains_present=False),
+            router_alive=True,
+            media_server=None,
+            on_battery_for=timedelta(minutes=40),
+            socket_dead_for=timedelta(minutes=40),
+        )
+
+        row = row_of(reserve, ReserveLayer.MEDIA_SERVER)
+
+        self.assertEqual((row.standing, row.charge_percent), (ReserveStanding.UNREACHABLE, None))
+
+
+class ReserveChargePercentTestCase(unittest.TestCase):
+    """A percent is shown wherever one is measured, and a percent nobody measures is never invented."""
+
+    def test_build_reserve_with_a_gauge_reading_over_full_shows_a_hundred_rather_than_a_broken_number(self):
+        reserve = build_reserve(
+            grid=GridState.ON_GRID,
+            station=charging_station(),
+            ups=hat(mains_present=True, battery_percent=101.8),
+            router_alive=True,
+            media_server=laptop(),
+            on_battery_for=None,
+            socket_dead_for=None,
+        )
+
+        row = row_of(reserve, ReserveLayer.PI)
+
+        self.assertEqual(row.charge_percent, 100)
+
+    def test_build_reserve_never_puts_a_charge_on_the_router(self):
+        reserve = build_reserve(
+            grid=GridState.ON_GRID,
+            station=charging_station(),
+            ups=hat(mains_present=True),
+            router_alive=True,
+            media_server=laptop(),
+            on_battery_for=None,
+            socket_dead_for=None,
+        )
+
+        row = row_of(reserve, ReserveLayer.ROUTER)
+
+        self.assertIsNone(row.charge_percent)
+
+
+class RenderReserveBoardTestCase(unittest.TestCase):
+    """One heading for the grid, then every layer in the same shape: what it holds, then how long that lasts."""
+
+    def test_render_on_battery_reports_the_charge_and_the_time_left_for_every_layer_that_has_them(self):
+        reserve = build_reserve(
+            grid=GridState.ON_BATTERY,
+            station=discharging_station(),
+            ups=hat(mains_present=False),
+            router_alive=True,
+            media_server=discharging_laptop(energy_watt_hours=20.0, power_watts=10.0),
             on_battery_for=timedelta(minutes=40),
             socket_dead_for=timedelta(minutes=40),
         )
@@ -337,9 +493,10 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             text,
             "🕯 <b>Резерв</b> — на батареї 40 хв\n"
             "\n"
-            "⚡ Delta 2 — лишилось ~2 год 10 хв\n"
-            "🖥 Pi — на батареї 40 хв\n"
+            "⚡ Delta 2 — 82% · лишилось ~2 год 10 хв\n"
+            "🖥 Pi — 99% · на батареї 40 хв\n"
             "📡 Роутер — на батареї 40 хв\n"
+            "💻 Медіасервер — 64% · лишилось ~2 год\n"
             "\n"
             "<i>станом на 12:40</i>",
         )
@@ -350,6 +507,7 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             station=charging_station(),
             ups=hat(mains_present=True),
             router_alive=True,
+            media_server=laptop(),
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -360,9 +518,10 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             text,
             "🔌 <b>Резерв</b> — від мережі\n"
             "\n"
-            "⚡ Delta 2 — заряджається · до повного ~1 год\n"
-            "🖥 Pi — повний\n"
+            "⚡ Delta 2 — 82% · заряджається · до повного ~1 год\n"
+            "🖥 Pi — 99% · повний\n"
             "📡 Роутер — живий\n"
+            "💻 Медіасервер — 64% · повний\n"
             "\n"
             "<i>станом на 12:40</i>",
         )
@@ -373,6 +532,7 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             station=None,
             ups=None,
             router_alive=False,
+            media_server=None,
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -386,6 +546,7 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             "⚡ Delta 2 — не відповідає\n"
             "🖥 Pi — не відповідає\n"
             "📡 Роутер — не відповідає\n"
+            "💻 Медіасервер — не відповідає\n"
             "\n"
             "<i>станом на 12:40</i>",
         )
@@ -396,6 +557,7 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             station=discharging_station(remaining_minutes=None),
             ups=hat(mains_present=False),
             router_alive=True,
+            media_server=discharging_laptop(power_watts=0.0),
             on_battery_for=None,
             socket_dead_for=None,
         )
@@ -406,9 +568,10 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             text,
             "🕯 <b>Резерв</b> — на батареї\n"
             "\n"
-            "⚡ Delta 2 — на батареї\n"
-            "🖥 Pi — на батареї\n"
+            "⚡ Delta 2 — 82% · на батареї\n"
+            "🖥 Pi — 99% · на батареї\n"
             "📡 Роутер — на батареї\n"
+            "💻 Медіасервер — 64% · на батареї\n"
             "\n"
             "<i>станом на 12:40</i>",
         )

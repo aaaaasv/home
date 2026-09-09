@@ -182,6 +182,13 @@ class Settings(BaseSettings):
     # a router that is up answers in milliseconds on the lan; anything slower than this is already an outage
     RESERVE_ROUTER_PORT: int = 80
     RESERVE_ROUTER_TIMEOUT_SECONDS: float = 3.0
+    # the media server publishes its own battery over http, from the agent in home-infrastructure/server. an
+    # endpoint rather than ssh or mqtt: the bot's container holds no keys to other machines, and opening the
+    # broker to the lan would widen the blast radius of any compromised wi-fi device for the sake of four numbers
+    RESERVE_MEDIA_SERVER_URL: str = ""
+    RESERVE_MEDIA_SERVER_TIMEOUT_SECONDS: float = 3.0
+    # the agent stamps every response, so a frozen box or a caching proxy cannot pass an old reading off as live
+    RESERVE_MEDIA_SERVER_STALE_AFTER_SECONDS: int = 120
     # yasno outage schedule — the daily digest is silent when nothing is planned. the group, region and
     # distribution operator identify one address's supply, so they are configuration, never defaults
     YASNO_ENABLED: bool = False

@@ -11,6 +11,7 @@ from src.bot.dependencies import (
     build_compose_transit_report,
     build_ecoflow_station,
     build_language_model,
+    build_media_server_battery,
     build_pi_health_sensor,
     build_pi_ups,
     build_presence_source,
@@ -186,16 +187,18 @@ async def run() -> None:
             timezone=settings.timezone,
         )
 
-    # the reserve board: every backup layer on one screen, one column, and that column is hours. it draws no row
-    # it cannot read, so it stands up only where all three sources are configured at once
+    # the reserve board: every backup layer on one screen, charge then time, the same shape on every row. it
+    # draws no row it cannot read, so it stands up only where all four sources are configured at once
     pi_ups = build_pi_ups(settings)
     router_link = build_router_link(settings)
+    media_server_battery = build_media_server_battery(settings)
     reserve_board = None
     if (
         settings.RESERVE_ENABLED
         and settings.ECOFLOW_ENABLED
         and settings.PI_UPS_ENABLED
         and router_link is not None
+        and media_server_battery is not None
         and power_topic is not None
     ):
         reserve_board = ReserveBoard(
@@ -206,6 +209,7 @@ async def run() -> None:
             ecoflow_station=ecoflow_station,
             pi_ups=pi_ups,
             router_link=router_link,
+            media_server_battery=media_server_battery,
             timezone=settings.timezone,
         )
 

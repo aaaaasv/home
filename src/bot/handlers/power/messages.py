@@ -90,6 +90,10 @@ POWER_RESERVE_LAYER_PI = "🖥 Pi"
 POWER_RESERVE_LAYER_ROUTER = "📡 Роутер"
 POWER_RESERVE_LAYER_MEDIA_SERVER = "💻 Медіасервер"
 POWER_RESERVE_ROW = "{layer} — {standing}"
+# the charge goes first and the time after it, so the eye reads the same shape down the whole column. the router
+# is the one layer that never gets a charge: four leds at 25/50/75/100 are not a percent, and there is nothing
+# else in a 2E to ask
+POWER_RESERVE_ROW_WITH_CHARGE = "{layer} — {charge}% · {standing}"
 POWER_RESERVE_HOLDING = "лишилось ~{duration}"
 # elapsed, never remaining: nothing measures the runtime of these two yet, and "тримає 40 хв" would read as a
 # promise of forty more minutes. said this way it is a fact about the past, which is all anyone can honestly give
