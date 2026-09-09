@@ -1,5 +1,5 @@
-"""How the EcoFlow card, the outage schedule and the conservation card render."""
-from datetime import datetime
+"""How the EcoFlow card, the reserve board, the outage schedule and the conservation card render."""
+from datetime import datetime, timedelta
 
 from src.bot.handlers.power.messages import (
     POWER_CONSERVATION_CYCLE_DUE,
@@ -26,12 +26,40 @@ from src.bot.handlers.power.messages import (
     POWER_MAINS_RESTORED,
     POWER_MAINS_RESTORED_ALONE,
     POWER_OUTAGE_SHORTFALL,
+    POWER_RESERVE_ALIVE,
+    POWER_RESERVE_AS_OF,
+    POWER_RESERVE_CHARGING,
+    POWER_RESERVE_CHARGING_UNTIMED,
+    POWER_RESERVE_FULL,
+    POWER_RESERVE_HOLDING,
+    POWER_RESERVE_HOLDING_UNMEASURED,
+    POWER_RESERVE_HOLDING_UNMEASURED_UNTIMED,
+    POWER_RESERVE_LAYER_MEDIA_SERVER,
+    POWER_RESERVE_LAYER_PI,
+    POWER_RESERVE_LAYER_ROUTER,
+    POWER_RESERVE_LAYER_STATION,
+    POWER_RESERVE_ROW,
+    POWER_RESERVE_TITLE_ON_BATTERY,
+    POWER_RESERVE_TITLE_ON_BATTERY_UNTIMED,
+    POWER_RESERVE_TITLE_ON_GRID,
+    POWER_RESERVE_TITLE_UNKNOWN,
+    POWER_RESERVE_UNREACHABLE,
     POWER_SCHEDULE_AS_OF,
     POWER_SCHEDULE_EMERGENCY_NOTE,
     POWER_SCHEDULE_INTERVAL,
     POWER_SCHEDULE_TITLE,
 )
-from src.modules.power.domain import EcoFlowState, GridState, OutageForecast, OutageSchedule, OutageScheduleStatus
+from src.modules.power.domain import (
+    EcoFlowState,
+    GridState,
+    OutageForecast,
+    OutageSchedule,
+    OutageScheduleStatus,
+    Reserve,
+    ReserveLayer,
+    ReserveRow,
+    ReserveStanding,
+)
 from src.modules.power.services.conservation import ConservationAdvisory, ConservationKind, ConservationLevel
 
 
@@ -84,6 +112,63 @@ def render_mains_change(grid: GridState, station: EcoFlowState | None) -> str:
     if station.remaining_minutes is None:
         return POWER_MAINS_LOST_NO_ESTIMATE.format(battery=battery)
     return POWER_MAINS_LOST.format(battery=battery, duration=_format_runtime(station.remaining_minutes))
+
+
+RESERVE_LAYER_LABELS = {
+    ReserveLayer.STATION: POWER_RESERVE_LAYER_STATION,
+    ReserveLayer.PI: POWER_RESERVE_LAYER_PI,
+    ReserveLayer.ROUTER: POWER_RESERVE_LAYER_ROUTER,
+    ReserveLayer.MEDIA_SERVER: POWER_RESERVE_LAYER_MEDIA_SERVER,
+}
+
+
+def render_reserve_board(reserve: Reserve, generated_at: datetime) -> str:
+    """
+    The whole reserve on one screen: one heading for the grid, then one line per layer, all in the same unit.
+
+    the heading carries the grid because it is one fact about the flat rather than four about the devices —
+    which is what lets every row below it be about time and nothing else.
+    """
+    lines = [_render_reserve_title(reserve), ""]
+    lines.extend(_render_reserve_row(row) for row in reserve.rows)
+    lines.extend(["", POWER_RESERVE_AS_OF.format(time=f"{generated_at:%H:%M}")])
+    return "\n".join(lines)
+
+
+def _render_reserve_title(reserve: Reserve) -> str:
+    if reserve.grid is GridState.ON_GRID:
+        return POWER_RESERVE_TITLE_ON_GRID
+    if reserve.grid is GridState.UNKNOWN:
+        return POWER_RESERVE_TITLE_UNKNOWN
+    if reserve.on_battery_for is None:
+        return POWER_RESERVE_TITLE_ON_BATTERY_UNTIMED
+    return POWER_RESERVE_TITLE_ON_BATTERY.format(duration=_format_duration(reserve.on_battery_for))
+
+
+def _render_reserve_row(row: ReserveRow) -> str:
+    return POWER_RESERVE_ROW.format(layer=RESERVE_LAYER_LABELS[row.layer], standing=_render_reserve_standing(row))
+
+
+def _render_reserve_standing(row: ReserveRow) -> str:
+    if row.standing is ReserveStanding.HOLDING and row.remaining is not None:
+        return POWER_RESERVE_HOLDING.format(duration=_format_duration(row.remaining))
+    if row.standing is ReserveStanding.CHARGING and row.remaining is not None:
+        return POWER_RESERVE_CHARGING.format(duration=_format_duration(row.remaining))
+    if row.standing is ReserveStanding.HOLDING_UNMEASURED and row.holding_for is not None:
+        return POWER_RESERVE_HOLDING_UNMEASURED.format(duration=_format_duration(row.holding_for))
+    # a layer that cannot say how long falls back to the bare state, which is still worth a line
+    return {
+        ReserveStanding.HOLDING: POWER_RESERVE_HOLDING_UNMEASURED_UNTIMED,
+        ReserveStanding.HOLDING_UNMEASURED: POWER_RESERVE_HOLDING_UNMEASURED_UNTIMED,
+        ReserveStanding.CHARGING: POWER_RESERVE_CHARGING_UNTIMED,
+        ReserveStanding.FULL: POWER_RESERVE_FULL,
+        ReserveStanding.ALIVE: POWER_RESERVE_ALIVE,
+        ReserveStanding.UNREACHABLE: POWER_RESERVE_UNREACHABLE,
+    }[row.standing]
+
+
+def _format_duration(duration: timedelta) -> str:
+    return _format_runtime(round(duration.total_seconds() / 60))
 
 
 def render_outage_forecast(forecast: OutageForecast) -> str:

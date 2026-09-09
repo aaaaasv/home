@@ -76,3 +76,29 @@ POWER_CONSERVATION_STORE_GREEN = "🟢 <b>Delta 2</b> — на зберіган�
 POWER_CONSERVATION_CYCLE_SOON = "🟢 <b>Delta 2</b> — калібрувальний цикл за ~{days} дн"
 POWER_CONSERVATION_CYCLE_DUE = "🟡 <b>Delta 2</b> — час калібрувального циклу (60→0→100→60)"
 POWER_CONSERVATION_WARRANTY = "🔴 <b>Delta 2</b> — {days} дн до втрати гарантії без циклу (60→0→100→60)"
+
+# ⚡ Світло — the reserve board: every backup layer on one screen, reposted each morning and edited in place
+# between. always silent — the two pushes that wake anyone are the mains ones above, and this is the glance
+# you take afterwards. one column, and that column is time: the question people arrive with is "чи буде
+# інтернет об 11-й", which has the dimension of hours, and a percent only makes the reader do the division
+POWER_RESERVE_TITLE_ON_BATTERY = "🕯 <b>Резерв</b> — на батареї {duration}"
+POWER_RESERVE_TITLE_ON_BATTERY_UNTIMED = "🕯 <b>Резерв</b> — на батареї"
+POWER_RESERVE_TITLE_ON_GRID = "🔌 <b>Резерв</b> — від мережі"
+POWER_RESERVE_TITLE_UNKNOWN = "❔ <b>Резерв</b>"
+POWER_RESERVE_LAYER_STATION = "⚡ Delta 2"
+POWER_RESERVE_LAYER_PI = "🖥 Pi"
+POWER_RESERVE_LAYER_ROUTER = "📡 Роутер"
+POWER_RESERVE_LAYER_MEDIA_SERVER = "💻 Медіасервер"
+POWER_RESERVE_ROW = "{layer} — {standing}"
+POWER_RESERVE_HOLDING = "лишилось ~{duration}"
+# elapsed, never remaining: nothing measures the runtime of these two yet, and "тримає 40 хв" would read as a
+# promise of forty more minutes. said this way it is a fact about the past, which is all anyone can honestly give
+POWER_RESERVE_HOLDING_UNMEASURED = "на батареї {duration}"
+POWER_RESERVE_HOLDING_UNMEASURED_UNTIMED = "на батареї"
+POWER_RESERVE_CHARGING = "заряджається · до повного ~{duration}"
+POWER_RESERVE_CHARGING_UNTIMED = "заряджається"
+POWER_RESERVE_FULL = "повний"
+POWER_RESERVE_ALIVE = "живий"
+POWER_RESERVE_UNREACHABLE = "не відповідає"
+POWER_RESERVE_AS_OF = "<i>станом на {time}</i>"
+POWER_RESERVE_UNAVAILABLE = "🔌 Дошка резерву не налаштована"
