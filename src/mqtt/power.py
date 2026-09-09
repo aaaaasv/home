@@ -8,7 +8,7 @@ import logging
 from collections.abc import Mapping
 
 from src.modules.power.domain import EcoFlowState, GridState
-from src.modules.power.mains_monitor import classify_grid
+from src.modules.power.mains_monitor import classify_grid_from_station
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.mqtt.surface import MqttContext, MqttSurface
 
@@ -26,7 +26,9 @@ LOW_BATTERY_PERCENT = 20
 
 def render_state(state: EcoFlowState | None) -> dict[str, str]:
     """Turn one Delta 2 reading into the topics a contact sensor with a battery expects."""
-    grid = classify_grid(state)
+    # the station's own view on purpose: the battery and charging topics beside it are station facts,
+    # so a tile that answered from the pi's hat would mix two devices into one accessory
+    grid = classify_grid_from_station(state)
     if state is None or grid is GridState.UNKNOWN:
         # off, shelved, out of ble range — or idle and full, which reads exactly like an outage and must not
         # be published as one. a tile saying "no response" is honest; a tile saying "світло зникло" is not

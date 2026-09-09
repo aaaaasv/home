@@ -29,6 +29,7 @@ from src.infrastructure.adapters.open_meteo_weather_provider import OpenMeteoWea
 from src.infrastructure.adapters.router_presence_source import RouterPresenceSource
 from src.infrastructure.adapters.sht31_room_climate_sensor import Sht31RoomClimateSensor
 from src.infrastructure.adapters.sysfs_pi_health_sensor import SysfsPiHealthSensor
+from src.infrastructure.adapters.x728_pi_ups import X728PiUps
 from src.infrastructure.adapters.yasno_schedule_provider import YasnoScheduleProvider
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner, NullAirConditioner
@@ -40,6 +41,7 @@ from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 from src.modules.plant_care.services.photo_storage import NullPhotoStorage, PhotoStorage
 from src.modules.plant_care.services.plant_identifier import PlantIdentifier
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
+from src.modules.power.services.pi_ups import NullPiUps, PiUps
 from src.modules.presence.services.presence_source import NullPresenceSource, PresenceSource
 from src.modules.room_climate.services.room_climate_sensor import NullRoomClimateSensor, RoomClimateSensor
 from src.modules.shopping.domain import ReputabilityPolicy
@@ -99,6 +101,17 @@ def build_ecoflow_station(settings: Settings) -> EcoFlowStation:
         ble_mac=settings.ECOFLOW_BLE_MAC,
         timezone=settings.timezone,
         scan_seconds=settings.ECOFLOW_BLE_SCAN_SECONDS,
+    )
+
+
+def build_pi_ups(settings: Settings) -> PiUps:
+    # the hat is bolted to one particular pi; everywhere else — a laptop, a test run — there is nothing to read
+    if not settings.PI_UPS_ENABLED:
+        return NullPiUps()
+
+    return X728PiUps(
+        state_path=settings.PI_UPS_STATE_PATH,
+        stale_after=timedelta(seconds=settings.PI_UPS_STALE_AFTER_SECONDS),
     )
 
 

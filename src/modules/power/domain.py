@@ -6,7 +6,7 @@ from src.common.domain import DomainModel
 
 
 class GridState(StrEnum):
-    """What the station's numbers say about the wall socket — UNKNOWN when they cannot say."""
+    """Whether the city grid is up — UNKNOWN when neither the hat nor the station can say."""
 
     ON_GRID = "on_grid"
     ON_BATTERY = "on_battery"
@@ -29,6 +29,23 @@ class EcoFlowState(DomainModel):
     charge_limit_max: int | None
     backup_reserve_percent: int | None
     cell_temperature_celsius: int | None
+    as_of: datetime
+
+
+class UpsState(DomainModel):
+    """
+    What the pi's own hat reports — the only direct measurement of the wall socket anywhere in the flat.
+
+    the station has to infer mains from watts and gets it wrong on an idle full battery; this pin is wired to
+    the socket itself, so it answers even when the station is shelved, unreachable or not owned at all.
+    """
+
+    # the x728 holds this line low while the socket feeds it and lets the pull-up take it high on loss
+    mains_present: bool
+    battery_volts: float
+    # the gauge re-learns the pack after a cell swap and reads nonsense meanwhile — 4% at 3.78 V on 08.09,
+    # which was really ~45%. compare voltages, never this, when the answer has to be right
+    battery_percent: float
     as_of: datetime
 
 
