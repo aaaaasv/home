@@ -11,6 +11,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from src.bot.handlers.power.formatting import render_mains_change, render_outage_forecast
 from src.bot.handlers.power.messages import POWER_OUTAGE_EMERGENCY, POWER_OUTAGE_SOON
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
+from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND, OUTAGE_PING_KIND, PostedMessageTracker
@@ -18,7 +19,7 @@ from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.power.domain import OutageSchedule, OutageScheduleStatus
+from src.modules.power.domain import GridState, OutageSchedule, OutageScheduleStatus, Reserve
 from src.modules.power.mains_monitor import MainsMonitor
 from src.modules.power.outage_forecast import forecast_outage
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
@@ -98,11 +99,44 @@ class MainsWatchJob:
         await self.bot.send_message(
             chat_id=self.chat_id,
             message_thread_id=await self.power_topic.resolve(),
-            text=render_mains_change(grid, station),
+            text=render_mains_change(grid),
             # the one push in this house that must arrive the moment it is sent
             disable_notification=False,
         )
         logger.info("Announced the grid going %s", grid.value)
+
+
+class ReserveBoardJob:
+    """
+    Keeps the reserve board current, on the cadence the moment deserves.
+
+    every tick while the flat is on battery — that is the hour anyone opens it, and a board an hour stale then
+    is worse than none. on the grid the picture does not move minute to minute, so it is rewritten every few.
+    the reading happens on every tick either way, because the reading is what decides which cadence applies,
+    and it is three local calls rather than a fetch.
+    """
+
+    def __init__(self, reserve_board: ReserveBoard, on_grid_interval: timedelta, timezone: tzinfo):
+        self.reserve_board = reserve_board
+        self.on_grid_interval = on_grid_interval
+        self.timezone = timezone
+        self._drawn_at: datetime | None = None
+
+    async def __call__(self) -> None:
+        reserve = await self.reserve_board.compose()
+        now = datetime.now(self.timezone)
+        if not self._is_due(reserve, now):
+            return
+
+        self._drawn_at = now
+        # the first draw of all has no board to edit, so it publishes one
+        if not await self.reserve_board.refresh(reserve):
+            await self.reserve_board.post(reserve)
+
+    def _is_due(self, reserve: Reserve, now: datetime) -> bool:
+        if reserve.grid is GridState.ON_BATTERY or self._drawn_at is None:
+            return True
+        return now - self._drawn_at >= self.on_grid_interval
 
 
 class OutageForecastJob:
@@ -258,6 +292,7 @@ def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> Non
     """Poll the station on its own cadence and follow the outage schedule on its — each switched on separately."""
     _register_station_jobs(scheduler, context)
     _register_mains_watch(scheduler, context)
+    _register_reserve_board(scheduler, context)
     _register_outage_schedule_jobs(scheduler, context)
 
 
@@ -287,6 +322,26 @@ def _register_mains_watch(scheduler: AsyncIOScheduler, context: SchedulerContext
         mains_watch_job.__call__,
         trigger=IntervalTrigger(minutes=settings.ECOFLOW_MAINS_CHECK_MINUTES),
         id="mains_watch",
+        replace_existing=True,
+    )
+
+
+def _register_reserve_board(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """The board is built only where every layer it names can be read, so here it is enough to check it exists."""
+    settings = context.settings
+    if not settings.RESERVE_ENABLED or context.reserve_board is None:
+        return
+
+    reserve_board_job = ReserveBoardJob(
+        reserve_board=context.reserve_board,
+        on_grid_interval=timedelta(minutes=settings.RESERVE_ON_GRID_REFRESH_MINUTES),
+        timezone=settings.timezone,
+    )
+    # no boot run: the held-open ble link needs a moment to come up, and the first tick lands after it has
+    scheduler.add_job(
+        reserve_board_job.__call__,
+        trigger=IntervalTrigger(minutes=settings.RESERVE_CHECK_MINUTES),
+        id="reserve_board",
         replace_existing=True,
     )
 

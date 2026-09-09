@@ -25,6 +25,7 @@ from src.tests.telegram import (
     CHORES_TOPIC,
     PLACES_TOPIC,
     PLANTS_TOPIC,
+    POWER_TOPIC,
     SHOPPING_TOPIC,
     RecordingSession,
     build_bot,
@@ -72,6 +73,7 @@ def shared_dispatcher() -> tuple[Dispatcher, Bot]:
             chores_board=NullBoard(),
             ecoflow_station=SimpleNamespace(),
             air_conditioner=SimpleNamespace(),
+            power_topic=StubForumTopic(thread_id=POWER_TOPIC),
         )
     return _dispatcher, _bot
 

@@ -11,6 +11,7 @@ from src.bot.handlers.plants.gemini_photo_analyst import GeminiPhotoAnalyst
 from src.bot.handlers.plants.gemini_plant_identifier import GeminiPlantIdentifier
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
+from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.handlers.shopping.board import ShoppingListBoard
 from src.bot.handlers.transit.board import TransitBoard
 from src.bot.handlers.weather.board import WeatherDigestBoard
@@ -25,10 +26,12 @@ from src.infrastructure.adapters.gree_air_conditioner import GreeAirConditioner
 from src.infrastructure.adapters.gtfs_realtime_feed import GtfsRealtimeFeed
 from src.infrastructure.adapters.gtfs_static_shape_catalog import GtfsStaticShapeCatalog
 from src.infrastructure.adapters.hotline_price_source import HotlinePriceSource
+from src.infrastructure.adapters.http_media_server_battery import HttpMediaServerBattery
 from src.infrastructure.adapters.open_meteo_weather_provider import OpenMeteoWeatherProvider
 from src.infrastructure.adapters.router_presence_source import RouterPresenceSource
 from src.infrastructure.adapters.sht31_room_climate_sensor import Sht31RoomClimateSensor
 from src.infrastructure.adapters.sysfs_pi_health_sensor import SysfsPiHealthSensor
+from src.infrastructure.adapters.tcp_router_link import TcpRouterLink
 from src.infrastructure.adapters.x728_pi_ups import X728PiUps
 from src.infrastructure.adapters.yasno_schedule_provider import YasnoScheduleProvider
 from src.infrastructure.db.uow import UnitOfWork
@@ -41,7 +44,9 @@ from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 from src.modules.plant_care.services.photo_storage import NullPhotoStorage, PhotoStorage
 from src.modules.plant_care.services.plant_identifier import PlantIdentifier
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
+from src.modules.power.services.media_server_battery import MediaServerBattery
 from src.modules.power.services.pi_ups import NullPiUps, PiUps
+from src.modules.power.services.router_link import RouterLink
 from src.modules.presence.services.presence_source import NullPresenceSource, PresenceSource
 from src.modules.room_climate.services.room_climate_sensor import NullRoomClimateSensor, RoomClimateSensor
 from src.modules.shopping.domain import ReputabilityPolicy
@@ -112,6 +117,30 @@ def build_pi_ups(settings: Settings) -> PiUps:
     return X728PiUps(
         state_path=settings.PI_UPS_STATE_PATH,
         stale_after=timedelta(seconds=settings.PI_UPS_STALE_AFTER_SECONDS),
+    )
+
+
+def build_router_link(settings: Settings) -> RouterLink | None:
+    """Not a null object: the reserve board exists only where every layer it draws can be read, so absence is off."""
+    if not settings.RESERVE_ENABLED or not settings.ROUTER_HOST:
+        return None
+
+    return TcpRouterLink(
+        host=settings.ROUTER_HOST,
+        port=settings.RESERVE_ROUTER_PORT,
+        timeout_seconds=settings.RESERVE_ROUTER_TIMEOUT_SECONDS,
+    )
+
+
+def build_media_server_battery(settings: Settings) -> MediaServerBattery | None:
+    """Not a null object: the reserve board exists only where every layer it draws can be read, so absence is off."""
+    if not settings.RESERVE_ENABLED or not settings.RESERVE_MEDIA_SERVER_URL:
+        return None
+
+    return HttpMediaServerBattery(
+        url=settings.RESERVE_MEDIA_SERVER_URL,
+        timeout_seconds=settings.RESERVE_MEDIA_SERVER_TIMEOUT_SECONDS,
+        stale_after=timedelta(seconds=settings.RESERVE_MEDIA_SERVER_STALE_AFTER_SECONDS),
     )
 
 
@@ -250,6 +279,7 @@ def build_workflow_data(
     weather_digest_board: WeatherDigestBoard | None = None,
     outage_schedule_board: OutageScheduleBoard | None = None,
     conservation_board: ConservationBoard | None = None,
+    reserve_board: ReserveBoard | None = None,
     transit_board: TransitBoard | None = None,
     answer_question: AnswerQuestionUseCase | None = None,
 ) -> dict[str, Any]:
@@ -267,6 +297,7 @@ def build_workflow_data(
         "weather_digest_board": weather_digest_board,
         "outage_schedule_board": outage_schedule_board,
         "conservation_board": conservation_board,
+        "reserve_board": reserve_board,
         "transit_board": transit_board,
         "answer_question": answer_question,
         "air_conditioner": air_conditioner,

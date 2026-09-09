@@ -27,14 +27,13 @@ POWER_ECOFLOW_BUTTON_REFRESH = "🔄 Оновити"
 POWER_ECOFLOW_WORKING_TOAST = "🔄 читаю Delta 2…"
 
 # the two messages the whole of layer 1 exists to send. they are rare by nature, so both ping — a silent
-# "світло зникло" would be read hours later, and the second one is the message the family actually waits for
-POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%, лишилось ~{duration}"
-POWER_MAINS_LOST_NO_ESTIMATE = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%"
-POWER_MAINS_RESTORED = "💡 <b>Світло є</b>\n\nDelta 2 — {battery}%, заряджається"
-# the pi's own hat sees the socket whether or not the station is around, so the outage is still announced when
-# the station is shelved or unreachable — just without the numbers nobody can read in that case
-POWER_MAINS_LOST_ALONE = "🕯 <b>Світло зникло</b>"
-POWER_MAINS_RESTORED_ALONE = "💡 <b>Світло є</b>"
+# "світло зникло" would be read hours later, and the second one is the message the family actually waits for.
+#
+# four words each, and deliberately: this is the one push that goes off at three in the morning, and at three
+# in the morning nobody is reading a charge percentage. the numbers live on the reserve board, which is a
+# glance away and already current — putting them here only buried the one word the push exists to deliver
+POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>"
+POWER_MAINS_RESTORED = "💡 <b>Світло є</b>"
 
 # said once per outage, and only when the answer is bad: "you reach" is not worth a notification, and a
 # push that speaks every time gets the whole group muted
@@ -76,3 +75,33 @@ POWER_CONSERVATION_STORE_GREEN = "🟢 <b>Delta 2</b> — на зберіган�
 POWER_CONSERVATION_CYCLE_SOON = "🟢 <b>Delta 2</b> — калібрувальний цикл за ~{days} дн"
 POWER_CONSERVATION_CYCLE_DUE = "🟡 <b>Delta 2</b> — час калібрувального циклу (60→0→100→60)"
 POWER_CONSERVATION_WARRANTY = "🔴 <b>Delta 2</b> — {days} дн до втрати гарантії без циклу (60→0→100→60)"
+
+# ⚡ Світло — the reserve board: every backup layer on one screen, reposted each morning and edited in place
+# between. always silent — the two pushes that wake anyone are the mains ones above, and this is the glance
+# you take afterwards. one column, and that column is time: the question people arrive with is "чи буде
+# інтернет об 11-й", which has the dimension of hours, and a percent only makes the reader do the division
+POWER_RESERVE_TITLE_ON_BATTERY = "🕯 <b>Резерв</b> — на батареї {duration}"
+POWER_RESERVE_TITLE_ON_BATTERY_UNTIMED = "🕯 <b>Резерв</b> — на батареї"
+POWER_RESERVE_TITLE_ON_GRID = "🔌 <b>Резерв</b> — від мережі"
+POWER_RESERVE_TITLE_UNKNOWN = "❔ <b>Резерв</b>"
+POWER_RESERVE_LAYER_STATION = "⚡ Delta 2"
+POWER_RESERVE_LAYER_PI = "🖥 Pi"
+POWER_RESERVE_LAYER_ROUTER = "📡 Роутер"
+POWER_RESERVE_LAYER_MEDIA_SERVER = "💻 Медіасервер"
+POWER_RESERVE_ROW = "{layer} — {standing}"
+# the charge goes first and the time after it, so the eye reads the same shape down the whole column. the router
+# is the one layer that never gets a charge: four leds at 25/50/75/100 are not a percent, and there is nothing
+# else in a 2E to ask
+POWER_RESERVE_ROW_WITH_CHARGE = "{layer} — {charge}% · {standing}"
+POWER_RESERVE_HOLDING = "лишилось ~{duration}"
+# elapsed, never remaining: nothing measures the runtime of these two yet, and "тримає 40 хв" would read as a
+# promise of forty more minutes. said this way it is a fact about the past, which is all anyone can honestly give
+POWER_RESERVE_HOLDING_UNMEASURED = "на батареї {duration}"
+POWER_RESERVE_HOLDING_UNMEASURED_UNTIMED = "на батареї"
+POWER_RESERVE_CHARGING = "заряджається · до повного ~{duration}"
+POWER_RESERVE_CHARGING_UNTIMED = "заряджається"
+POWER_RESERVE_FULL = "повний"
+POWER_RESERVE_ALIVE = "живий"
+POWER_RESERVE_UNREACHABLE = "не відповідає"
+POWER_RESERVE_AS_OF = "<i>станом на {time}</i>"
+POWER_RESERVE_UNAVAILABLE = "🔌 Дошка резерву не налаштована"

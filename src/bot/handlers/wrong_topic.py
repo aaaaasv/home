@@ -8,7 +8,7 @@ from src.bot import messages
 # must stay included after every module router — it answers whatever they declined
 router = Router(name="wrong_topic")
 
-MODULE_COMMANDS = ("today", "add", "history", "list", "later", "track", "ac", "eco", "conserve", "pi", "bus")
+MODULE_COMMANDS = ("today", "add", "history", "list", "later", "track", "ac", "eco", "reserve", "conserve", "pi", "bus")
 
 
 @router.message(Command(*MODULE_COMMANDS))
