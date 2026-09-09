@@ -27,14 +27,13 @@ POWER_ECOFLOW_BUTTON_REFRESH = "🔄 Оновити"
 POWER_ECOFLOW_WORKING_TOAST = "🔄 читаю Delta 2…"
 
 # the two messages the whole of layer 1 exists to send. they are rare by nature, so both ping — a silent
-# "світло зникло" would be read hours later, and the second one is the message the family actually waits for
-POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%, лишилось ~{duration}"
-POWER_MAINS_LOST_NO_ESTIMATE = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%"
-POWER_MAINS_RESTORED = "💡 <b>Світло є</b>\n\nDelta 2 — {battery}%, заряджається"
-# the pi's own hat sees the socket whether or not the station is around, so the outage is still announced when
-# the station is shelved or unreachable — just without the numbers nobody can read in that case
-POWER_MAINS_LOST_ALONE = "🕯 <b>Світло зникло</b>"
-POWER_MAINS_RESTORED_ALONE = "💡 <b>Світло є</b>"
+# "світло зникло" would be read hours later, and the second one is the message the family actually waits for.
+#
+# four words each, and deliberately: this is the one push that goes off at three in the morning, and at three
+# in the morning nobody is reading a charge percentage. the numbers live on the reserve board, which is a
+# glance away and already current — putting them here only buried the one word the push exists to deliver
+POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>"
+POWER_MAINS_RESTORED = "💡 <b>Світло є</b>"
 
 # said once per outage, and only when the answer is bad: "you reach" is not worth a notification, and a
 # push that speaks every time gets the whole group muted
@@ -90,6 +89,10 @@ POWER_RESERVE_LAYER_PI = "🖥 Pi"
 POWER_RESERVE_LAYER_ROUTER = "📡 Роутер"
 POWER_RESERVE_LAYER_MEDIA_SERVER = "💻 Медіасервер"
 POWER_RESERVE_ROW = "{layer} — {standing}"
+# the charge goes first and the time after it, so the eye reads the same shape down the whole column. the router
+# is the one layer that never gets a charge: four leds at 25/50/75/100 are not a percent, and there is nothing
+# else in a 2E to ask
+POWER_RESERVE_ROW_WITH_CHARGE = "{layer} — {charge}% · {standing}"
 POWER_RESERVE_HOLDING = "лишилось ~{duration}"
 # elapsed, never remaining: nothing measures the runtime of these two yet, and "тримає 40 хв" would read as a
 # promise of forty more minutes. said this way it is a fact about the past, which is all anyone can honestly give

@@ -21,10 +21,7 @@ from src.bot.handlers.power.messages import (
     POWER_ECOFLOW_TIME_TO_FULL,
     POWER_ECOFLOW_TITLE,
     POWER_MAINS_LOST,
-    POWER_MAINS_LOST_ALONE,
-    POWER_MAINS_LOST_NO_ESTIMATE,
     POWER_MAINS_RESTORED,
-    POWER_MAINS_RESTORED_ALONE,
     POWER_OUTAGE_SHORTFALL,
     POWER_RESERVE_ALIVE,
     POWER_RESERVE_AS_OF,
@@ -39,6 +36,7 @@ from src.bot.handlers.power.messages import (
     POWER_RESERVE_LAYER_ROUTER,
     POWER_RESERVE_LAYER_STATION,
     POWER_RESERVE_ROW,
+    POWER_RESERVE_ROW_WITH_CHARGE,
     POWER_RESERVE_TITLE_ON_BATTERY,
     POWER_RESERVE_TITLE_ON_BATTERY_UNTIMED,
     POWER_RESERVE_TITLE_ON_GRID,
@@ -96,22 +94,15 @@ def _format_runtime(minutes: int) -> str:
     return f"{remaining_minutes} хв"
 
 
-def render_mains_change(grid: GridState, station: EcoFlowState | None) -> str:
+def render_mains_change(grid: GridState) -> str:
     """
-    What the family reads when the lights go out, and when they come back.
+    What the family reads when the lights go out, and when they come back — the fact, and nothing beside it.
 
-    the station is what makes the message useful — how much is left, and for how long. without it there is
-    nothing to say beyond the fact itself, and the fact alone is still worth waking someone for.
+    it used to carry the station's charge and runtime too, and that was the wrong place for them: this push
+    fires at three in the morning, and what it has to deliver in one glance is a single word. the numbers are
+    on the reserve board, which is refreshed every minute through an outage and is one tap away.
     """
-    if station is None:
-        return POWER_MAINS_RESTORED_ALONE if grid is GridState.ON_GRID else POWER_MAINS_LOST_ALONE
-
-    battery = round(station.battery_percent)
-    if grid is GridState.ON_GRID:
-        return POWER_MAINS_RESTORED.format(battery=battery)
-    if station.remaining_minutes is None:
-        return POWER_MAINS_LOST_NO_ESTIMATE.format(battery=battery)
-    return POWER_MAINS_LOST.format(battery=battery, duration=_format_runtime(station.remaining_minutes))
+    return POWER_MAINS_RESTORED if grid is GridState.ON_GRID else POWER_MAINS_LOST
 
 
 RESERVE_LAYER_LABELS = {
@@ -146,7 +137,11 @@ def _render_reserve_title(reserve: Reserve) -> str:
 
 
 def _render_reserve_row(row: ReserveRow) -> str:
-    return POWER_RESERVE_ROW.format(layer=RESERVE_LAYER_LABELS[row.layer], standing=_render_reserve_standing(row))
+    layer = RESERVE_LAYER_LABELS[row.layer]
+    standing = _render_reserve_standing(row)
+    if row.charge_percent is None:
+        return POWER_RESERVE_ROW.format(layer=layer, standing=standing)
+    return POWER_RESERVE_ROW_WITH_CHARGE.format(layer=layer, charge=row.charge_percent, standing=standing)
 
 
 def _render_reserve_standing(row: ReserveRow) -> str:

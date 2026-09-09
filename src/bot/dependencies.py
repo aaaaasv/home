@@ -26,6 +26,7 @@ from src.infrastructure.adapters.gree_air_conditioner import GreeAirConditioner
 from src.infrastructure.adapters.gtfs_realtime_feed import GtfsRealtimeFeed
 from src.infrastructure.adapters.gtfs_static_shape_catalog import GtfsStaticShapeCatalog
 from src.infrastructure.adapters.hotline_price_source import HotlinePriceSource
+from src.infrastructure.adapters.http_media_server_battery import HttpMediaServerBattery
 from src.infrastructure.adapters.open_meteo_weather_provider import OpenMeteoWeatherProvider
 from src.infrastructure.adapters.router_presence_source import RouterPresenceSource
 from src.infrastructure.adapters.sht31_room_climate_sensor import Sht31RoomClimateSensor
@@ -43,6 +44,7 @@ from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 from src.modules.plant_care.services.photo_storage import NullPhotoStorage, PhotoStorage
 from src.modules.plant_care.services.plant_identifier import PlantIdentifier
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
+from src.modules.power.services.media_server_battery import MediaServerBattery
 from src.modules.power.services.pi_ups import NullPiUps, PiUps
 from src.modules.power.services.router_link import RouterLink
 from src.modules.presence.services.presence_source import NullPresenceSource, PresenceSource
@@ -127,6 +129,18 @@ def build_router_link(settings: Settings) -> RouterLink | None:
         host=settings.ROUTER_HOST,
         port=settings.RESERVE_ROUTER_PORT,
         timeout_seconds=settings.RESERVE_ROUTER_TIMEOUT_SECONDS,
+    )
+
+
+def build_media_server_battery(settings: Settings) -> MediaServerBattery | None:
+    """Not a null object: the reserve board exists only where every layer it draws can be read, so absence is off."""
+    if not settings.RESERVE_ENABLED or not settings.RESERVE_MEDIA_SERVER_URL:
+        return None
+
+    return HttpMediaServerBattery(
+        url=settings.RESERVE_MEDIA_SERVER_URL,
+        timeout_seconds=settings.RESERVE_MEDIA_SERVER_TIMEOUT_SECONDS,
+        stale_after=timedelta(seconds=settings.RESERVE_MEDIA_SERVER_STALE_AFTER_SECONDS),
     )
 
 

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from src.modules.power.domain import (
     EcoFlowState,
     GridState,
+    MediaServerState,
     Reserve,
     ReserveLayer,
     ReserveRow,
@@ -21,6 +22,7 @@ def build_reserve(
     station: EcoFlowState | None,
     ups: UpsState | None,
     router_alive: bool,
+    media_server: MediaServerState | None,
     on_battery_for: timedelta | None,
     socket_dead_for: timedelta | None,
 ) -> Reserve:
@@ -40,6 +42,7 @@ def build_reserve(
             _station_row(station),
             _pi_row(ups, socket_dead_for),
             _router_row(router_alive, socket_live, socket_dead_for),
+            _media_server_row(media_server, socket_dead_for),
         ),
         on_battery_for=on_battery_for if grid is GridState.ON_BATTERY else None,
     )
@@ -57,31 +60,50 @@ def _station_row(station: EcoFlowState | None) -> ReserveRow:
 
     remaining = timedelta(minutes=station.remaining_minutes) if station.remaining_minutes else None
     if station.ac_input_power:
-        return ReserveRow(layer=ReserveLayer.STATION, standing=ReserveStanding.CHARGING, remaining=remaining)
-    if station.ac_output_power:
-        return ReserveRow(layer=ReserveLayer.STATION, standing=ReserveStanding.HOLDING, remaining=remaining)
-    return ReserveRow(layer=ReserveLayer.STATION, standing=ReserveStanding.FULL)
+        standing = ReserveStanding.CHARGING
+    elif station.ac_output_power:
+        standing = ReserveStanding.HOLDING
+    else:
+        standing = ReserveStanding.FULL
+        remaining = None
+    return ReserveRow(
+        layer=ReserveLayer.STATION,
+        standing=standing,
+        charge_percent=_as_percent(station.battery_percent),
+        remaining=remaining,
+    )
 
 
 def _pi_row(ups: UpsState | None, socket_dead_for: timedelta | None) -> ReserveRow:
-    """The hat knows whether its socket is live and how full its pack is, but nothing about how long it lasts."""
+    """
+    The hat knows whether its socket is live and how full its pack is, but nothing about how long it lasts.
+
+    which of the two the standing rests on matters: volts, never the gauge's percent. the percent is shown
+    because it is the number a reader understands, and once the gauge has settled it is right within a few
+    points — but it is also the one that read 4% at 3.78 V, so no decision is ever taken on it.
+    """
     if ups is None:
         return ReserveRow(layer=ReserveLayer.PI, standing=ReserveStanding.UNREACHABLE)
+
+    charge_percent = _as_percent(ups.battery_percent)
     if not ups.mains_present:
         return ReserveRow(
-            layer=ReserveLayer.PI, standing=ReserveStanding.HOLDING_UNMEASURED, holding_for=socket_dead_for
+            layer=ReserveLayer.PI,
+            standing=ReserveStanding.HOLDING_UNMEASURED,
+            charge_percent=charge_percent,
+            holding_for=socket_dead_for,
         )
-    if ups.battery_volts >= PACK_FULL_VOLTS:
-        return ReserveRow(layer=ReserveLayer.PI, standing=ReserveStanding.FULL)
-    return ReserveRow(layer=ReserveLayer.PI, standing=ReserveStanding.CHARGING)
+    standing = ReserveStanding.FULL if ups.battery_volts >= PACK_FULL_VOLTS else ReserveStanding.CHARGING
+    return ReserveRow(layer=ReserveLayer.PI, standing=standing, charge_percent=charge_percent)
 
 
 def _router_row(router_alive: bool, socket_live: bool | None, socket_dead_for: timedelta | None) -> ReserveRow:
     """
     The 2E has no data interface at all, so this row is a reachability probe plus what the hat says about the socket.
 
-    with no hat to ask, the row stops at "alive": claiming it runs on battery would be inventing the one number
-    this layer is least able to give.
+    it is the one layer with no percent to show, and inventing one is exactly what must not happen here: four
+    leds at 25/50/75/100 are not a charge, and a nominal capacity over a guessed load is not one either. with
+    no hat to ask, the row also stops at "alive" rather than claim the router is running on its own battery.
     """
     if not router_alive:
         return ReserveRow(layer=ReserveLayer.ROUTER, standing=ReserveStanding.UNREACHABLE)
@@ -90,6 +112,42 @@ def _router_row(router_alive: bool, socket_live: bool | None, socket_dead_for: t
             layer=ReserveLayer.ROUTER, standing=ReserveStanding.HOLDING_UNMEASURED, holding_for=socket_dead_for
         )
     return ReserveRow(layer=ReserveLayer.ROUTER, standing=ReserveStanding.ALIVE)
+
+
+def _media_server_row(media_server: MediaServerState | None, socket_dead_for: timedelta | None) -> ReserveRow:
+    """
+    The only layer that can give both numbers honestly: the kernel counts watt-hours and watts for its own pack.
+
+    the runtime comes from energy over power and never from the percent, because the percent is measured
+    against an `energy_full` that a standing 60% charge cap keeps from ever recalibrating.
+    """
+    if media_server is None:
+        return ReserveRow(layer=ReserveLayer.MEDIA_SERVER, standing=ReserveStanding.UNREACHABLE)
+
+    charge_percent = _as_percent(media_server.charge_percent)
+    if media_server.on_mains:
+        standing = ReserveStanding.CHARGING if media_server.is_charging else ReserveStanding.FULL
+        return ReserveRow(layer=ReserveLayer.MEDIA_SERVER, standing=standing, charge_percent=charge_percent)
+    if media_server.power_watts <= 0:
+        # discharging at no watts is a suspended box, not an eternal one — say the state, skip the division
+        return ReserveRow(
+            layer=ReserveLayer.MEDIA_SERVER,
+            standing=ReserveStanding.HOLDING_UNMEASURED,
+            charge_percent=charge_percent,
+            holding_for=socket_dead_for,
+        )
+    return ReserveRow(
+        layer=ReserveLayer.MEDIA_SERVER,
+        standing=ReserveStanding.HOLDING,
+        charge_percent=charge_percent,
+        remaining=timedelta(hours=media_server.energy_watt_hours / media_server.power_watts),
+    )
+
+
+def _as_percent(reported: float) -> int:
+    # gauges overshoot at the top of a charge — the max17048 on the hat reads 101.8% at rest — and a board that
+    # says 102% reads as broken rather than as full
+    return min(100, max(0, round(reported)))
 
 
 class ElapsedClock:

@@ -99,7 +99,7 @@ class MainsWatchJob:
         await self.bot.send_message(
             chat_id=self.chat_id,
             message_thread_id=await self.power_topic.resolve(),
-            text=render_mains_change(grid, station),
+            text=render_mains_change(grid),
             # the one push in this house that must arrive the moment it is sent
             disable_notification=False,
         )

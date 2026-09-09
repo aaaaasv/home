@@ -13,6 +13,7 @@ from src.modules.power.domain import GridState, Reserve
 from src.modules.power.mains_monitor import classify_grid
 from src.modules.power.reserve import ElapsedClock, build_reserve
 from src.modules.power.services.ecoflow_station import EcoFlowStation
+from src.modules.power.services.media_server_battery import MediaServerBattery
 from src.modules.power.services.pi_ups import PiUps
 from src.modules.power.services.router_link import RouterLink
 
@@ -45,6 +46,7 @@ class ReserveBoard:
         ecoflow_station: EcoFlowStation,
         pi_ups: PiUps,
         router_link: RouterLink,
+        media_server_battery: MediaServerBattery,
         timezone: tzinfo,
     ):
         self.bot = bot
@@ -54,16 +56,18 @@ class ReserveBoard:
         self.ecoflow_station = ecoflow_station
         self.pi_ups = pi_ups
         self.router_link = router_link
+        self.media_server_battery = media_server_battery
         self.timezone = timezone
         self.tracker = PostedMessageTracker(bot=bot, uow_factory=uow_factory)
         self._on_battery_clock = ElapsedClock()
         self._socket_dead_clock = ElapsedClock()
 
     async def compose(self) -> Reserve:
-        """Read all three layers and stamp the two clocks, so the caller only has to decide whether to draw it."""
+        """Read every layer and stamp the two clocks, so the caller only has to decide whether to draw it."""
         ups = await self.pi_ups.read_state()
         station = await self.ecoflow_station.read_state()
         router_alive = await self.router_link.is_alive()
+        media_server = await self.media_server_battery.read_state()
         now = datetime.now(self.timezone)
 
         grid = classify_grid(ups, station)
@@ -72,6 +76,7 @@ class ReserveBoard:
             station=station,
             ups=ups,
             router_alive=router_alive,
+            media_server=media_server,
             on_battery_for=self._on_battery_clock.update(grid is GridState.ON_BATTERY, now),
             socket_dead_for=self._socket_dead_clock.update(ups is not None and not ups.mains_present, now),
         )
