@@ -24,6 +24,7 @@ from src.bot.handlers.chores.board import ChoresBoard
 from src.bot.handlers.places.board import PlacesBoard
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
+from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.handlers.shopping.board import ShoppingListBoard
 from src.bot.handlers.transit.board import TransitBoard
 from src.bot.handlers.weather.board import WeatherDigestBoard
@@ -63,6 +64,7 @@ def build_dispatcher(
     power_topic: ForumTopicRegistry | None = None,
     outage_schedule_board: OutageScheduleBoard | None = None,
     conservation_board: ConservationBoard | None = None,
+    reserve_board: ReserveBoard | None = None,
     transit_topic: ForumTopicRegistry | None = None,
     transit_board: TransitBoard | None = None,
     assistant_topic: ForumTopicRegistry | None = None,
@@ -83,6 +85,7 @@ def build_dispatcher(
             weather_digest_board=weather_digest_board,
             outage_schedule_board=outage_schedule_board,
             conservation_board=conservation_board,
+            reserve_board=reserve_board,
             transit_board=transit_board,
             answer_question=answer_question,
         ),

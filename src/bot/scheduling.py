@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
+from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.handlers.weather.board import WeatherDigestBoard
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import PostedMessageTracker
@@ -55,6 +56,7 @@ class SchedulerContext:
     schedule_provider: OutageScheduleProvider | None = None
     outage_schedule_board: OutageScheduleBoard | None = None
     conservation_board: ConservationBoard | None = None
+    reserve_board: ReserveBoard | None = None
     shape_catalog: RouteShapeCatalog | None = None
 
     def build_posted_message_tracker(self) -> PostedMessageTracker:

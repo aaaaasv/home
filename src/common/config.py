@@ -170,6 +170,18 @@ class Settings(BaseSettings):
     # the agent republishes every few seconds — a reading older than this means it stopped, and a stale
     # "mains present" would announce the light coming back in the middle of an outage
     PI_UPS_STALE_AFTER_SECONDS: int = 120
+    # the reserve board: all four backup layers on one screen, one column, and that column is hours. it needs the
+    # station, the hat and the router all configured, because a row it cannot read honestly is a row it must not
+    # draw — so it registers only when every source it names is there
+    RESERVE_ENABLED: bool = False
+    # every tick while the flat is on battery, since that is the hour anyone opens it; on the grid the picture
+    # does not move minute to minute, so the board is only rewritten every few
+    RESERVE_CHECK_MINUTES: int = 1
+    RESERVE_ON_GRID_REFRESH_MINUTES: int = 5
+    # the router has no data interface at all, so its row is a tcp handshake to the admin port and nothing more.
+    # a router that is up answers in milliseconds on the lan; anything slower than this is already an outage
+    RESERVE_ROUTER_PORT: int = 80
+    RESERVE_ROUTER_TIMEOUT_SECONDS: float = 3.0
     # yasno outage schedule — the daily digest is silent when nothing is planned. the group, region and
     # distribution operator identify one address's supply, so they are configuration, never defaults
     YASNO_ENABLED: bool = False

@@ -16,6 +16,7 @@ from src.bot.dependencies import (
     build_presence_source,
     build_price_source,
     build_room_climate_sensor,
+    build_router_link,
     build_shape_catalog,
     build_weather_provider,
     build_yasno_schedule_provider,
@@ -27,6 +28,7 @@ from src.bot.handlers.plants import PLANTS_MODULE_NAME
 from src.bot.handlers.power import POWER_MODULE_NAME
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
+from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.handlers.shopping.board import SHOPPING_MODULE_NAME, ShoppingListBoard
 from src.bot.handlers.system import SYSTEM_MODULE_NAME
 from src.bot.handlers.transit.board import TRANSIT_MODULE_NAME, TransitBoard
@@ -55,6 +57,7 @@ GROUP_COMMANDS = [
     BotCommand(command="track", description="🛒 стежити за ціною (лінк hotline)"),
     BotCommand(command="ac", description="❄️ кондиціонер"),
     BotCommand(command="eco", description="⚡ EcoFlow Delta 2"),
+    BotCommand(command="reserve", description="⚡ резерв живлення"),
     BotCommand(command="conserve", description="⚡ зберігання EcoFlow"),
     BotCommand(command="pi", description="🩺 стан Raspberry Pi"),
     BotCommand(command="bus", description="🚌 коли транспорт із зупинки"),
@@ -183,6 +186,29 @@ async def run() -> None:
             timezone=settings.timezone,
         )
 
+    # the reserve board: every backup layer on one screen, one column, and that column is hours. it draws no row
+    # it cannot read, so it stands up only where all three sources are configured at once
+    pi_ups = build_pi_ups(settings)
+    router_link = build_router_link(settings)
+    reserve_board = None
+    if (
+        settings.RESERVE_ENABLED
+        and settings.ECOFLOW_ENABLED
+        and settings.PI_UPS_ENABLED
+        and router_link is not None
+        and power_topic is not None
+    ):
+        reserve_board = ReserveBoard(
+            bot=bot,
+            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+            power_topic=power_topic,
+            uow_factory=UnitOfWork,
+            ecoflow_station=ecoflow_station,
+            pi_ups=pi_ups,
+            router_link=router_link,
+            timezone=settings.timezone,
+        )
+
     # transit: an on-demand arrival card in its own topic — built only when on. the shape catalog is shared by
     # the weekly refresh job and the use case; the board owns the short refresh window that polls the live feed
     transit_topic = None
@@ -231,6 +257,7 @@ async def run() -> None:
         power_topic=power_topic,
         outage_schedule_board=outage_schedule_board,
         conservation_board=conservation_board,
+        reserve_board=reserve_board,
         transit_topic=transit_topic,
         transit_board=transit_board,
         assistant_topic=assistant_topic,
@@ -254,11 +281,12 @@ async def run() -> None:
             pi_health_sensor=build_pi_health_sensor(settings),
             presence_source=build_presence_source(settings),
             ecoflow_station=ecoflow_station,
-            pi_ups=build_pi_ups(settings),
+            pi_ups=pi_ups,
             power_topic=power_topic,
             schedule_provider=schedule_provider,
             outage_schedule_board=outage_schedule_board,
             conservation_board=conservation_board,
+            reserve_board=reserve_board,
             shape_catalog=shape_catalog,
         )
     )

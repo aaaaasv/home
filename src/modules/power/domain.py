@@ -49,6 +49,60 @@ class UpsState(DomainModel):
     as_of: datetime
 
 
+class ReserveLayer(StrEnum):
+    """The four things that have to outlive a blackout, in the order the board lists them."""
+
+    STATION = "station"
+    PI = "pi"
+    ROUTER = "router"
+    MEDIA_SERVER = "media_server"
+
+
+class ReserveStanding(StrEnum):
+    """
+    How one layer is doing, in terms that survive four different kinds of sensor.
+
+    the station reports minutes, the hat reports volts, the router reports nothing at all — so the board says
+    what they have in common and stays silent about the rest. HOLDING_UNMEASURED is the honest answer where
+    nothing measures the runtime yet: alive, and for how long it has been, but no promise about the end.
+    """
+
+    HOLDING = "holding"
+    HOLDING_UNMEASURED = "holding_unmeasured"
+    CHARGING = "charging"
+    FULL = "full"
+    ALIVE = "alive"
+    UNREACHABLE = "unreachable"
+
+
+@dataclass(frozen=True)
+class ReserveRow:
+    """One layer as the board shows it: how it stands, and how long that lasts where anything can say."""
+
+    layer: ReserveLayer
+    standing: ReserveStanding
+    # time left on battery, or time to full while charging — only where something measures it
+    remaining: timedelta | None = None
+    # how long it has been running on its own battery, for the layers where that is all anyone can say
+    holding_for: timedelta | None = None
+
+
+@dataclass(frozen=True)
+class Reserve:
+    """
+    Every backup layer on one screen, under one shared answer to "are we on the city grid or not".
+
+    that answer is a single fact, not four — the hat is wired to the socket and speaks for the whole flat —
+    so it belongs in the heading and leaves the rows free to be about time alone.
+    """
+
+    grid: GridState
+    rows: tuple[ReserveRow, ...]
+    # how long the flat has been on battery, counted from the first reading that saw it — None on the grid, and
+    # None through an outage the bot woke up inside, where the honest answer is that nobody watched the start
+    on_battery_for: timedelta | None = None
+
+
 MINUTES_PER_DAY = 24 * 60
 
 
