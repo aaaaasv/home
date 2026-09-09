@@ -92,6 +92,11 @@ services:
       # (uid 1000) talks to it through the shared dbus socket + membership in the host bluetooth
       # group — no privileged, no host network (inert while ECOFLOW_ENABLED is false)
       - /var/run/dbus:/var/run/dbus
+      # what the x728 host agent publishes about the pi's own ups. read-only, and a plain file rather than
+      # the gpio device: nothing in here may halt the machine, so the agent that watches the board has to
+      # exist anyway — and once it does, the bot needs no device node, no gpio group and no linux-only
+      # extension in the test suite (inert while PI_UPS_ENABLED is false)
+      - /run/x728:/run/x728:ro
     # the sht31 climate sensor lives on the pi's i2c bus; the container runs as uid 1000, so it
     # needs the device node plus membership in the host's i2c group to open it (inert while
     # CLIMATE_SENSOR_ENABLED is false)

@@ -21,8 +21,9 @@ from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.domain import OutageSchedule, OutageScheduleStatus
 from src.modules.power.mains_monitor import MainsMonitor
 from src.modules.power.outage_forecast import forecast_outage
-from src.modules.power.services.ecoflow_station import EcoFlowStation
+from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
+from src.modules.power.services.pi_ups import NullPiUps, PiUps
 from src.modules.power.use_cases.track_conservation import TrackConservationUseCase
 
 logger = logging.getLogger(__name__)
@@ -63,11 +64,12 @@ class EcoFlowPollJob:
 
 class MainsWatchJob:
     """
-    Watches the wall socket through the station and speaks twice per outage: when it goes, and when it returns.
+    Watches the wall socket and speaks twice per outage: when it goes, and when it returns.
 
     this is the message the whole of layer 1 is built for, and the second half is the one the family waits for.
-    it stays silent whenever the station cannot answer — shelved, unreachable, or simply idle and full — because
-    a guess here reads exactly like a blackout.
+    the pi's own hat answers first because its line is wired to the socket; the station is read alongside it,
+    both to fill in how much is left and to tell the city's power from the station's after the transfer switch
+    is thrown. with neither able to answer it stays silent, because a guess here reads exactly like a blackout.
     """
 
     def __init__(
@@ -76,24 +78,27 @@ class MainsWatchJob:
         chat_id: int,
         power_topic: ForumTopicRegistry,
         ecoflow_station: EcoFlowStation,
+        pi_ups: PiUps,
         settings: Settings,
     ):
         self.bot = bot
         self.chat_id = chat_id
         self.power_topic = power_topic
         self.ecoflow_station = ecoflow_station
+        self.pi_ups = pi_ups
         self.monitor = MainsMonitor(confirmations=settings.ECOFLOW_MAINS_CONFIRMATIONS)
 
     async def __call__(self) -> None:
-        state = await self.ecoflow_station.read_state()
-        grid = self.monitor.update(state)
-        if grid is None or state is None:
+        ups = await self.pi_ups.read_state()
+        station = await self.ecoflow_station.read_state()
+        grid = self.monitor.update(ups, station)
+        if grid is None:
             return
 
         await self.bot.send_message(
             chat_id=self.chat_id,
             message_thread_id=await self.power_topic.resolve(),
-            text=render_mains_change(grid, state),
+            text=render_mains_change(grid, station),
             # the one push in this house that must arrive the moment it is sent
             disable_notification=False,
         )
@@ -252,7 +257,38 @@ class YasnoScheduleJob:
 def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
     """Poll the station on its own cadence and follow the outage schedule on its — each switched on separately."""
     _register_station_jobs(scheduler, context)
+    _register_mains_watch(scheduler, context)
     _register_outage_schedule_jobs(scheduler, context)
+
+
+def _register_mains_watch(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """
+    The grid is watched on its own, far tighter cadence: this is the one message worth being early.
+
+    it registers on either source alone. the hat answers without the station, and a flat that has a station
+    but no hat is still better served by the inference than by silence — so this is deliberately not gated
+    on both.
+    """
+    settings = context.settings
+    watches_from_hat = settings.PI_UPS_ENABLED and context.pi_ups is not None
+    watches_from_station = settings.ECOFLOW_ENABLED and context.ecoflow_station is not None
+    if context.power_topic is None or not (watches_from_hat or watches_from_station):
+        return
+
+    mains_watch_job = MainsWatchJob(
+        bot=context.bot,
+        chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+        power_topic=context.power_topic,
+        ecoflow_station=context.ecoflow_station or NullEcoFlowStation(),
+        pi_ups=context.pi_ups or NullPiUps(),
+        settings=settings,
+    )
+    scheduler.add_job(
+        mains_watch_job.__call__,
+        trigger=IntervalTrigger(minutes=settings.ECOFLOW_MAINS_CHECK_MINUTES),
+        id="mains_watch",
+        replace_existing=True,
+    )
 
 
 def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
@@ -288,23 +324,6 @@ def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContex
             outage_forecast_job.__call__,
             trigger=IntervalTrigger(minutes=settings.ECOFLOW_FORECAST_CHECK_MINUTES),
             id="ecoflow_outage_forecast",
-            replace_existing=True,
-        )
-
-    # the grid is watched on its own, far tighter cadence: this is the one message worth being early, and the
-    # read is cheap because the ble link is already held open
-    if context.power_topic is not None:
-        mains_watch_job = MainsWatchJob(
-            bot=context.bot,
-            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
-            power_topic=context.power_topic,
-            ecoflow_station=context.ecoflow_station,
-            settings=settings,
-        )
-        scheduler.add_job(
-            mains_watch_job.__call__,
-            trigger=IntervalTrigger(minutes=settings.ECOFLOW_MAINS_CHECK_MINUTES),
-            id="ecoflow_mains_watch",
             replace_existing=True,
         )
 

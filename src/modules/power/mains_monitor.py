@@ -1,10 +1,30 @@
-"""Deciding, from what the station reports, whether the grid is up — and noticing the moment it changes."""
-from src.modules.power.domain import EcoFlowState, GridState
+"""Deciding whether the city grid is up, and noticing the moment it changes."""
+from src.modules.power.domain import EcoFlowState, GridState, UpsState
 
 
-def classify_grid(state: EcoFlowState | None) -> GridState:
+def classify_grid(ups: UpsState | None, station: EcoFlowState | None) -> GridState:
     """
-    Read the grid off the station, and refuse to answer when the reading cannot carry the question.
+    Answer from the pi's own hat where it can, from the station's watts where it cannot, and refuse otherwise.
+
+    the hat's line is wired to the socket, so it is a measurement rather than an inference — but after the
+    transfer switch is thrown the whole flat, this pi included, runs off the station, and the line then reports
+    the station's power as if it were the city's. the station feeding the flat is what tells those two apart.
+    """
+    if ups is not None:
+        if not ups.mains_present:
+            return GridState.ON_BATTERY
+        # only a discharging station is evidence of the switch: one drawing from the wall while it feeds the
+        # flat is proof of the opposite, and an idle or unreachable one is no evidence either way
+        if classify_grid_from_station(station) is GridState.ON_BATTERY:
+            return GridState.ON_BATTERY
+        return GridState.ON_GRID
+
+    return classify_grid_from_station(station)
+
+
+def classify_grid_from_station(state: EcoFlowState | None) -> GridState:
+    """
+    Read the grid off the station alone, and refuse to answer when the reading cannot carry the question.
 
     the delta 2 has no "plugged in" flag — its firmware exposes only watts, and the newer stations' explicit
     flag does not exist here — so mains presence has to be inferred. drawing from the wall is proof the grid
@@ -36,9 +56,9 @@ class MainsMonitor:
         self._pending: GridState | None = None
         self._seen = 0
 
-    def update(self, state: EcoFlowState | None) -> GridState | None:
+    def update(self, ups: UpsState | None, station: EcoFlowState | None) -> GridState | None:
         """Return the new grid state at the moment it is confirmed, and None every other time."""
-        grid = classify_grid(state)
+        grid = classify_grid(ups, station)
         if grid is GridState.UNKNOWN:
             return None
 
