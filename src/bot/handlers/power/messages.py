@@ -27,14 +27,13 @@ POWER_ECOFLOW_BUTTON_REFRESH = "🔄 Оновити"
 POWER_ECOFLOW_WORKING_TOAST = "🔄 читаю Delta 2…"
 
 # the two messages the whole of layer 1 exists to send. they are rare by nature, so both ping — a silent
-# "світло зникло" would be read hours later, and the second one is the message the family actually waits for
-POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%, лишилось ~{duration}"
-POWER_MAINS_LOST_NO_ESTIMATE = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%"
-POWER_MAINS_RESTORED = "💡 <b>Світло є</b>\n\nDelta 2 — {battery}%, заряджається"
-# the pi's own hat sees the socket whether or not the station is around, so the outage is still announced when
-# the station is shelved or unreachable — just without the numbers nobody can read in that case
-POWER_MAINS_LOST_ALONE = "🕯 <b>Світло зникло</b>"
-POWER_MAINS_RESTORED_ALONE = "💡 <b>Світло є</b>"
+# "світло зникло" would be read hours later, and the second one is the message the family actually waits for.
+#
+# four words each, and deliberately: this is the one push that goes off at three in the morning, and at three
+# in the morning nobody is reading a charge percentage. the numbers live on the reserve board, which is a
+# glance away and already current — putting them here only buried the one word the push exists to deliver
+POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>"
+POWER_MAINS_RESTORED = "💡 <b>Світло є</b>"
 
 # said once per outage, and only when the answer is bad: "you reach" is not worth a notification, and a
 # push that speaks every time gets the whole group muted

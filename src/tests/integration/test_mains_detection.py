@@ -246,27 +246,19 @@ class MainsMonitorTestCase(unittest.TestCase):
 
 
 class RenderMainsChangeTestCase(unittest.TestCase):
-    def test_render_losing_the_grid_reports_the_charge_and_how_long_it_holds(self):
-        text = render_mains_change(GridState.ON_BATTERY, on_battery(battery_percent=82.0, remaining_minutes=95))
+    """
+    Four words each, and that is the whole design: this is the push that goes off at three in the morning.
 
-        self.assertEqual(text, "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — 82%, лишилось ~1 год 35 хв")
+    it used to carry the station's charge and runtime as well. those belong on the reserve board, which is
+    refreshed every minute through an outage — here they only buried the one word the message exists for.
+    """
 
-    def test_render_losing_the_grid_without_an_estimate_still_reports_the_charge(self):
-        text = render_mains_change(GridState.ON_BATTERY, on_battery(battery_percent=82.0, remaining_minutes=None))
-
-        self.assertEqual(text, "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — 82%")
-
-    def test_render_the_grid_returning_reports_the_charge_and_that_it_is_filling_again(self):
-        text = render_mains_change(GridState.ON_GRID, on_grid(battery_percent=61.0))
-
-        self.assertEqual(text, "💡 <b>Світло є</b>\n\nDelta 2 — 61%, заряджається")
-
-    def test_render_losing_the_grid_without_a_station_still_says_the_light_is_out(self):
-        text = render_mains_change(GridState.ON_BATTERY, None)
+    def test_render_losing_the_grid_says_the_light_is_out_and_nothing_else(self):
+        text = render_mains_change(GridState.ON_BATTERY)
 
         self.assertEqual(text, "🕯 <b>Світло зникло</b>")
 
-    def test_render_the_grid_returning_without_a_station_still_says_the_light_is_back(self):
-        text = render_mains_change(GridState.ON_GRID, None)
+    def test_render_the_grid_returning_says_the_light_is_back_and_nothing_else(self):
+        text = render_mains_change(GridState.ON_GRID)
 
         self.assertEqual(text, "💡 <b>Світло є</b>")
