@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 
 from src.modules.power.domain import EcoFlowState, GridState, OutageForecast, OutageSchedule
-from src.modules.power.mains_monitor import classify_grid
+from src.modules.power.mains_monitor import classify_grid_from_station
 
 
 def forecast_outage(
@@ -17,7 +17,7 @@ def forecast_outage(
     for what the flat is drawing right now, which is the hard half of the question. `moment` is local wall
     clock, because the schedule counts minutes from local midnight.
     """
-    if state is None or classify_grid(state) is not GridState.ON_BATTERY:
+    if state is None or classify_grid_from_station(state) is not GridState.ON_BATTERY:
         return None
     if not state.remaining_minutes:
         return None

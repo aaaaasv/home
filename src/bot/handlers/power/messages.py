@@ -31,6 +31,10 @@ POWER_ECOFLOW_WORKING_TOAST = "🔄 читаю Delta 2…"
 POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%, лишилось ~{duration}"
 POWER_MAINS_LOST_NO_ESTIMATE = "🕯 <b>Світло зникло</b>\n\nDelta 2 тримає квартиру — {battery}%"
 POWER_MAINS_RESTORED = "💡 <b>Світло є</b>\n\nDelta 2 — {battery}%, заряджається"
+# the pi's own hat sees the socket whether or not the station is around, so the outage is still announced when
+# the station is shelved or unreachable — just without the numbers nobody can read in that case
+POWER_MAINS_LOST_ALONE = "🕯 <b>Світло зникло</b>"
+POWER_MAINS_RESTORED_ALONE = "💡 <b>Світло є</b>"
 
 # said once per outage, and only when the answer is bad: "you reach" is not worth a notification, and a
 # push that speaks every time gets the whole group muted

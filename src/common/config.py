@@ -161,6 +161,15 @@ class Settings(BaseSettings):
     # the conservation card is re-evaluated this often while the station is shelved — day-based advisories change
     # slowly, but a few-hourly cadence surfaces "just shelved" guidance without waiting for the next morning
     ECOFLOW_CONSERVATION_CHECK_HOURS: int = 4
+    # the pi's own x728 hat — the only direct reading of the wall socket in the flat, so mains detection prefers
+    # it over the station's inference and keeps answering while the station is shelved or not owned. the board is
+    # watched by a host agent (home-infrastructure/pi/x728), which also halts the pi on a dying pack; the bot only
+    # reads what that agent publishes, so it needs no device mounts of its own
+    PI_UPS_ENABLED: bool = False
+    PI_UPS_STATE_PATH: str = "/run/x728/state.json"
+    # the agent republishes every few seconds — a reading older than this means it stopped, and a stale
+    # "mains present" would announce the light coming back in the middle of an outage
+    PI_UPS_STALE_AFTER_SECONDS: int = 120
     # yasno outage schedule — the daily digest is silent when nothing is planned. the group, region and
     # distribution operator identify one address's supply, so they are configuration, never defaults
     YASNO_ENABLED: bool = False
