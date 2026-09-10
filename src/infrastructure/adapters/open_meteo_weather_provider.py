@@ -13,10 +13,11 @@ logger = logging.getLogger(__name__)
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 REQUEST_TIMEOUT_SECONDS = 15
-# open-meteo sheds load on the hour and the half hour, and the morning digest fires at exactly 08:00 — one bad
-# second was losing the whole day's weather, because the overnight cache is long past WEATHER_RECENT_MAX_AGE
-FETCH_ATTEMPTS = 3
-RETRY_DELAY_SECONDS = 5
+# open-meteo sheds load on the hour and the half hour, and a refusal there lasts longer than one second: on
+# 10.09 all three attempts — :00:01, :00:06, :00:11 — came back 503, because five seconds apart is still inside
+# the same spike. the waits grow so the last attempt lands a full minute clear of the boundary
+RETRY_DELAYS_SECONDS = (15, 45)
+FETCH_ATTEMPTS = len(RETRY_DELAYS_SECONDS) + 1
 # the outdoor weather barely moves minute to minute, so /ac buttons reuse the last fetch instead of blocking on a
 # fresh network call — the live fetch happens only when the card is first opened (or the digest refreshes)
 WEATHER_RECENT_MAX_AGE_SECONDS = 1800
@@ -72,8 +73,11 @@ class OpenMeteoWeatherProvider:
                 if attempt == FETCH_ATTEMPTS:
                     logger.warning("Weather fetch failed after %d attempts: %r", FETCH_ATTEMPTS, error)
                     return None, None
-                logger.info("Weather fetch attempt %d of %d failed, retrying: %r", attempt, FETCH_ATTEMPTS, error)
-                await asyncio.sleep(RETRY_DELAY_SECONDS)
+                delay = RETRY_DELAYS_SECONDS[attempt - 1]
+                logger.info(
+                    "Weather fetch attempt %d of %d failed, retrying in %ds: %r", attempt, FETCH_ATTEMPTS, delay, error
+                )
+                await asyncio.sleep(delay)
         return None, None
 
     def recent(self) -> WeatherReport | None:

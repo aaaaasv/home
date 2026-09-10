@@ -253,7 +253,7 @@ class FetchRetryTestCase(unittest.IsolatedAsyncioTestCase):
         provider, session = self.build_provider([aiohttp.ClientError("503"), forecast, air_quality])
 
         with mock.patch.object(aiohttp, "ClientSession", return_value=session), mock.patch.object(
-            open_meteo, "RETRY_DELAY_SECONDS", 0
+            open_meteo, "RETRY_DELAYS_SECONDS", (0, 0)
         ):
             report = await provider.fetch()
 
@@ -265,7 +265,7 @@ class FetchRetryTestCase(unittest.IsolatedAsyncioTestCase):
         provider, session = self.build_provider(outcomes)
 
         with mock.patch.object(aiohttp, "ClientSession", return_value=session), mock.patch.object(
-            open_meteo, "RETRY_DELAY_SECONDS", 0
+            open_meteo, "RETRY_DELAYS_SECONDS", (0, 0)
         ):
             report = await provider.fetch()
 

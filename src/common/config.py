@@ -80,11 +80,16 @@ class Settings(BaseSettings):
     WEATHER_DIGEST_ENABLED: bool = False
     TELEGRAM_WEATHER_TOPIC_ID: int = 0
     WEATHER_TOPIC_TITLE: str = "climate"
-    WEATHER_DIGEST_TIME: str = "08:00"
+    # deliberately not 08:00. open-meteo sheds load exactly on the hour, and the digest's own fetch is the one
+    # that decides whether the day has weather at all — firing it on the boundary lost the forecast repeatedly
+    WEATHER_DIGEST_TIME: str = "08:03"
     # the morning digest then keeps itself current in place: a silent edit every N minutes, only during the hours
     # someone might look (inclusive hour range), so a glance at the topic shows now, not the 08:00 snapshot
     WEATHER_REFRESH_MINUTES: int = 15
-    WEATHER_REFRESH_START_HOUR: int = 8
+    # an hour before the digest, so the last successful reading is minutes old rather than from last night. that
+    # is what lets the digest survive its own fetch failing: the fallback only reaches back WEATHER_RECENT_MAX_AGE,
+    # and starting at 8 left a nine-hour hole exactly where the fallback was needed
+    WEATHER_REFRESH_START_HOUR: int = 7
     WEATHER_REFRESH_END_HOUR: int = 22
     # where the forecast is for — required once the digest is on. no default: a coordinate
     # is a place, and a place belongs in configuration, not in the source

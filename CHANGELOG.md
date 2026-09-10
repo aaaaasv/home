@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Виправлено
+
+- Ранковий дайджест більше не виходить без погоди. Він стріляв рівно о 08:00 — саме тоді, коли Open-Meteo
+  скидає навантаження й відповідає відмовою, — а всі три спроби вкладались в одинадцять секунд, тобто в той
+  самий сплеск. Тепер дайджест о 08:03, оновлення починаються на годину раніше (тож за одинадцять хвилин до
+  дайджесту вже є свіжі дані), а спроби рознесені на 15 і 45 секунд.
+
 ## [0.16.0] - 2026-09-09
 
 ### Додано
