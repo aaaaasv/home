@@ -105,7 +105,7 @@ or pull · what happens when the internet, the service, the sensor, or **the ele
 `docs/vision.md` is the canonical version of this, with worked examples, the never-build list, and the
 phased path. Read it before proposing anything structural.
 
-## The five rules
+## The six rules
 
 **1. A push must usually be empty.** A module earns a scheduled message only if that message is normally
 silent. An always-non-empty list that speaks every morning gets the group muted, and a muted group takes the
@@ -137,7 +137,14 @@ longer reach with an `InaccessibleMessage` that has no `message_thread_id` and c
 weather digest may carry a refresh button because it is reposted daily; air-conditioner controls may not,
 so `/ac` lives on its own card.
 
-**5. Ukrainian lives only in the delivery layer** (`src/bot/`). Domain errors carry English detail for logs;
+**5. Text the family reads must be actionable on its own.** A care card is read in a group with no other card
+in view, and a herbarium sheet is opened by a guest who has never heard of this bot. So no relative quantity
+("пів дози"), no pointer elsewhere ("за інструкцією", "як у сусідньої"), and no meta-information about the
+software — where a month carries no reminder, say what the plant is doing that month, never that the bot is
+quiet. Resolve every deferred value into a number before storing it; the household protocol is usually already
+written down on a sibling record.
+
+**6. Ukrainian lives only in the delivery layer** (`src/bot/`). Domain errors carry English detail for logs;
 `src/bot/errors.py` maps the exception to what a person reads.
 
 ## Layers
