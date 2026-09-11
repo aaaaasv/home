@@ -22,6 +22,7 @@ from src.modules.power.services.pi_ups import PiUps
 from src.modules.presence.services.presence_source import PresenceSource
 from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
 from src.modules.shopping.services.price_source import PriceSource
+from src.modules.system_health.services.disk_health_source import DiskHealthSource
 from src.modules.system_health.services.pi_health_sensor import PiHealthSensor
 from src.modules.transit.services.route_shape_catalog import RouteShapeCatalog
 
@@ -49,6 +50,7 @@ class SchedulerContext:
     air_conditioner: AirConditioner | None = None
     tech_topic: ForumTopicRegistry | None = None
     pi_health_sensor: PiHealthSensor | None = None
+    media_server_disks: DiskHealthSource | None = None
     presence_source: PresenceSource | None = None
     ecoflow_station: EcoFlowStation | None = None
     pi_ups: PiUps | None = None
