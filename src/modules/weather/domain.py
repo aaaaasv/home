@@ -44,6 +44,24 @@ class WeatherReport(DomainModel):
     # the peak over the hours still ahead — the daily max would announce a shower that fell while everyone slept
     precipitation_probability_percent: int | None
     rain_window: RainWindow | None
+    # the european index, modelled at ~11 km — useful as a fallback, but it cannot see a fire two streets
+    # away. LocalAirQuality below is what replaces it whenever a real sensor nearby is answering
     european_air_quality_index: int | None
     pm2_5_micrograms: float | None
     pollen: list[PollenReading]
+
+
+class LocalAirQuality(DomainModel):
+    """
+    PM2.5 as actually measured a few streets away, rather than modelled over a third of the city.
+
+    measured 2–10.09.2026 from the sensors near this flat: median 1.6 µg/m³, above the WHO guideline 1.1% of
+    the time, and one hour at 29.6 with a peak of 102. that shape — clean almost always, rare sharp spikes —
+    is exactly what an 11 km model averages away, and the only reason this source exists.
+
+    `sensor_count` is kept because these are hobby sensors: one of them reading oddly is common, and a median
+    over several is worth more than a single number. it also tells a reader how much to trust the value.
+    """
+
+    pm2_5_micrograms: float
+    sensor_count: int
