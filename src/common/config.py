@@ -93,6 +93,16 @@ class Settings(BaseSettings):
     WEATHER_REFRESH_END_HOUR: int = 22
     # where the forecast is for — required once the digest is on. no default: a coordinate
     # is a place, and a place belongs in configuration, not in the source
+    # pm2.5 from the volunteer sensors a few streets away, which replaces the modelled index in the digest
+    # whenever they answer. the model is ~11 km wide and averages away exactly the local spikes that matter
+    LOCAL_AIR_QUALITY_ENABLED: bool = False
+    # the forecast coordinate is deliberately coarse — a few km either way changes nothing about the
+    # weather. finding the sensors on your own street is the opposite problem, so it gets its own pair
+    # and falls back to the weather one when unset
+    LOCAL_AIR_QUALITY_LATITUDE: float = 0.0
+    LOCAL_AIR_QUALITY_LONGITUDE: float = 0.0
+    LOCAL_AIR_QUALITY_RADIUS_KM: float = 2.0
+    LOCAL_AIR_QUALITY_TIMEOUT_SECONDS: float = 10.0
     WEATHER_LATITUDE: float = 0.0
     WEATHER_LONGITUDE: float = 0.0
 

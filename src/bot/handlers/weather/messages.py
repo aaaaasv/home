@@ -24,6 +24,9 @@ WEATHER_RAIN_WINDOW_SINGLE_HOUR = "о {start:02d}:00"
 # a low chance of rain is just noise — mention it only when rain is actually plausible
 RAIN_NOTABLE_THRESHOLD_PERCENT = 30
 WEATHER_AIR_QUALITY_LINE = "🌫 повітря: {label} (AQI {index})"
+# used whenever a sensor a few streets away is answering: it names the measured number instead of an index,
+# because the index is modelled over ~11 km and averages away exactly the local spikes worth knowing about
+WEATHER_AIR_QUALITY_MEASURED = "🌫 повітря: {label} · PM2.5 {value} мкг/м³"
 WEATHER_POLLEN_LINE = "🌾 пилок: {details}"
 WEATHER_UNAVAILABLE = "🌤 Погода зараз недоступна."
 # a quiet footer that says how fresh the reading is, so an open topic never looks like a morning snapshot
@@ -43,6 +46,14 @@ AIR_QUALITY_BANDS: list[tuple[int, str]] = [
     (100, "дуже погане"),
 ]
 AIR_QUALITY_WORST_LABEL = "небезпечне"
+# the same labels against measured pm2.5 in µg/m³, on the european index's own pm2.5 breakpoints
+PM2_5_BANDS: list[tuple[float, str]] = [
+    (10, "чудове"),
+    (20, "добре"),
+    (25, "помірне"),
+    (50, "погане"),
+    (75, "дуже погане"),
+]
 
 # below a fresh breeze nobody would call the day windy, so the line stays absent entirely
 WIND_NOTABLE_THRESHOLD_METERS_PER_SECOND = 8.0

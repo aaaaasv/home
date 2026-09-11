@@ -30,6 +30,7 @@ from src.infrastructure.adapters.http_media_server_battery import HttpMediaServe
 from src.infrastructure.adapters.http_media_server_disks import HttpMediaServerDisks
 from src.infrastructure.adapters.open_meteo_weather_provider import OpenMeteoWeatherProvider
 from src.infrastructure.adapters.router_presence_source import RouterPresenceSource
+from src.infrastructure.adapters.sensor_community_air_quality import SensorCommunityAirQuality
 from src.infrastructure.adapters.sht31_room_climate_sensor import Sht31RoomClimateSensor
 from src.infrastructure.adapters.sysfs_pi_health_sensor import SysfsPiHealthSensor
 from src.infrastructure.adapters.tcp_router_link import TcpRouterLink
@@ -56,6 +57,7 @@ from src.modules.system_health.services.pi_health_sensor import NullPiHealthSens
 from src.modules.transit.domain import GeoPoint, StopLocation, parse_watched_routes
 from src.modules.transit.services.arrival_estimator import ArrivalEstimator
 from src.modules.transit.use_cases.compose_transit_report import ComposeTransitReportUseCase
+from src.modules.weather.services.local_air_quality import LocalAirQualitySource
 from src.modules.weather.services.weather_provider import NullWeatherProvider, WeatherProvider
 
 
@@ -83,6 +85,19 @@ def build_weather_provider(settings: Settings) -> WeatherProvider:
         latitude=settings.WEATHER_LATITUDE,
         longitude=settings.WEATHER_LONGITUDE,
         timezone_name=settings.TIMEZONE,
+    )
+
+
+def build_local_air_quality(settings: Settings) -> LocalAirQualitySource | None:
+    """Not a null object: absence means the digest keeps showing the modelled index, which is the old behaviour."""
+    if not settings.LOCAL_AIR_QUALITY_ENABLED or not settings.WEATHER_LATITUDE:
+        return None
+
+    return SensorCommunityAirQuality(
+        latitude=settings.LOCAL_AIR_QUALITY_LATITUDE or settings.WEATHER_LATITUDE,
+        longitude=settings.LOCAL_AIR_QUALITY_LONGITUDE or settings.WEATHER_LONGITUDE,
+        radius_km=settings.LOCAL_AIR_QUALITY_RADIUS_KM,
+        timeout_seconds=settings.LOCAL_AIR_QUALITY_TIMEOUT_SECONDS,
     )
 
 
