@@ -11,6 +11,7 @@ from src.bot.dependencies import (
     build_compose_transit_report,
     build_ecoflow_station,
     build_language_model,
+    build_local_air_quality,
     build_media_server_battery,
     build_media_server_disks,
     build_pi_health_sensor,
@@ -145,6 +146,7 @@ async def run() -> None:
             uow_factory=UnitOfWork,
             weather_provider=weather_provider,
             timezone=settings.timezone,
+            local_air_quality=build_local_air_quality(settings),
         )
 
     # a push-only topic for the pi's own alerts — no router, since nothing there listens for a command

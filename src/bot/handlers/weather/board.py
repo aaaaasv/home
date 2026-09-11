@@ -12,7 +12,8 @@ from src.bot.services.posted_message_tracker import WEATHER_DIGEST_KIND, PostedM
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.room_climate.domain import RoomClimate
 from src.modules.room_climate.use_cases.retrieve_room_climate import RetrieveRoomClimateUseCase
-from src.modules.weather.domain import VentilationEffect, WeatherReport
+from src.modules.weather.domain import LocalAirQuality, VentilationEffect, WeatherReport
+from src.modules.weather.services.local_air_quality import LocalAirQualitySource
 from src.modules.weather.services.ventilation import resolve_ventilation_effect
 from src.modules.weather.services.weather_provider import WeatherProvider
 
@@ -42,6 +43,7 @@ class WeatherDigestBoard:
         uow_factory: Callable[[], UnitOfWork],
         weather_provider: WeatherProvider,
         timezone: tzinfo,
+        local_air_quality: LocalAirQualitySource | None = None,
     ):
         self.bot = bot
         self.chat_id = chat_id
@@ -49,6 +51,7 @@ class WeatherDigestBoard:
         self.uow_factory = uow_factory
         self.weather_provider = weather_provider
         self.timezone = timezone
+        self.local_air_quality = local_air_quality
         self.tracker = PostedMessageTracker(bot=bot, uow_factory=uow_factory)
 
     async def post(self) -> None:
@@ -96,12 +99,16 @@ class WeatherDigestBoard:
         return True
 
     async def _render(self) -> str | None:
-        indoor, outdoor, ventilation = await self._compose()
+        indoor, outdoor, ventilation, local_air = await self._compose()
         if indoor is None and outdoor is None:
             return None
-        return render_climate_digest(indoor, outdoor, ventilation, generated_at=datetime.now(self.timezone))
+        return render_climate_digest(
+            indoor, outdoor, ventilation, generated_at=datetime.now(self.timezone), local_air=local_air
+        )
 
-    async def _compose(self) -> tuple[RoomClimate | None, WeatherReport | None, VentilationEffect | None]:
+    async def _compose(
+        self,
+    ) -> tuple[RoomClimate | None, WeatherReport | None, VentilationEffect | None, LocalAirQuality | None]:
         indoor = await RetrieveRoomClimateUseCase(uow=self.uow_factory())()
         # open-meteo throws transient 503s; on a miss show the last good reading (minutes old) rather than
         # blanking the digest to «погода недоступна» — the weather barely moves between 15-min refreshes
@@ -115,7 +122,10 @@ class WeatherDigestBoard:
                 outdoor_temperature_celsius=outdoor.temperature_celsius,
                 outdoor_humidity_percent=outdoor.relative_humidity_percent,
             )
-        return indoor, outdoor, ventilation
+        # a measurement three streets away beats a model over eleven kilometres; when the volunteer
+        # sensors are quiet the modelled index in `outdoor` stands in, which is what used to be shown
+        local_air = await self.local_air_quality.read() if self.local_air_quality is not None else None
+        return indoor, outdoor, ventilation, local_air
 
     async def _remembered_message_id(self) -> int | None:
         async with self.uow_factory() as uow:

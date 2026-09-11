@@ -6,6 +6,7 @@ from src.bot.handlers.weather.messages import (
     AIR_QUALITY_WORST_LABEL,
     FEELS_LIKE_DIFFERENCE_THRESHOLD_CELSIUS,
     FROST_THRESHOLD_CELSIUS,
+    PM2_5_BANDS,
     POLLEN_LEVEL_HIGH,
     POLLEN_LEVEL_MODERATE,
     POLLEN_SPECIES_LABELS,
@@ -13,6 +14,7 @@ from src.bot.handlers.weather.messages import (
     RAIN_NOTABLE_THRESHOLD_PERCENT,
     UV_INDEX_NOTABLE_THRESHOLD,
     WEATHER_AIR_QUALITY_LINE,
+    WEATHER_AIR_QUALITY_MEASURED,
     WEATHER_DIGEST_AS_OF,
     WEATHER_DIGEST_TITLE,
     WEATHER_EVENING_SUFFIX,
@@ -35,7 +37,7 @@ from src.bot.handlers.weather.messages import (
     WIND_STRONGEST_LABEL,
 )
 from src.modules.room_climate.domain import RoomClimate
-from src.modules.weather.domain import PollenReading, VentilationEffect, WeatherReport
+from src.modules.weather.domain import LocalAirQuality, PollenReading, VentilationEffect, WeatherReport
 
 
 def render_climate_digest(
@@ -43,6 +45,7 @@ def render_climate_digest(
     outdoor: WeatherReport | None,
     ventilation: VentilationEffect | None = None,
     generated_at: datetime | None = None,
+    local_air: LocalAirQuality | None = None,
 ) -> str:
     lines = [WEATHER_DIGEST_TITLE, ""]
 
@@ -69,7 +72,7 @@ def render_climate_digest(
             lines.append(WEATHER_FROST_LINE.format(temperature=f"{outdoor.temperature_min_celsius:.0f}"))
         if outdoor.uv_index_max is not None and outdoor.uv_index_max >= UV_INDEX_NOTABLE_THRESHOLD:
             lines.append(WEATHER_UV_LINE)
-        air_quality_line = _render_air_quality(outdoor)
+        air_quality_line = _render_air_quality(outdoor, local_air)
         if air_quality_line:
             lines.append(air_quality_line)
         pollen_line = _render_pollen(outdoor.pollen)
@@ -131,17 +134,32 @@ def _render_rain(outdoor: WeatherReport) -> str | None:
     return WEATHER_RAIN_LINE_WITH_WINDOW.format(probability=probability, window=rendered_window)
 
 
-def _render_air_quality(outdoor: WeatherReport) -> str | None:
+def _render_air_quality(outdoor: WeatherReport, local: LocalAirQuality | None) -> str | None:
+    """
+    A measurement from three streets away beats a model averaged over eleven kilometres, so it wins when it
+    answers. the modelled index stays as the fallback, because volunteer sensors go quiet without notice.
+    """
+    if local is not None:
+        return WEATHER_AIR_QUALITY_MEASURED.format(
+            label=_band_label(local.pm2_5_micrograms, PM2_5_BANDS), value=_format_pm2_5(local.pm2_5_micrograms)
+        )
+
     index = outdoor.european_air_quality_index
     if index is None:
         return None
+    return WEATHER_AIR_QUALITY_LINE.format(label=_band_label(index, AIR_QUALITY_BANDS), index=index)
 
-    label = AIR_QUALITY_WORST_LABEL
-    for upper_bound, band_label in AIR_QUALITY_BANDS:
-        if index <= upper_bound:
-            label = band_label
-            break
-    return WEATHER_AIR_QUALITY_LINE.format(label=label, index=index)
+
+def _band_label(value: float, bands: list[tuple[float, str]]) -> str:
+    for upper_bound, label in bands:
+        if value <= upper_bound:
+            return label
+    return AIR_QUALITY_WORST_LABEL
+
+
+def _format_pm2_5(value: float) -> str:
+    # a tenth is the honest resolution of these sensors, and whole numbers read as more certain than they are
+    return f"{value:.1f}".rstrip("0").rstrip(".")
 
 
 def _render_pollen(readings: list[PollenReading]) -> str | None:
