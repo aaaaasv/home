@@ -27,6 +27,7 @@ from src.infrastructure.adapters.gtfs_realtime_feed import GtfsRealtimeFeed
 from src.infrastructure.adapters.gtfs_static_shape_catalog import GtfsStaticShapeCatalog
 from src.infrastructure.adapters.hotline_price_source import HotlinePriceSource
 from src.infrastructure.adapters.http_media_server_battery import HttpMediaServerBattery
+from src.infrastructure.adapters.http_media_server_disks import HttpMediaServerDisks
 from src.infrastructure.adapters.open_meteo_weather_provider import OpenMeteoWeatherProvider
 from src.infrastructure.adapters.router_presence_source import RouterPresenceSource
 from src.infrastructure.adapters.sht31_room_climate_sensor import Sht31RoomClimateSensor
@@ -50,6 +51,7 @@ from src.modules.power.services.router_link import RouterLink
 from src.modules.presence.services.presence_source import NullPresenceSource, PresenceSource
 from src.modules.room_climate.services.room_climate_sensor import NullRoomClimateSensor, RoomClimateSensor
 from src.modules.shopping.domain import ReputabilityPolicy
+from src.modules.system_health.services.disk_health_source import DiskHealthSource
 from src.modules.system_health.services.pi_health_sensor import NullPiHealthSensor, PiHealthSensor
 from src.modules.transit.domain import GeoPoint, StopLocation, parse_watched_routes
 from src.modules.transit.services.arrival_estimator import ArrivalEstimator
@@ -162,6 +164,17 @@ def build_pi_health_sensor(settings: Settings) -> PiHealthSensor:
         return NullPiHealthSensor()
 
     return SysfsPiHealthSensor(data_path=str(Path(settings.DATABASE_PATH).parent) or ".")
+
+
+def build_media_server_disks(settings: Settings) -> DiskHealthSource | None:
+    """Not a null object: without a url there is no machine to ask, so the job simply never registers."""
+    if not settings.MEDIA_SERVER_DISKS_URL:
+        return None
+
+    return HttpMediaServerDisks(
+        url=settings.MEDIA_SERVER_DISKS_URL,
+        timeout_seconds=settings.MEDIA_SERVER_DISKS_TIMEOUT_SECONDS,
+    )
 
 
 def build_price_source(settings: Settings) -> HotlinePriceSource:

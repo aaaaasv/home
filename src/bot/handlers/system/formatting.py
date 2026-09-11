@@ -1,5 +1,12 @@
-"""How the Pi health alert and status card render."""
+"""How the Pi health alert, the status card and the media server disk alert render."""
 from src.bot.handlers.system.messages import (
+    MEDIA_SERVER_DISK_FAILED,
+    MEDIA_SERVER_DISK_PENDING,
+    MEDIA_SERVER_DISK_REALLOCATED,
+    MEDIA_SERVER_DISK_SPARE,
+    MEDIA_SERVER_DISK_TITLE,
+    MEDIA_SERVER_DISK_UNCORRECTABLE,
+    MEDIA_SERVER_DISK_WORN,
     PI_STATUS_DISK,
     PI_STATUS_POWER_LOW,
     PI_STATUS_POWER_OK,
@@ -10,7 +17,13 @@ from src.bot.handlers.system.messages import (
     SYSTEM_HEALTH_TEMPERATURE,
     SYSTEM_HEALTH_UNDERVOLTAGE,
 )
-from src.modules.system_health.domain import PiHealthReading, SystemHealthDimension, SystemHealthIssue
+from src.modules.system_health.domain import (
+    DiskFault,
+    DiskIssue,
+    PiHealthReading,
+    SystemHealthDimension,
+    SystemHealthIssue,
+)
 
 
 def render_system_health_alert(issues: list[SystemHealthIssue]) -> str:
@@ -34,3 +47,20 @@ def render_pi_health(reading: PiHealthReading) -> str:
             PI_STATUS_DISK.format(percent=f"{reading.disk_used_percent:.0f}"),
         ]
     )
+
+
+DISK_FAULT_LINES = {
+    DiskFault.FAILED: MEDIA_SERVER_DISK_FAILED,
+    DiskFault.REALLOCATED: MEDIA_SERVER_DISK_REALLOCATED,
+    DiskFault.PENDING: MEDIA_SERVER_DISK_PENDING,
+    DiskFault.UNCORRECTABLE: MEDIA_SERVER_DISK_UNCORRECTABLE,
+    DiskFault.WORN: MEDIA_SERVER_DISK_WORN,
+    DiskFault.SPARE: MEDIA_SERVER_DISK_SPARE,
+}
+
+
+def render_media_server_disk_alert(issues: list[DiskIssue]) -> str:
+    """Names the disk and the finding, and stops there — what to do about a dying drive is not the bot's call."""
+    lines = [MEDIA_SERVER_DISK_TITLE]
+    lines.extend(DISK_FAULT_LINES[issue.fault].format(model=issue.model, value=issue.value) for issue in issues)
+    return "\n".join(lines)

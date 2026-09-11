@@ -117,6 +117,12 @@ class Settings(BaseSettings):
     PI_DISK_ALERT_PERCENT: float = 90.0
     PI_DISK_RECOVERY_PERCENT: float = 85.0
     PI_HEALTH_CHECK_MINUTES: int = 10
+    # the media server's disks, read over the same http agent that serves its battery. smartd on that machine
+    # already watches them every half hour and then mails local root, which nobody reads — this is the path
+    # that actually reaches a person. the probe there refreshes hourly, so asking faster only re-reads a file
+    MEDIA_SERVER_DISKS_URL: str = ""
+    MEDIA_SERVER_DISKS_TIMEOUT_SECONDS: float = 5.0
+    MEDIA_SERVER_DISK_CHECK_HOURS: int = 1
 
     # presence: the router's local api tells the bot which phones are on Wi-Fi, to catch "everyone left, ac still on"
     PRESENCE_ENABLED: bool = False
