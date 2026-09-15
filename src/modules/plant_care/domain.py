@@ -167,6 +167,9 @@ def is_in_growing_season(day: date, season_start_month: int | None, season_end_m
     # a null window is year-round care (watering); a range gates a seasonal task (fertilizing) to those months
     if season_start_month is None or season_end_month is None:
         return True
+    # a start month after the end month means the window wraps through the new year, e.g. September-April
+    if season_start_month > season_end_month:
+        return day.month >= season_start_month or day.month <= season_end_month
     return season_start_month <= day.month <= season_end_month
 
 
@@ -183,7 +186,9 @@ def seasonal_next_due(
     if season_start_month is None or season_end_month is None:
         return next_due_on
     if is_in_growing_season(today, season_start_month, season_end_month):
-        return max(next_due_on, date(today.year, season_start_month, 1))
+        # a window wrapping the new year started last year once today is past it, e.g. January inside September-April
+        season_year = today.year if today.month >= season_start_month else today.year - 1
+        return max(next_due_on, date(season_year, season_start_month, 1))
     next_season_year = today.year if today.month < season_start_month else today.year + 1
     return date(next_season_year, season_start_month, 1)
 

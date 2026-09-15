@@ -19,6 +19,19 @@ class IsInGrowingSeasonTestCase(unittest.TestCase):
     def test_is_in_growing_season_outside_the_window_is_false(self):
         self.assertFalse(is_in_growing_season(date(2027, 1, 15), 4, 9))
 
+    def test_is_in_growing_season_in_the_head_of_a_window_crossing_the_new_year_is_true(self):
+        self.assertTrue(is_in_growing_season(date(2026, 10, 20), 9, 4))
+
+    def test_is_in_growing_season_in_the_tail_of_a_window_crossing_the_new_year_is_true(self):
+        self.assertTrue(is_in_growing_season(date(2027, 1, 15), 9, 4))
+
+    def test_is_in_growing_season_on_both_boundary_months_of_a_window_crossing_the_new_year_is_true(self):
+        self.assertTrue(is_in_growing_season(date(2026, 9, 1), 9, 4))
+        self.assertTrue(is_in_growing_season(date(2027, 4, 30), 9, 4))
+
+    def test_is_in_growing_season_in_the_dormant_gap_of_a_window_crossing_the_new_year_is_false(self):
+        self.assertFalse(is_in_growing_season(date(2027, 6, 10), 9, 4))
+
 
 class SeasonalNextDueTestCase(unittest.TestCase):
     def test_seasonal_next_due_without_a_window_returns_the_stored_date(self):
@@ -35,6 +48,18 @@ class SeasonalNextDueTestCase(unittest.TestCase):
 
     def test_seasonal_next_due_before_the_season_starts_points_to_this_spring(self):
         self.assertEqual(seasonal_next_due(date(2027, 3, 20), date(2027, 2, 10), 4, 9), date(2027, 4, 1))
+
+    def test_seasonal_next_due_in_the_tail_of_a_window_crossing_the_new_year_keeps_the_stored_date(self):
+        self.assertEqual(seasonal_next_due(date(2027, 1, 20), date(2027, 1, 15), 9, 4), date(2027, 1, 20))
+
+    def test_seasonal_next_due_in_the_head_of_a_window_crossing_the_new_year_keeps_the_stored_date(self):
+        self.assertEqual(seasonal_next_due(date(2026, 10, 20), date(2026, 10, 15), 9, 4), date(2026, 10, 20))
+
+    def test_seasonal_next_due_in_the_tail_pulls_a_date_older_than_the_season_up_to_the_season_start(self):
+        self.assertEqual(seasonal_next_due(date(2026, 6, 4), date(2027, 1, 15), 9, 4), date(2026, 9, 1))
+
+    def test_seasonal_next_due_in_the_dormant_gap_of_a_window_crossing_the_new_year_points_to_september(self):
+        self.assertEqual(seasonal_next_due(date(2027, 4, 20), date(2027, 6, 10), 9, 4), date(2027, 9, 1))
 
 
 class CareScheduleDetailsSeasonTestCase(unittest.TestCase):
