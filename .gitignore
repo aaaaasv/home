@@ -39,6 +39,7 @@ scratchpad/
 # trends-api and stats-infrastructure. plain repos, not submodules: one folder
 # to open, independent histories, and neither can leak into this one
 home-docs/
+atelier/
 home-infrastructure/
 
 # local deploy target — your host, not the repo's
