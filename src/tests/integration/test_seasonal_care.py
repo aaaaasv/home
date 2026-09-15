@@ -5,8 +5,9 @@ from src.modules.plant_care.use_cases.build_care_digest import BuildCareDigestUs
 from src.tests.fakes import FrozenHouseholdCalendar
 from src.tests.integration.base import KYIV, BaseIntegrationTestCase
 
-# a fertilizing season of April–September; the plants that eat only in the warm half of the year live inside it
-FERTILIZING_SEASON = {"season_start_month": 4, "season_end_month": 9}
+# a fertilizing season of April–September, written as silence everywhere else: the plants that eat only in the
+# warm half of the year live inside it
+FERTILIZING_SEASON = {"month_interval_overrides": {"1": None, "2": None, "3": None, "10": None, "11": None, "12": None}}
 
 
 class SeasonalCareDigestTestCase(BaseIntegrationTestCase):
@@ -75,8 +76,15 @@ class SeasonalCareDigestTestCase(BaseIntegrationTestCase):
             plant_id=plant_id,
             task_type=CareTaskType.FERTILIZING,
             next_due_on=date(2027, 3, 20),
-            season_start_month=5,
-            season_end_month=9,
+            month_interval_overrides={
+                "1": None,
+                "2": None,
+                "3": None,
+                "4": None,
+                "10": None,
+                "11": None,
+                "12": None,
+            },
         )
 
         digest = await self.build_use_case_at(datetime(2027, 4, 20, 12, 0, tzinfo=timezone.utc))()

@@ -115,6 +115,8 @@ POSTPONE_INTERVAL_DIVISOR = 3
 MINIMUM_POSTPONE_DAYS = 1
 MAXIMUM_POSTPONE_DAYS = 14
 
+MONTHS_IN_YEAR = 12
+
 MINIMUM_CARE_INTERVAL_DAYS = 1
 # repotting runs on a two-to-three year cycle, so a yearly cap would exclude it
 MAXIMUM_CARE_INTERVAL_DAYS = 1095
