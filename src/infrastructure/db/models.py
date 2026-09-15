@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     Column,
@@ -67,9 +68,9 @@ class CareSchedule(Base):
     next_due_on = Column(Date, nullable=False)
     last_performed_at = Column(UtcDateTime, nullable=True)
     instructions = Column(Text, nullable=True)
-    # the growing-season window a task lives in; null on both means year-round (watering), a range gates fertilizing
-    season_start_month = Column(Integer, nullable=True)
-    season_end_month = Column(Integer, nullable=True)
+    # per-month exceptions to interval_days, keyed by month number: {"1": 25} is slower, {"5": null} is silence.
+    # null here means no exceptions at all, so the interval above holds the whole year round
+    month_interval_overrides = Column(JSON, nullable=True)
     created_at = Column(UtcDateTime, default=current_time, nullable=False)
     updated_at = Column(UtcDateTime, default=current_time, onupdate=current_time, nullable=False)
 

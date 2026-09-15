@@ -3,6 +3,7 @@ from datetime import date, datetime
 from src.common.constants import (
     MAXIMUM_POSTPONE_DAYS,
     MINIMUM_POSTPONE_DAYS,
+    MONTHS_IN_YEAR,
     POSTPONE_INTERVAL_DIVISOR,
     SKIPPABLE_TASK_TYPES,
     CareTaskType,
@@ -26,12 +27,12 @@ class CareScheduleDetails(DomainModel):
 
     @classmethod
     def from_schedule(cls, schedule: CareSchedule, today: date) -> "CareScheduleDetails":
-        next_due_on = seasonal_next_due(
-            schedule.next_due_on, today, schedule.season_start_month, schedule.season_end_month
-        )
+        next_due_on = active_next_due(schedule.next_due_on, today, schedule.month_interval_overrides)
+        month_interval = resolve_month_interval(today, schedule.interval_days, schedule.month_interval_overrides)
         return cls(
             task_type=CareTaskType(schedule.task_type),
-            interval_days=schedule.interval_days,
+            # a silent month has no interval of its own, so the card falls back to the schedule's own pace
+            interval_days=month_interval if month_interval is not None else schedule.interval_days,
             next_due_on=next_due_on,
             last_performed_at=schedule.last_performed_at,
             days_until_due=(next_due_on - today).days,
@@ -163,29 +164,69 @@ class PlantComfortChange(DomainModel):
     problems: list[ClimateProblem]
 
 
-def is_in_growing_season(day: date, season_start_month: int | None, season_end_month: int | None) -> bool:
-    # a null window is year-round care (watering); a range gates a seasonal task (fertilizing) to those months
-    if season_start_month is None or season_end_month is None:
+def resolve_month_interval(
+    day: date, interval_days: int, month_interval_overrides: dict[str, int | None] | None
+) -> int | None:
+    """
+    The interval in force on a day, or None when the task is not done at all in that month.
+
+    Json object keys are strings, so a month is looked up as one. A month with no entry falls back to the
+    schedule's own interval; a month whose entry is null is a deliberate "never in this month", which is how a
+    plant that sleeps rather than merely slows is written down.
+    """
+    if not month_interval_overrides:
+        return interval_days
+    return month_interval_overrides.get(str(day.month), interval_days)
+
+
+def is_care_done_in_month(day: date, month_interval_overrides: dict[str, int | None] | None) -> bool:
+    if not month_interval_overrides:
         return True
-    return season_start_month <= day.month <= season_end_month
+    month = str(day.month)
+    return month not in month_interval_overrides or month_interval_overrides[month] is not None
 
 
-def seasonal_next_due(
-    next_due_on: date, today: date, season_start_month: int | None, season_end_month: int | None
-) -> date:
+def find_active_stretch_start(day: date, month_interval_overrides: dict[str, int | None] | None) -> date:
     """
-    The real next date a seasonal task should be done, folding the growing-season window over the stored date.
+    The first day of the unbroken run of active months this day sits in.
 
-    off-season it is the coming season's first day, so a task that fell due last autumn waits silently for spring
-    instead of piling up months of "overdue"; in-season a stale off-season due date is pulled up to the season
-    start, so the first spring reminder reads "due today", not "overdue 180 days".
+    With no silent month anywhere the walk runs its full length and lands a year back, which is harmless: the
+    only caller compares it against a stored due date and keeps the later of the two.
     """
-    if season_start_month is None or season_end_month is None:
+    year, month = day.year, day.month
+    for _ in range(MONTHS_IN_YEAR):
+        earlier_year, earlier_month = (year - 1, MONTHS_IN_YEAR) if month == 1 else (year, month - 1)
+        if not is_care_done_in_month(date(earlier_year, earlier_month, 1), month_interval_overrides):
+            break
+        year, month = earlier_year, earlier_month
+    return date(year, month, 1)
+
+
+def find_next_active_month_start(day: date, month_interval_overrides: dict[str, int | None] | None) -> date:
+    """The first day of the next month the task is done in."""
+    year, month = day.year, day.month
+    for _ in range(MONTHS_IN_YEAR):
+        year, month = (year + 1, 1) if month == MONTHS_IN_YEAR else (year, month + 1)
+        if is_care_done_in_month(date(year, month, 1), month_interval_overrides):
+            return date(year, month, 1)
+    # every month silenced means the task is never done; the schedule is then its own answer
+    return date(day.year, day.month, 1)
+
+
+def active_next_due(next_due_on: date, today: date, month_interval_overrides: dict[str, int | None] | None) -> date:
+    """
+    The real next date a task should be done, folding months of silence over the stored date.
+
+    in a silent month it is the first day of the next month the task happens in, so a task that fell due last
+    autumn waits quietly for spring instead of piling up months of "overdue"; in an active month a due date left
+    behind in a silent stretch is pulled up to the day that stretch ended, so the first reminder after it reads
+    "due today", not "overdue 180 days".
+    """
+    if not month_interval_overrides:
         return next_due_on
-    if is_in_growing_season(today, season_start_month, season_end_month):
-        return max(next_due_on, date(today.year, season_start_month, 1))
-    next_season_year = today.year if today.month < season_start_month else today.year + 1
-    return date(next_season_year, season_start_month, 1)
+    if is_care_done_in_month(today, month_interval_overrides):
+        return max(next_due_on, find_active_stretch_start(today, month_interval_overrides))
+    return find_next_active_month_start(today, month_interval_overrides)
 
 
 def calculate_postpone_days(interval_days: int) -> int:
@@ -236,18 +277,18 @@ class CareDigest(DomainModel):
                     plant_id=plant.id,
                     plant_name=plant.name,
                     task_type=CareTaskType(schedule.task_type),
-                    interval_days=schedule.interval_days,
+                    interval_days=resolve_month_interval(
+                        today, schedule.interval_days, schedule.month_interval_overrides
+                    )
+                    or schedule.interval_days,
                     overdue_days=(
-                        today
-                        - seasonal_next_due(
-                            schedule.next_due_on, today, schedule.season_start_month, schedule.season_end_month
-                        )
+                        today - active_next_due(schedule.next_due_on, today, schedule.month_interval_overrides)
                     ).days,
                     photo_file_id=photo_file_ids.get(plant.id),
                     instructions=schedule.instructions,
                 )
                 for schedule, plant in due_schedules
-                if is_in_growing_season(today, schedule.season_start_month, schedule.season_end_month)
+                if is_care_done_in_month(today, schedule.month_interval_overrides)
             ],
         )
 
