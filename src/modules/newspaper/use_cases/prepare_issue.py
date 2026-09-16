@@ -17,8 +17,9 @@ from src.modules.newspaper.services.word_source import WordSource
 
 # half a year of issues before a word may return; at twenty words an issue that already takes most of the bank
 RECENT_ISSUES_WITHOUT_REPEATS = 26
-# more candidates than this only slows the layout down without making the grid denser
-CANDIDATE_POOL_SIZE = 180
+# ninety candidates still fill the grid, and a pool this small lets the first source's words — the fresh, harder
+# ones — make up nearly half of it instead of being crowded out by the whole bank
+CANDIDATE_POOL_SIZE = 90
 
 
 class PrepareIssueUseCase(BaseUseCase):
