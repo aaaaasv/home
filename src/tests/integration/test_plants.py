@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from src.common.constants import CareTaskType
+from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.common.exceptions import DoesNotExistError
 from src.modules.plant_care.commands import ArchivePlantCommand
 from src.modules.plant_care.use_cases.archive_plant import ArchivePlantUseCase
@@ -94,7 +94,22 @@ class RetrievePlantCardTestCase(BaseIntegrationTestCase):
         self.assertEqual(len(card.recent_events), 1)
         self.assertEqual(card.recent_events[0].performed_by_display_name, "Марта")
         self.assertEqual(card.photo_count, 2)
-        self.assertEqual(card.latest_photo.telegram_file_id, "file-new")
+        self.assertEqual(card.cover_photo.telegram_file_id, "file-new")
+
+    async def test_retrieve_plant_card_after_an_album_shows_the_general_frame_not_the_last_close_up(self):
+        plant_id = await self.seed_plant(name="Містер Біг")
+        await self.seed_plant_photo(plant_id=plant_id, telegram_file_id="file-general", taken_at=FROZEN_NOW)
+        await self.seed_plant_photo(
+            plant_id=plant_id,
+            telegram_file_id="file-trunks",
+            telegram_file_unique_id="unique-2",
+            taken_at=FROZEN_NOW + timedelta(seconds=1),
+            frame=PlantPhotoFrame.DETAIL.value,
+        )
+
+        card = await self.build_use_case()(plant_id)
+
+        self.assertEqual(card.cover_photo.telegram_file_id, "file-general")
 
     async def test_retrieve_plant_card_for_a_missing_plant_raises_does_not_exist(self):
         with self.assertRaises(DoesNotExistError) as context:

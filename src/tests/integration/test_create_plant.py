@@ -86,8 +86,8 @@ class CreatePlantTestCase(BaseIntegrationTestCase):
 
         self.assertEqual(self.photo_storage.saved_file_ids, ["file-abc"])
         self.assertEqual(card.photo_count, 1)
-        self.assertEqual(card.latest_photo.telegram_file_id, "file-abc")
-        self.assertEqual(card.latest_photo.caption, "перший день")
+        self.assertEqual(card.cover_photo.telegram_file_id, "file-abc")
+        self.assertEqual(card.cover_photo.caption, "перший день")
 
     async def test_create_plant_with_duplicate_name_raises_already_exists(self):
         await self.seed_plant(**build_plant_payload(name="Монстера"))

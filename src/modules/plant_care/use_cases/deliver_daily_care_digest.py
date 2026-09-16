@@ -42,7 +42,7 @@ class DeliverDailyCareDigestUseCase(BaseUseCase):
             if await uow.care_digest_deliveries.retrieve_last_sent_date() == today:
                 return None
             due_schedules = await uow.care_schedules.list_due_with_plants(today)
-            photo_file_ids = await uow.plant_photos.latest_file_ids([plant.id for _, plant in due_schedules])
+            photo_file_ids = await uow.plant_photos.list_cover_file_ids([plant.id for _, plant in due_schedules])
 
         digest = CareDigest.from_due_schedules(today, due_schedules, photo_file_ids)
         return digest if digest.tasks else None

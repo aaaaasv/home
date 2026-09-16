@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Виправлено
+
+- Головне фото рослини знову показує всю рослину. Після альбому «загальний план + крупні плани» картка,
+  дайджест догляду, гербарний аркуш і обкладинка в шухляді брали просто найновіший знімок, тобто останній
+  крупний план — у драцени це були стовбури. Тепер головним завжди є найновіший загальний план.
+
 ## [0.19.0] - 2026-09-15
 
 ### Змінено

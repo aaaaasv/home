@@ -8,7 +8,7 @@ import json
 from html import escape
 
 from src.common.constants import CareTaskType, PlantPhotoFrame
-from src.modules.plant_care.domain import ClimatePoint, DrawerEntry, PlantSheet
+from src.modules.plant_care.domain import ClimatePoint, DrawerEntry, PlantSheet, find_cover_photo
 from src.web.styles import GOOGLE_FONTS_URL, SCRIPT, STYLESHEET
 
 ROMAN_MONTHS = (
@@ -490,25 +490,25 @@ def render_plant_sheet(
     drawer=(),
 ) -> str:
     swatches = "".join(f'<i style="background:{colour}"></i>' for colour in CALIBRATION_SWATCHES)
-    latest = sheet.photos[-1] if sheet.photos else None
+    cover = find_cover_photo(sheet.photos)
     total = len(sheet.photos)
     specimen = (
         (
-            f'<figure class="mount"><img id="mounted" src="{photo_url(latest.id)}" alt="{escape(sheet.name)}">'
+            f'<figure class="mount"><img id="mounted" src="{photo_url(cover.id)}" alt="{escape(sheet.name)}">'
             f'<i class="strap a"></i><i class="strap b"></i><i class="strap c"></i>'
             f'<button class="loupe-btn" id="loupe" type="button" aria-pressed="false" '
             f'aria-label="Лупа">&#9906;</button>'
             f'<button class="loupe-btn expand" id="expand" type="button" '
             f'aria-label="На весь екран">&#9974;</button>'
             f'<figcaption class="mount-cap" id="mount-caption">'
-            f"{_plate_caption(latest.taken_at, total, total)}</figcaption></figure>"
+            f"{_plate_caption(cover.taken_at, sheet.photos.index(cover) + 1, total)}</figcaption></figure>"
         )
-        if latest
+        if cover
         else ""
     )
     plates = ""
     for index, photo in enumerate(sheet.photos, start=1):
-        mounted_now = ' class="is-mounted"' if index == total else ""
+        mounted_now = ' class="is-mounted"' if photo is cover else ""
         plates += (
             f'<figure data-photo="{photo_url(photo.id)}"'
             f' data-caption="{_plate_caption(photo.taken_at, index, total)}"{mounted_now}>'

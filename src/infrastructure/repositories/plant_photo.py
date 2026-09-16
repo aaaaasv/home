@@ -1,5 +1,6 @@
 from sqlalchemy import func, select
 
+from src.common.constants import PlantPhotoFrame
 from src.infrastructure.db.models import PlantPhoto
 from src.infrastructure.repositories.base import SQLAlchemyRepository
 
@@ -19,37 +20,26 @@ class PlantPhotoRepository(SQLAlchemyRepository[PlantPhoto]):
         )
         return result.scalars().first()
 
-    async def latest_file_ids(self, plant_ids: list[int]) -> dict[int, str]:
-        if not plant_ids:
-            return {}
-        latest = (
-            select(PlantPhoto.plant_id, func.max(PlantPhoto.taken_at).label("taken_at"))
-            .where(PlantPhoto.plant_id.in_(plant_ids))
-            .group_by(PlantPhoto.plant_id)
-            .subquery()
-        )
-        result = await self.session.execute(
-            select(PlantPhoto).join(
-                latest,
-                (PlantPhoto.plant_id == latest.c.plant_id) & (PlantPhoto.taken_at == latest.c.taken_at),
-            )
-        )
-        return {photo.plant_id: photo.telegram_file_id for photo in result.scalars()}
+    async def list_cover_file_ids(self, plant_ids: list[int]) -> dict[int, str]:
+        return {photo.plant_id: photo.telegram_file_id for photo in await self._list_covers(plant_ids)}
 
-    async def latest_ids(self, plant_ids: list[int]) -> dict[int, int]:
-        """The newest photo's own id per plant — what the drawer needs to show a cover."""
+    async def list_cover_photo_ids(self, plant_ids: list[int]) -> dict[int, int]:
+        return {photo.plant_id: photo.id for photo in await self._list_covers(plant_ids)}
+
+    async def _list_covers(self, plant_ids: list[int]) -> list[PlantPhoto]:
+        """Each plant's newest general frame — a close-up saved after it in the same album is not the plant."""
         if not plant_ids:
-            return {}
-        latest = (
+            return []
+        is_overview = PlantPhoto.frame == PlantPhotoFrame.OVERVIEW.value
+        newest = (
             select(PlantPhoto.plant_id, func.max(PlantPhoto.taken_at).label("taken_at"))
-            .where(PlantPhoto.plant_id.in_(plant_ids))
+            .where(PlantPhoto.plant_id.in_(plant_ids), is_overview)
             .group_by(PlantPhoto.plant_id)
             .subquery()
         )
         result = await self.session.execute(
-            select(PlantPhoto.plant_id, PlantPhoto.id).join(
-                latest,
-                (PlantPhoto.plant_id == latest.c.plant_id) & (PlantPhoto.taken_at == latest.c.taken_at),
-            )
+            select(PlantPhoto)
+            .join(newest, (PlantPhoto.plant_id == newest.c.plant_id) & (PlantPhoto.taken_at == newest.c.taken_at))
+            .where(is_overview)
         )
-        return {plant_id: photo_id for plant_id, photo_id in result.all()}
+        return list(result.scalars().all())
