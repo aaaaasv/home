@@ -64,7 +64,7 @@ class RenderPlantCardTestCase(unittest.TestCase):
             created_at=MOMENT,
             schedules=[],
             recent_events=events,
-            latest_photo=None,
+            cover_photo=None,
             photo_count=0,
         )
 

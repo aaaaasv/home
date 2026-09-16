@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from src.common.constants import CareTaskType
+from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.modules.plant_care.use_cases.retrieve_drawer import RetrieveDrawerUseCase
 from src.tests.integration.base import FROZEN_NOW, BaseIntegrationTestCase
 from src.web.rendering import find_neighbours, render_drawer
@@ -47,6 +47,17 @@ class DrawerTestCase(BaseIntegrationTestCase):
         entries = await self.drawer()
 
         self.assertEqual([entry.cover_photo_id for entry in entries], [newest_photo_id])
+
+    async def test_drawer_entry_after_an_album_covers_with_the_general_frame_not_the_last_close_up(self):
+        plant_id = await self.seed_plant_due_in("Містер Біг", 1, slug="mister-bih")
+        general_photo_id = await self.seed_plant_photo(plant_id, taken_at=FROZEN_NOW - timedelta(seconds=2))
+        await self.seed_plant_photo(
+            plant_id, taken_at=FROZEN_NOW - timedelta(seconds=1), frame=PlantPhotoFrame.DETAIL.value
+        )
+
+        entries = await self.drawer()
+
+        self.assertEqual([entry.cover_photo_id for entry in entries], [general_photo_id])
 
     async def test_render_drawer_gives_every_plant_a_folder_that_links_to_its_sheet(self):
         await self.seed_plant_due_in("Тігл", 3, slug="tihl")

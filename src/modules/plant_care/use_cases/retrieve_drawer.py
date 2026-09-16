@@ -32,7 +32,7 @@ class RetrieveDrawerUseCase(BaseUseCase):
             plants = await uow.plants.list_all()
             plant_ids = [plant.id for plant in plants]
             schedules = await uow.care_schedules.list_by_plant_ids(plant_ids)
-            cover_photo_ids = await uow.plant_photos.latest_ids(plant_ids)
+            cover_photo_ids = await uow.plant_photos.list_cover_photo_ids(plant_ids)
 
         watering = {s.plant_id: s for s in schedules if CareTaskType(s.task_type) is CareTaskType.WATERING}
         return [

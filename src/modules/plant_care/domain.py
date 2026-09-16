@@ -84,6 +84,15 @@ class PlantPhotoDetails(DomainModel):
         )
 
 
+def find_cover_photo(photos: list[PlantPhotoDetails]) -> PlantPhotoDetails | None:
+    """
+    The newest general frame, which stands for the plant on its card and its sheet.
+
+    an album saves its close-ups after the general frame, so the newest photo of all is a single leaf.
+    """
+    return next((photo for photo in reversed(photos) if photo.frame == PlantPhotoFrame.OVERVIEW), None)
+
+
 class PlantSummary(DomainModel):
     id: int
     name: str
@@ -110,7 +119,7 @@ class PlantCard(DomainModel):
     created_at: datetime
     schedules: list[CareScheduleDetails]
     recent_events: list[CareEventDetails]
-    latest_photo: PlantPhotoDetails | None
+    cover_photo: PlantPhotoDetails | None
     photo_count: int
 
     @classmethod
@@ -135,7 +144,7 @@ class PlantCard(DomainModel):
             created_at=plant.created_at,
             schedules=[CareScheduleDetails.from_schedule(schedule, today) for schedule in schedules],
             recent_events=[CareEventDetails.from_event(event) for event in recent_events],
-            latest_photo=PlantPhotoDetails.from_photo(photos[-1]) if photos else None,
+            cover_photo=find_cover_photo([PlantPhotoDetails.from_photo(photo) for photo in photos]),
             photo_count=len(photos),
         )
 

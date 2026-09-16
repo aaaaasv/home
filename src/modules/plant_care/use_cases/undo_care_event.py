@@ -43,7 +43,7 @@ class UndoCareEventUseCase(BaseUseCase):
                 },
             )
 
-            photo_file_ids = await uow.plant_photos.latest_file_ids([plant.id])
+            photo_file_ids = await uow.plant_photos.list_cover_file_ids([plant.id])
 
         return DueCareTask(
             plant_id=plant.id,

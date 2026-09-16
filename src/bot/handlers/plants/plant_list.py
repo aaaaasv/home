@@ -30,15 +30,15 @@ router = Router(name="plants")
 async def send_plant_card(message: Message, card: PlantCard, household_calendar: HouseholdCalendar) -> None:
     text = render_plant_card(card, household_calendar)
     keyboard = build_plant_card_keyboard(card)
-    if card.latest_photo is None:
+    if card.cover_photo is None:
         await message.answer(text, reply_markup=keyboard)
         return
     # a grown card no longer fits a caption, so the photo goes bare and the text keeps the buttons
     if exceeds_caption_limit(text):
-        await message.answer_photo(card.latest_photo.telegram_file_id)
+        await message.answer_photo(card.cover_photo.telegram_file_id)
         await message.answer(text, reply_markup=keyboard)
         return
-    await message.answer_photo(card.latest_photo.telegram_file_id, caption=text, reply_markup=keyboard)
+    await message.answer_photo(card.cover_photo.telegram_file_id, caption=text, reply_markup=keyboard)
 
 
 @router.message(Command("list"))
