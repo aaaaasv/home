@@ -14,6 +14,8 @@ from src.bot.dependencies import (
     build_local_air_quality,
     build_media_server_battery,
     build_media_server_disks,
+    build_newspaper_print_queue,
+    build_newspaper_word_sources,
     build_pi_health_sensor,
     build_pi_ups,
     build_presence_source,
@@ -296,6 +298,8 @@ async def run() -> None:
             conservation_board=conservation_board,
             reserve_board=reserve_board,
             shape_catalog=shape_catalog,
+            newspaper_print_queue=build_newspaper_print_queue(settings),
+            newspaper_word_sources=build_newspaper_word_sources(settings),
         )
     )
 
