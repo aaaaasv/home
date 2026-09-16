@@ -196,3 +196,38 @@ class FixedKnowledgeSource:
 
     async def gather(self) -> str:
         return self.facts
+
+
+class ScriptedWordSource:
+    """Offers the same clues every time, and records which answers it was asked to leave out"""
+
+    def __init__(self, clues):
+        self.clues = list(clues)
+        self.excluded_requests: list[set[str]] = []
+
+    async def fetch_clues(self, excluded_answers: set[str]):
+        self.excluded_requests.append(set(excluded_answers))
+        return [clue for clue in self.clues if clue.answer not in excluded_answers]
+
+
+class RecordingPrintQueue:
+    """Takes documents instead of a printer and reports whatever outcome the test scripted"""
+
+    def __init__(self, printed: bool = True):
+        self.printed = printed
+        self.jobs: list[tuple[str, bytes]] = []
+
+    async def print_document(self, document: bytes, job_name: str) -> bool:
+        self.jobs.append((job_name, document))
+        return self.printed
+
+
+class FixedOutageScheduleProvider:
+    def __init__(self, schedule):
+        self.schedule = schedule
+
+    async def fetch(self):
+        return None
+
+    async def fetch_today(self):
+        return self.schedule

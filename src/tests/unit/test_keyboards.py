@@ -80,7 +80,7 @@ def build_card() -> PlantCard:
         created_at=MOMENT,
         schedules=[build_schedule(task_type) for task_type in CareTaskType],
         recent_events=[],
-        latest_photo=None,
+        cover_photo=None,
         photo_count=3,
     )
 

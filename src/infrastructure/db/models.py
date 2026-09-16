@@ -326,3 +326,16 @@ class ConservationRecord(Base):
     saw_low_since_cycle = Column(Boolean, nullable=False, default=False, server_default="0")
     last_advised_level = Column(String(8), nullable=True)
     updated_at = Column(UtcDateTime, default=current_time, onupdate=current_time, nullable=False)
+
+
+class NewspaperIssue(Base):
+    """One week's printed paper — kept so a retry prints the same crossword and next week's avoids its words"""
+
+    __tablename__ = "newspaper_issues"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    number = Column(Integer, nullable=False, unique=True)
+    week_starts_on = Column(Date, nullable=False, unique=True)
+    crossword = Column(JSON, nullable=False)
+    printed_at = Column(UtcDateTime, nullable=True)
+    created_at = Column(UtcDateTime, default=current_time, nullable=False)

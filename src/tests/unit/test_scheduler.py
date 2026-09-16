@@ -9,16 +9,19 @@ from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.room_climate.services.room_climate_sensor import NullRoomClimateSensor
 from src.modules.weather.services.weather_provider import NullWeatherProvider
-from src.tests.fakes import ScriptedPriceSource
+from src.tests.fakes import RecordingPrintQueue, ScriptedPriceSource
 from src.tests.integration.base import KYIV
 
 
 class SchedulerJobsAreAwaitableTestCase(unittest.TestCase):
-    def build_scheduler(self, climate_enabled: bool = False, weather_enabled: bool = False):
+    def build_scheduler(
+        self, climate_enabled: bool = False, weather_enabled: bool = False, newspaper_enabled: bool = False
+    ):
         settings = Settings(
             TELEGRAM_BOT_TOKEN="123:abc",
             CLIMATE_SENSOR_ENABLED=climate_enabled,
             WEATHER_DIGEST_ENABLED=weather_enabled,
+            NEWSPAPER_ENABLED=newspaper_enabled,
         )
         weather_digest_board = None
         if weather_enabled:
@@ -42,6 +45,7 @@ class SchedulerJobsAreAwaitableTestCase(unittest.TestCase):
                 price_source=ScriptedPriceSource({}),
                 weather_topic=object() if weather_enabled else None,
                 weather_digest_board=weather_digest_board,
+                newspaper_print_queue=RecordingPrintQueue() if newspaper_enabled else None,
             )
         )
 
@@ -69,3 +73,10 @@ class SchedulerJobsAreAwaitableTestCase(unittest.TestCase):
         self.assertEqual(
             job_ids, ["chore_deadlines", "daily_care_digest", "price_watch", "weather_digest", "weather_refresh"]
         )
+
+    def test_the_weekly_newspaper_job_is_scheduled_only_when_enabled_with_a_print_queue(self):
+        scheduler = self.build_scheduler(newspaper_enabled=True)
+
+        job_ids = sorted(job.id for job in scheduler.get_jobs())
+
+        self.assertEqual(job_ids, ["chore_deadlines", "daily_care_digest", "price_watch", "weekly_newspaper"])

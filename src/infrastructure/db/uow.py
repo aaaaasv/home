@@ -11,6 +11,7 @@ from src.infrastructure.repositories.chore import ChoreRepository
 from src.infrastructure.repositories.conservation import ConservationRepository
 from src.infrastructure.repositories.family_member import FamilyMemberRepository
 from src.infrastructure.repositories.forum_topic import ForumTopicRepository
+from src.infrastructure.repositories.newspaper_issue import NewspaperIssueRepository
 from src.infrastructure.repositories.place import PlaceRepository
 from src.infrastructure.repositories.plant import PlantRepository
 from src.infrastructure.repositories.plant_climate_alert import PlantClimateAlertRepository
@@ -47,6 +48,7 @@ class UnitOfWork:
         self.care_digest_deliveries: CareDigestDeliveryRepository | None = None
         self.posted_messages: PostedMessageRepository | None = None
         self.conservation: ConservationRepository | None = None
+        self.newspaper_issues: NewspaperIssueRepository | None = None
 
     async def __aenter__(self):
         self.session = self.session_factory()
@@ -68,6 +70,7 @@ class UnitOfWork:
         self.care_digest_deliveries = CareDigestDeliveryRepository(session=self.session)
         self.posted_messages = PostedMessageRepository(session=self.session)
         self.conservation = ConservationRepository(session=self.session)
+        self.newspaper_issues = NewspaperIssueRepository(session=self.session)
         return self
 
     async def __aexit__(self, exception_type, exception_value, exception_traceback):

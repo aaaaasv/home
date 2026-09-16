@@ -169,6 +169,23 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         self.assertIn('знімок 2 із 2" class="is-mounted"', page)
         self.assertIn('id="mounted"', page)
 
+    async def test_render_after_an_album_mounts_the_general_frame_not_the_last_close_up(self):
+        await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=9))
+        general_photo_id = await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(seconds=2))
+        await self.seed_plant_photo(
+            self.plant_id, taken_at=FROZEN_NOW - timedelta(seconds=1), frame=PlantPhotoFrame.DETAIL.value
+        )
+
+        page = render_plant_sheet(await self.sheet(), lambda photo_id: f"/photo/{photo_id}", "Домовик")
+
+        self.assertIn(f'<img id="mounted" src="/photo/{general_photo_id}"', page)
+        self.assertIn('id="mount-caption">12.vii.2026 · знімок 2 із 3</figcaption>', page)
+        self.assertIn(
+            f'data-photo="/photo/{general_photo_id}" data-caption="12.vii.2026 · знімок 2 із 3" class="is-mounted"',
+            page,
+        )
+        self.assertEqual(page.count('class="is-mounted"'), 1)
+
     async def test_render_compares_first_and_latest_plate_once_there_are_two(self):
         await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=9))
         await self.seed_plant_photo(self.plant_id, taken_at=FROZEN_NOW - timedelta(days=1))

@@ -5,6 +5,7 @@ from typing import Any
 from aiogram import Bot
 
 from src.bot.handlers.chores.board import ChoresBoard
+from src.bot.handlers.newspaper.gemini_word_source import GeminiWordSource
 from src.bot.handlers.places.board import PlacesBoard
 from src.bot.handlers.plants.claude_photo_analyst import ClaudePhotoAnalyst
 from src.bot.handlers.plants.gemini_photo_analyst import GeminiPhotoAnalyst
@@ -28,6 +29,7 @@ from src.infrastructure.adapters.gtfs_static_shape_catalog import GtfsStaticShap
 from src.infrastructure.adapters.hotline_price_source import HotlinePriceSource
 from src.infrastructure.adapters.http_media_server_battery import HttpMediaServerBattery
 from src.infrastructure.adapters.http_media_server_disks import HttpMediaServerDisks
+from src.infrastructure.adapters.ipp_print_queue import IppPrintQueue
 from src.infrastructure.adapters.open_meteo_weather_provider import OpenMeteoWeatherProvider
 from src.infrastructure.adapters.router_presence_source import RouterPresenceSource
 from src.infrastructure.adapters.sensor_community_air_quality import SensorCommunityAirQuality
@@ -42,6 +44,8 @@ from src.modules.assistant.services.conversation_memory import ConversationMemor
 from src.modules.assistant.services.knowledge_source import FileKnowledgeSource
 from src.modules.assistant.services.language_model import LanguageModel
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
+from src.modules.newspaper.services.print_queue import PrintQueue
+from src.modules.newspaper.services.word_source import WordBank, WordSource
 from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 from src.modules.plant_care.services.photo_storage import NullPhotoStorage, PhotoStorage
 from src.modules.plant_care.services.plant_identifier import PlantIdentifier
@@ -214,6 +218,19 @@ def build_photo_analyst(settings: Settings) -> PhotoAnalyst | None:
     if settings.ANTHROPIC_API_KEY:
         return ClaudePhotoAnalyst(api_key=settings.ANTHROPIC_API_KEY, model=settings.PLANT_PHOTO_REVIEW_MODEL)
     return None
+
+
+def build_newspaper_print_queue(settings: Settings) -> PrintQueue | None:
+    if not settings.NEWSPAPER_ENABLED or not settings.NEWSPAPER_PRINT_QUEUE_URI:
+        return None
+    return IppPrintQueue(queue_uri=settings.NEWSPAPER_PRINT_QUEUE_URI, requesting_user_name=settings.BOT_DISPLAY_NAME)
+
+
+def build_newspaper_word_sources(settings: Settings) -> tuple[WordSource, ...]:
+    """Fresh words first when there is a key to ask for them, and the checked bank behind them either way."""
+    if settings.GEMINI_API_KEY:
+        return GeminiWordSource(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL), WordBank()
+    return (WordBank(),)
 
 
 def build_plant_identifier(settings: Settings) -> PlantIdentifier | None:

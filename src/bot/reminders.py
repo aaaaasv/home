@@ -3,6 +3,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from src.bot.handlers.air_conditioner import jobs as air_conditioner_jobs
 from src.bot.handlers.chores import jobs as chores_jobs
+from src.bot.handlers.newspaper import jobs as newspaper_jobs
 from src.bot.handlers.plants import jobs as plants_jobs
 from src.bot.handlers.power import jobs as power_jobs
 from src.bot.handlers.presence import jobs as presence_jobs
@@ -24,6 +25,7 @@ JOB_REGISTRARS: tuple[JobRegistrar, ...] = (
     presence_jobs.register_jobs,
     shopping_jobs.register_jobs,
     chores_jobs.register_jobs,
+    newspaper_jobs.register_jobs,
 )
 
 

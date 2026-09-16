@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 
-from src.common.constants import CareTaskType
+from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.modules.plant_care.use_cases.build_care_digest import BuildCareDigestUseCase
 from src.tests.integration.base import BaseIntegrationTestCase
 
@@ -92,6 +92,27 @@ class BuildCareDigestTestCase(BaseIntegrationTestCase):
         digest = await self.build_use_case()()
 
         self.assertEqual(digest.tasks[0].photo_file_id, "latest")
+
+    async def test_build_care_digest_carries_the_general_frame_not_a_close_up_taken_after_it(self):
+        plant_id = await self.seed_plant(name="Містер Біг")
+        await self.seed_care_schedule(plant_id=plant_id, task_type=CareTaskType.WATERING, next_due_on=self.today)
+        await self.seed_plant_photo(
+            plant_id=plant_id,
+            telegram_file_id="general",
+            telegram_file_unique_id="unique-general",
+            taken_at=datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc),
+        )
+        await self.seed_plant_photo(
+            plant_id=plant_id,
+            telegram_file_id="close-up",
+            telegram_file_unique_id="unique-close-up",
+            taken_at=datetime(2026, 7, 10, 10, 0, 1, tzinfo=timezone.utc),
+            frame=PlantPhotoFrame.DETAIL.value,
+        )
+
+        digest = await self.build_use_case()()
+
+        self.assertEqual(digest.tasks[0].photo_file_id, "general")
 
     async def test_build_care_digest_leaves_the_photo_absent_when_the_plant_has_none(self):
         plant_id = await self.seed_plant(name="Фікус")
