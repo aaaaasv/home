@@ -222,6 +222,16 @@ class Settings(BaseSettings):
     # a planned outage gets one heads-up this many minutes before it starts — a bare fact, no advice
     YASNO_PRE_OUTAGE_LEAD_MINUTES: int = 30
 
+    # the weekly paper: a half-page crossword the lan printer prints on its own. the printing is the point as much
+    # as the puzzle — an inkjet that fires no ink for a week starts to clog. the queue is the cups container that
+    # carries epson's driver; gemini words are used when GEMINI_API_KEY is set, the bundled word bank otherwise
+    NEWSPAPER_ENABLED: bool = False
+    NEWSPAPER_PRINT_QUEUE_URI: str = ""
+    NEWSPAPER_TITLE: str = ""
+    # mon … sun; retries run every half hour for 32 hours after this, so a printer off at lunch still gets its page
+    NEWSPAPER_PRINT_WEEKDAY: str = "sat"
+    NEWSPAPER_PRINT_TIME: str = "13:00"
+
     # transit: on-demand arrival card for the family stop — the endpoints are raw-ip gov hosts that may move
     TRANSIT_ENABLED: bool = False
     TELEGRAM_TRANSIT_TOPIC_ID: int = 0
@@ -351,6 +361,10 @@ class Settings(BaseSettings):
     @property
     def yasno_digest_time(self) -> time:
         return time.fromisoformat(self.YASNO_DIGEST_TIME)
+
+    @property
+    def newspaper_print_time(self) -> time:
+        return time.fromisoformat(self.NEWSPAPER_PRINT_TIME)
 
     @property
     def hotline_trusted_firm_ids(self) -> frozenset[int]:

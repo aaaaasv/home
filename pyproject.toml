@@ -30,6 +30,8 @@ dependencies = [
     "ecdsa>=0.19.0",
     # gtfs-realtime protobuf schema for the kyiv transit vehicle-position feed
     "gtfs-realtime-bindings>=1.0",
+    # the weekly paper is laid out as a pdf; pure python, so nothing to compile on the pi
+    "fpdf2>=2.8",
 ]
 
 [project.optional-dependencies]

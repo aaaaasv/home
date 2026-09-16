@@ -16,6 +16,8 @@ from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
+from src.modules.newspaper.services.print_queue import PrintQueue
+from src.modules.newspaper.services.word_source import WordSource
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.power.services.pi_ups import PiUps
@@ -60,6 +62,8 @@ class SchedulerContext:
     conservation_board: ConservationBoard | None = None
     reserve_board: ReserveBoard | None = None
     shape_catalog: RouteShapeCatalog | None = None
+    newspaper_print_queue: PrintQueue | None = None
+    newspaper_word_sources: tuple[WordSource, ...] = ()
 
     def build_posted_message_tracker(self) -> PostedMessageTracker:
         return PostedMessageTracker(bot=self.bot, uow_factory=self.uow_factory)
