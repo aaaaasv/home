@@ -1,18 +1,16 @@
-import asyncio
 import json
 import logging
 from typing import Any
 
-import aiohttp
 from pydantic import ValidationError
 
 from src.bot.handlers.plants.photo_review_prompt import SYSTEM_PROMPT, describe_plant, format_day
+from src.infrastructure.adapters.gemini_client import GeminiQuotaRefused, generate_content
 from src.infrastructure.adapters.image_encoding import read_image_base64
 from src.modules.plant_care.domain import PlantPhotoReview, PlantPhotoReviewContext
 
 logger = logging.getLogger(__name__)
 
-GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 REQUEST_TIMEOUT_SECONDS = 60
 
 # gemini honours responseMimeType=application/json, but not a fixed shape — so the keys are spelled out here and
@@ -37,28 +35,23 @@ class GeminiPhotoAnalyst:
             logger.exception("Could not read the stored photos of '%s'", context.plant_name)
             return None
 
-        url = GENERATE_CONTENT_URL.format(model=self.model)
-        headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
         body = {
             "contents": [{"parts": parts}],
             "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
         }
         try:
-            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(url, headers=headers, json=body) as response:
-                    response.raise_for_status()
-                    payload = await response.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-            # never logger.exception here: the aiohttp error repr carries the request headers, incl. the api key
-            logger.warning(
-                "Photo review failed for '%s': %s (HTTP %s)",
-                context.plant_name,
-                type(error).__name__,
-                getattr(error, "status", "?"),
+            payload = await generate_content(
+                api_key=self.api_key,
+                model=self.model,
+                body=body,
+                purpose=f"Photo review for '{context.plant_name}'",
+                timeout_seconds=REQUEST_TIMEOUT_SECONDS,
             )
+        except GeminiQuotaRefused:
+            logger.warning("Photo review for '%s' refused: the gemini quota is spent", context.plant_name)
             return None
-
+        if payload is None:
+            return None
         return parse_review(payload, context.plant_name)
 
 

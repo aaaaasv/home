@@ -54,13 +54,28 @@ class PlantPhotoAlbumTestCase(BaseBehaviourTestCase):
             saved = await uow.plant_photos.list_by_plant_id(self.plant_id)
 
         self.assertEqual(
-            [photo.frame for photo in saved],
-            [
-                PlantPhotoFrame.OVERVIEW.value,
-                PlantPhotoFrame.DETAIL.value,
-                PlantPhotoFrame.DETAIL.value,
-                PlantPhotoFrame.DETAIL.value,
-            ],
+            {photo.telegram_file_unique_id: photo.frame for photo in saved},
+            {
+                "first": PlantPhotoFrame.OVERVIEW.value,
+                "second": PlantPhotoFrame.DETAIL.value,
+                "third": PlantPhotoFrame.DETAIL.value,
+                "fourth": PlantPhotoFrame.DETAIL.value,
+            },
+        )
+
+    async def test_add_photo_with_an_album_whose_first_frame_is_handled_last_still_marks_it_the_overview(self):
+        # the order production once saw: the album's first message reached the lock after the second one
+        with patch.object(photos, "ALBUM_SETTLE_SECONDS", 0.05):
+            await self.feed(photo_update("second", update_id=11))
+            await self.feed(photo_update("first", update_id=10))
+            await photos._open_sessions[(CHAT_ID, ACTOR_ID)].closing
+
+        async with self.uow as uow:
+            saved = await uow.plant_photos.list_by_plant_id(self.plant_id)
+
+        self.assertEqual(
+            {photo.telegram_file_unique_id: photo.frame for photo in saved},
+            {"first": PlantPhotoFrame.OVERVIEW.value, "second": PlantPhotoFrame.DETAIL.value},
         )
 
     async def test_add_photo_with_an_album_reports_the_number_of_frames_it_saved(self):

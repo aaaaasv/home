@@ -101,6 +101,8 @@ class AddPlantPhotoCommand(BaseModel):
     photo: TelegramPhoto
     taken_at: datetime
     frame: PlantPhotoFrame = PlantPhotoFrame.OVERVIEW
+    # an album frame that turns out to come before the one already saved as the overview takes its place
+    supersedes_overview_photo_id: int | None = None
 
 
 class ArchivePlantCommand(BaseModel):

@@ -1,4 +1,4 @@
-from src.common.constants import CareTaskType
+from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.common.domain import Actor
 from src.common.exceptions import DoesNotExistError
 from src.common.household_calendar import HouseholdCalendar
@@ -37,6 +37,10 @@ class AddPlantPhotoUseCase(BaseActorUseCase):
                     "taken_at": command.taken_at,
                 }
             )
+            if command.supersedes_overview_photo_id is not None:
+                await uow.plant_photos.update(
+                    command.supersedes_overview_photo_id, {"frame": PlantPhotoFrame.DETAIL.value}
+                )
             await self._reschedule_next_photo(command)
             return PlantPhotoDetails.from_photo(photo)
 
