@@ -1,19 +1,19 @@
-import asyncio
 import base64
 import json
 import logging
 from typing import Any
 
-import aiohttp
 from pydantic import ValidationError
 
 from src.bot.handlers.plants.plant_identification_prompt import SYSTEM_PROMPT
+from src.infrastructure.adapters.gemini_client import GeminiQuotaRefused, generate_content
 from src.modules.plant_care.domain import PlantIdentification
 
 logger = logging.getLogger(__name__)
 
-GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 REQUEST_TIMEOUT_SECONDS = 60
+# a person is waiting on the answer in the add-plant flow, so the retries are quick
+RETRY_DELAYS_SECONDS = (2, 6)
 
 
 class GeminiPlantIdentifier:
@@ -29,8 +29,6 @@ class GeminiPlantIdentifier:
         self.model = model
 
     async def identify(self, photo: bytes) -> PlantIdentification | None:
-        url = GENERATE_CONTENT_URL.format(model=self.model)
-        headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
         body = {
             "contents": [
                 {
@@ -44,18 +42,19 @@ class GeminiPlantIdentifier:
             "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json"},
         }
         try:
-            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(url, headers=headers, json=body) as response:
-                    response.raise_for_status()
-                    payload = await response.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-            # never logger.exception here: the aiohttp error repr carries the request headers, incl. the api key
-            logger.warning(
-                "Plant identification failed: %s (HTTP %s)", type(error).__name__, getattr(error, "status", "?")
+            payload = await generate_content(
+                api_key=self.api_key,
+                model=self.model,
+                body=body,
+                purpose="Plant identification",
+                timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+                retry_delays_seconds=RETRY_DELAYS_SECONDS,
             )
+        except GeminiQuotaRefused:
+            logger.warning("Plant identification refused: the gemini quota is spent")
             return None
-
+        if payload is None:
+            return None
         return parse_identification(payload)
 
 

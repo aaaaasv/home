@@ -1,18 +1,16 @@
-import asyncio
 import base64
 import logging
 from collections.abc import Sequence
 from typing import Any
 
-import aiohttp
-
+from src.infrastructure.adapters.gemini_client import GeminiQuotaRefused, generate_content
 from src.modules.assistant.services.language_model import ConversationTurn, QuotaExhausted
 
 logger = logging.getLogger(__name__)
 
-GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 REQUEST_TIMEOUT_SECONDS = 30
-TOO_MANY_REQUESTS = 429
+# someone asked in the chat and is watching for the answer, so the retries are quick
+RETRY_DELAYS_SECONDS = (2, 6)
 
 
 class GeminiLanguageModel:
@@ -29,20 +27,19 @@ class GeminiLanguageModel:
         self.temperature = temperature
 
     async def generate(self, conversation: Sequence[ConversationTurn], system_instruction: str) -> str | None:
-        url = GENERATE_CONTENT_URL.format(model=self.model)
-        headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
         body = build_request_body(conversation, system_instruction, self.temperature)
         try:
-            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(url, headers=headers, json=body) as response:
-                    if response.status == TOO_MANY_REQUESTS:
-                        raise QuotaExhausted(is_daily=names_the_daily_quota(await response.text()))
-                    response.raise_for_status()
-                    payload = await response.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-            # log the status only, never the error object — its repr carries the request headers, incl. the api key
-            logger.warning("Gemini request failed: %s (HTTP %s)", type(error).__name__, getattr(error, "status", "?"))
+            payload = await generate_content(
+                api_key=self.api_key,
+                model=self.model,
+                body=body,
+                purpose="Assistant answer",
+                timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+                retry_delays_seconds=RETRY_DELAYS_SECONDS,
+            )
+        except GeminiQuotaRefused as refusal:
+            raise QuotaExhausted(is_daily=names_the_daily_quota(refusal.body)) from None
+        if payload is None:
             return None
         return extract_answer_text(payload)
 

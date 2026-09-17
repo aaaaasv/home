@@ -47,6 +47,8 @@ class PhotoSession:
         self.lock = asyncio.Lock()
         self.frames_arriving = 0
         self.closing: asyncio.Task | None = None
+        # the message id and saved photo id of the frame currently marked as the overview
+        self.overview: tuple[int, int] | None = None
 
 
 # one open photo session per person per chat, kept here because neither a lock nor a task can live in fsm data
@@ -92,9 +94,13 @@ async def add_photo(
     Saves one frame of a photo session, which may be a whole album.
 
     the care instruction asks for a general frame and then close-ups of the leaves, in that order, so the first
-    frame of a session is the one growth is measured against and the rest are evidence. the state is deliberately
-    not cleared here: telegram delivers an album as separate messages, and clearing on the first would drop the
-    rest of it in silence.
+    frame of an album is the one growth is measured against and the rest are evidence. first means first in the
+    album, not first saved: the frames arrive as separate updates handled at once, and whichever reaches the lock
+    first is often not the one the person put first — a close-up once became the overview that way. the message
+    id carries the album's own order, so a frame older than the current overview takes the overview over.
+
+    the state is deliberately not cleared here: telegram delivers an album as separate messages, and clearing on
+    the first would drop the rest of it in silence.
     """
     key = (message.chat.id, message.from_user.id)
     session = _open_sessions.setdefault(key, PhotoSession())
@@ -108,10 +114,11 @@ async def add_photo(
             frames_saved = collected_data.get("frames_saved", 0)
 
             largest_photo = message.photo[-1]
+            is_earliest_frame = session.overview is None or message.message_id < session.overview[0]
             use_case = AddPlantPhotoUseCase(
                 uow=uow_factory(), actor=actor, photo_storage=photo_storage, household_calendar=household_calendar
             )
-            await use_case(
+            saved = await use_case(
                 AddPlantPhotoCommand(
                     plant_id=collected_data["plant_id"],
                     photo=TelegramPhoto(
@@ -120,9 +127,14 @@ async def add_photo(
                         caption=message.caption,
                     ),
                     taken_at=household_calendar.now(),
-                    frame=PlantPhotoFrame.OVERVIEW if frames_saved == 0 else PlantPhotoFrame.DETAIL,
+                    frame=PlantPhotoFrame.OVERVIEW if is_earliest_frame else PlantPhotoFrame.DETAIL,
+                    supersedes_overview_photo_id=session.overview[1]
+                    if is_earliest_frame and session.overview
+                    else None,
                 )
             )
+            if is_earliest_frame:
+                session.overview = (message.message_id, saved.id)
             await state.update_data(frames_saved=frames_saved + 1)
     finally:
         session.frames_arriving -= 1
