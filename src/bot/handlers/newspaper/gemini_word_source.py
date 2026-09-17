@@ -1,17 +1,17 @@
-import asyncio
 import json
 import logging
 from typing import Any
 
-import aiohttp
 from pydantic import TypeAdapter, ValidationError
 
+from src.infrastructure.adapters.gemini_client import GeminiQuotaRefused, generate_content
 from src.modules.newspaper.domain import CrosswordClue, normalize_answer
 
 logger = logging.getLogger(__name__)
 
-GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 REQUEST_TIMEOUT_SECONDS = 90
+# nobody is waiting on the paper, and the bank covers a miss, so the waits are long
+RETRY_DELAYS_SECONDS = (15, 60)
 REQUESTED_WORDS = 40
 # the prompt names recent answers so they are not offered again; past this many the request only grows
 EXCLUDED_WORDS_IN_PROMPT = 300
@@ -57,24 +57,24 @@ class GeminiWordSource:
         self.model = model
 
     async def fetch_clues(self, excluded_answers: set[str]) -> list[CrosswordClue]:
-        url = GENERATE_CONTENT_URL.format(model=self.model)
-        headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
         excluded = ", ".join(sorted(excluded_answers)[:EXCLUDED_WORDS_IN_PROMPT]) or "—"
         body = {
             "contents": [{"parts": [{"text": PROMPT.format(count=REQUESTED_WORDS, excluded=excluded)}]}],
             "generationConfig": {"temperature": 0.9, "responseMimeType": "application/json"},
         }
         try:
-            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(url, headers=headers, json=body) as response:
-                    response.raise_for_status()
-                    payload = await response.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-            # never logger.exception here: the aiohttp error repr carries the request headers, incl. the api key
-            logger.warning(
-                "Crossword words from Gemini failed: %s (HTTP %s)", type(error).__name__, getattr(error, "status", "?")
+            payload = await generate_content(
+                api_key=self.api_key,
+                model=self.model,
+                body=body,
+                purpose="Crossword words",
+                timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+                retry_delays_seconds=RETRY_DELAYS_SECONDS,
             )
+        except GeminiQuotaRefused:
+            logger.warning("Crossword words refused: the gemini quota is spent, the bank covers this week")
+            return []
+        if payload is None:
             return []
         return parse_clues(payload)
 
