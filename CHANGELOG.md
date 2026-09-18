@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-09-18
+
+### Додано
+
+- **Топік «Запитати» тепер знає, що вдома.** Раніше він читав лише файл фактів про дім, тому на «коли
+  поливали Бубика» відповідав, що не знає, хоча в базі це записано. Тепер до кожного питання додаються
+  рослини з їхнім справжнім доглядом, незроблені справи та список покупок — те саме, що бачить кожен свій
+  топік.
+
 ## [0.20.3] - 2026-09-17
 
 ### Виправлено
