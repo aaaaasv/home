@@ -6,12 +6,11 @@ from aiogram.types import Message
 
 from src.bot.handlers.assistant.ask import answer_in_place
 from src.bot.handlers.plants import messages
-from src.bot.handlers.plants.question_facts import render_collection_facts
+from src.bot.handlers.plants.facts import gather_facts
+from src.bot.services.household_facts import FactsContext
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
-from src.modules.plant_care.use_cases.list_plants import ListPlantsUseCase
-from src.modules.plant_care.use_cases.retrieve_plant_sheet import RetrievePlantSheetUseCase
 
 router = Router(name="plant_questions")
 
@@ -35,14 +34,5 @@ async def answer_about_the_plants(
         return
 
     thinking = await message.answer(messages.PLANT_QUESTION_THINKING)
-    plants = await ListPlantsUseCase(uow=uow_factory(), household_calendar=household_calendar)()
-    sheets = [
-        await RetrievePlantSheetUseCase(uow=uow_factory(), household_calendar=household_calendar)(str(plant.id))
-        for plant in plants
-    ]
-    await answer_in_place(
-        thinking,
-        answer_question,
-        message.text,
-        extra_facts=render_collection_facts(sheets, household_calendar),
-    )
+    facts = await gather_facts(FactsContext(household_calendar=household_calendar, uow_factory=uow_factory))
+    await answer_in_place(thinking, answer_question, message.text, extra_facts=facts)

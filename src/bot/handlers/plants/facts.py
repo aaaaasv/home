@@ -1,10 +1,24 @@
 """Turns this collection's own record into facts a model can answer from."""
 from src.bot.handlers.plants.messages import CARE_TASK_LABELS
+from src.bot.services.household_facts import FactsContext
 from src.common.household_calendar import HouseholdCalendar
 from src.modules.plant_care.domain import PlantSheet
+from src.modules.plant_care.use_cases.list_plants import ListPlantsUseCase
+from src.modules.plant_care.use_cases.retrieve_plant_sheet import RetrievePlantSheetUseCase
 
 # enough history to show a rhythm without burying the question in it
 RECENT_EVENTS_PER_PLANT = 6
+
+
+async def gather_facts(context: FactsContext) -> str:
+    """Every living plant's sheet, read the same way the herbarium page reads it."""
+    calendar = context.household_calendar
+    plants = await ListPlantsUseCase(uow=context.uow_factory(), household_calendar=calendar)()
+    sheets = [
+        await RetrievePlantSheetUseCase(uow=context.uow_factory(), household_calendar=calendar)(str(plant.id))
+        for plant in plants
+    ]
+    return render_collection_facts(sheets, calendar)
 
 
 def render_collection_facts(sheets: list[PlantSheet], calendar: HouseholdCalendar) -> str:

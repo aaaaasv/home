@@ -4,18 +4,22 @@ from typing import Any
 
 from aiogram import Bot
 
+from src.bot.handlers.chores import facts as chores_facts
 from src.bot.handlers.chores.board import ChoresBoard
 from src.bot.handlers.newspaper.gemini_word_source import GeminiWordSource
 from src.bot.handlers.places.board import PlacesBoard
+from src.bot.handlers.plants import facts as plant_facts
 from src.bot.handlers.plants.claude_photo_analyst import ClaudePhotoAnalyst
 from src.bot.handlers.plants.gemini_photo_analyst import GeminiPhotoAnalyst
 from src.bot.handlers.plants.gemini_plant_identifier import GeminiPlantIdentifier
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.handlers.power.reserve_board import ReserveBoard
+from src.bot.handlers.shopping import facts as shopping_facts
 from src.bot.handlers.shopping.board import ShoppingListBoard
 from src.bot.handlers.transit.board import TransitBoard
 from src.bot.handlers.weather.board import WeatherDigestBoard
+from src.bot.services.household_facts import HouseholdFacts
 from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.bot.services.telegram_photo_storage import TelegramPhotoStorage
 from src.common.config import Settings
@@ -63,6 +67,10 @@ from src.modules.transit.services.arrival_estimator import ArrivalEstimator
 from src.modules.transit.use_cases.compose_transit_report import ComposeTransitReportUseCase
 from src.modules.weather.services.local_air_quality import LocalAirQualitySource
 from src.modules.weather.services.weather_provider import NullWeatherProvider, WeatherProvider
+
+# every module that keeps a record the family may ask about, collected here because only the composition root
+# may know them all. src/tests/unit/test_architecture.py fails if a module publishes facts nobody collects
+FACT_GATHERERS = (plant_facts.gather_facts, chores_facts.gather_facts, shopping_facts.gather_facts)
 
 
 def build_photo_storage(bot: Bot, settings: Settings) -> PhotoStorage:
@@ -328,10 +336,11 @@ def build_workflow_data(
     transit_board: TransitBoard | None = None,
     answer_question: AnswerQuestionUseCase | None = None,
 ) -> dict[str, Any]:
+    household_calendar = HouseholdCalendar(timezone=settings.timezone)
     return {
         "settings": settings,
         "uow_factory": UnitOfWork,
-        "household_calendar": HouseholdCalendar(timezone=settings.timezone),
+        "household_calendar": household_calendar,
         "photo_storage": build_photo_storage(bot=bot, settings=settings),
         "photo_analyst": build_photo_analyst(settings),
         "plant_identifier": build_plant_identifier(settings),
@@ -345,6 +354,7 @@ def build_workflow_data(
         "reserve_board": reserve_board,
         "transit_board": transit_board,
         "answer_question": answer_question,
+        "household_facts": HouseholdFacts(FACT_GATHERERS),
         "air_conditioner": air_conditioner,
         "ecoflow_station": ecoflow_station,
         "weather_provider": build_weather_provider(settings),
