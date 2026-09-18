@@ -116,6 +116,11 @@ scheduled jobs live under `src/bot/handlers/<name>/`; `jobs.py` exposes one `reg
 flag that switches it on stay in one folder, and adding one never edits a file every other module also
 edits. A handful of architecture tests fail if that starts to slip.
 
+**A module publishes what it remembers.** `facts.py` exposes one `gather_facts(context)` that renders the
+module's own record as text, and the composition root collects them all into `HouseholdFacts`. That is how a
+question in the assistant topic — which has no subject of its own — is answered from the database rather than
+from what the internet says about houseplants in general.
+
 **A module earns use cases only when it remembers something.** `presence`, `system_health` and `weather`
 own no table and never open a Unit of Work — they read a sensor, decide, and answer. A use case there would
 be a pass-through to a service, and reads worse than the call it wraps.
@@ -136,6 +141,7 @@ task type does not fit. Every button payload is asserted under the cap.
    `ForumTopicRegistry`, and add the module's section to `messages.WELCOME`
 5. Register the command in `wrong_topic.MODULE_COMMANDS` and `main.GROUP_COMMANDS`
 6. If it has scheduled work, add its `register_jobs` to `reminders.JOB_REGISTRARS`
+7. If the family can ask about what it remembers, add its `gather_facts` to `dependencies.FACT_GATHERERS`
 
 `start.router` must stay included first: `/cancel` has to win over any module's FSM state that swallows
 plain text.

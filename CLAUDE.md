@@ -191,6 +191,11 @@ src/vendor/                  vendored third-party code; read as a dependency, ne
   enabling flag never live in a shared file. `src/tests/unit/test_architecture.py` fails if a `jobs.py`
   goes uncollected, if anything outside a `jobs.py` calls `add_job`, or if a shared delivery file starts
   importing from one module.
+- **A module publishes what it remembers.** `src/bot/handlers/<name>/facts.py` exposes one
+  `gather_facts(context)` returning its record as plain text, and `dependencies.FACT_GATHERERS` collects
+  them into `HouseholdFacts` — the seam that lets the assistant topic answer «коли поливали Бубика» from the
+  database. A module with nothing to answer about simply has no `facts.py`; one that has it and is not
+  collected fails `test_architecture.py`.
 - **Time**: everything is stored UTC through the `UtcDateTime` column type — SQLite keeps no offset, so it
   is re-attached on read. A due date is a calendar day in the household timezone, and only `HouseholdCalendar`
   may convert between the two.
@@ -209,6 +214,7 @@ src/vendor/                  vendored third-party code; read as a dependency, ne
    `ForumTopicRegistry`, and add the module's section to `messages.WELCOME`.
 5. Register any new command in `wrong_topic.MODULE_COMMANDS` and `main.GROUP_COMMANDS`.
 6. If it has scheduled work, add its `register_jobs` to `reminders.JOB_REGISTRARS`.
+7. If the family can ask about what it remembers, add its `gather_facts` to `dependencies.FACT_GATHERERS`.
 
 `start.router` must stay included first: `/cancel` has to win over any module's FSM state that swallows
 plain text.
