@@ -3,6 +3,7 @@ import importlib
 import pathlib
 import unittest
 
+from src.bot.dependencies import FACT_GATHERERS
 from src.bot.handlers.plants.messages import CARE_TASK_ACTIONS, CARE_TASK_EMOJI, CARE_TASK_LABELS
 from src.bot.reminders import JOB_REGISTRARS
 from src.common.constants import CareTaskType
@@ -77,6 +78,25 @@ class SchedulingTestCase(unittest.TestCase):
         )
 
         self.assertEqual(schedulers, [])
+
+
+class HouseholdFactsTestCase(unittest.TestCase):
+    """
+    Keeps the assistant an assembly point, the way the scheduler and the broker already are.
+
+    a facts.py nobody collects is a module the assistant silently cannot answer about — and the answer it gives
+    instead is «не знаю», which reads like the feature working rather than like a wire that was never connected.
+    """
+
+    def test_every_module_that_publishes_facts_is_collected_for_the_assistant(self):
+        modules_with_facts = sorted(path.parent.name for path in HANDLERS_ROOT.glob("*/facts.py"))
+
+        gatherers = {
+            getattr(importlib.import_module(f"src.bot.handlers.{module}.facts"), "gather_facts", None)
+            for module in modules_with_facts
+        }
+
+        self.assertEqual(gatherers, set(FACT_GATHERERS))
 
 
 class MqttSurfaceTestCase(unittest.TestCase):

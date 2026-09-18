@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
@@ -6,7 +6,10 @@ from aiogram.types import Message
 
 from src.bot.handlers.assistant import messages
 from src.bot.markdown import render_markdown_as_html
+from src.bot.services.household_facts import FactsContext, HouseholdFacts
+from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
+from src.infrastructure.db.uow import UnitOfWork
 from src.modules.assistant.services.language_model import ImageAttachment, QuotaExhausted
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
 
@@ -14,14 +17,31 @@ router = Router(name="assistant_ask")
 
 
 @router.message(F.text & ~F.text.startswith("/"))
-async def answer_a_question(message: Message, answer_question: AnswerQuestionUseCase) -> None:
+async def answer_a_question(
+    message: Message,
+    answer_question: AnswerQuestionUseCase,
+    household_facts: HouseholdFacts,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+) -> None:
     # plain text in this topic is a question; a leading "/" is a command for start.router or wrong_topic to claim
     thinking = await message.answer(messages.ASSISTANT_THINKING)
-    await answer_in_place(thinking, answer_question, message.text)
+    await answer_in_place(
+        thinking,
+        answer_question,
+        message.text,
+        extra_facts=await gather_household_facts(household_facts, uow_factory, household_calendar),
+    )
 
 
 @router.message(F.photo)
-async def answer_about_a_photo(message: Message, answer_question: AnswerQuestionUseCase) -> None:
+async def answer_about_a_photo(
+    message: Message,
+    answer_question: AnswerQuestionUseCase,
+    household_facts: HouseholdFacts,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+) -> None:
     # the caption is the question; a bare photo just asks what is on it
     thinking = await message.answer(messages.ASSISTANT_THINKING)
     downloaded_photo = await message.bot.download(message.photo[-1])
@@ -30,7 +50,17 @@ async def answer_about_a_photo(message: Message, answer_question: AnswerQuestion
         answer_question,
         message.caption or messages.ASSISTANT_DESCRIBE_PHOTO,
         images=[ImageAttachment(data=downloaded_photo.read())],
+        extra_facts=await gather_household_facts(household_facts, uow_factory, household_calendar),
     )
+
+
+async def gather_household_facts(
+    household_facts: HouseholdFacts,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+) -> str:
+    """This topic is the one with no subject of its own, so it gets what every other topic knows."""
+    return await household_facts.gather(FactsContext(household_calendar=household_calendar, uow_factory=uow_factory))
 
 
 async def answer_in_place(

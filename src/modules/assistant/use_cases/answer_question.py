@@ -40,9 +40,9 @@ class AnswerQuestionUseCase:
         extra_facts: str | None = None,
     ) -> str | None:
         facts = await self.knowledge_source.gather()
-        # a caller that knows more than the facts file — the plants topic knows this collection's own history —
-        # adds it here rather than keeping a second model client of its own
-        if extra_facts is not None:
+        # a caller that knows more than the facts file — the topics know their own modules' record — adds it
+        # here rather than keeping a second model client of its own. an empty dossier is simply nothing to add
+        if extra_facts:
             facts = f"{facts}\n\n{extra_facts}"
 
         # the facts belong in the system instruction, not in a turn: they are reread every time and would otherwise

@@ -21,6 +21,7 @@ from src.tests.fakes import FrozenHouseholdCalendar, RecordingPhotoStorage, Stub
 from src.tests.integration.base import FROZEN_NOW, KYIV, BaseIntegrationTestCase
 from src.tests.telegram import (
     ACTOR_ID,
+    ASSISTANT_TOPIC,
     CHAT_ID,
     CHORES_TOPIC,
     PLACES_TOPIC,
@@ -74,6 +75,7 @@ def shared_dispatcher() -> tuple[Dispatcher, Bot]:
             ecoflow_station=SimpleNamespace(),
             air_conditioner=SimpleNamespace(),
             power_topic=StubForumTopic(thread_id=POWER_TOPIC),
+            assistant_topic=StubForumTopic(thread_id=ASSISTANT_TOPIC),
         )
     return _dispatcher, _bot
 
