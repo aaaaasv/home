@@ -10,6 +10,7 @@ from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.formatting import (
     render_care_card_caption,
     render_care_history,
+    render_postponements,
     render_recent_care_warning,
     render_recorded_care,
 )
@@ -153,9 +154,9 @@ async def postpone_care(
         )
     )
 
-    await callback.answer(
-        messages.CARE_POSTPONED_TOAST.format(when=format_day(postponed.next_due_on, household_calendar.today()))
-    )
+    toast = messages.CARE_POSTPONED_TOAST.format(when=format_day(postponed.next_due_on, household_calendar.today()))
+    again = render_postponements(postponed.consecutive_postponements)
+    await callback.answer(f"{toast} · {again}" if again else toast)
     await _delete_quietly(callback.message)
     await _drop_digest_card(posted_message_tracker, callback_data.plant_id, callback_data.task_type)
 

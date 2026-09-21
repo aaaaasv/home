@@ -77,6 +77,20 @@ CARE_POSTPONE_BUTTON = "⏳ нагадати через {days}"
 # a skippable task (fertilizing, photo) defers a whole cycle, so its button says "skip", not "in N days"
 CARE_SKIP_BUTTON = "⏭ пропустити"
 CARE_POSTPONED_TOAST = "Нагадаю {when}"
+# a deferral that keeps repeating says the interval is wrong, so the card counts it out loud from the second one
+POSTPONED_AGAIN = "відкладено {ordinal}"
+POSTPONED_ORDINALS = {
+    2: "вдруге",
+    3: "втретє",
+    4: "вчетверте",
+    5: "вп'яте",
+    6: "вшосте",
+    7: "всьоме",
+    8: "увосьме",
+    9: "вдев'яте",
+    10: "вдесяте",
+}
+POSTPONED_MANY = "{count}-й раз"
 
 # the card stays after recording instead of vanishing — with the record button gone it no longer invites a
 # second watering, and it is the only place an accidental tap can be taken back the moment it happens

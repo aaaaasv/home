@@ -71,6 +71,8 @@ class CareSchedule(Base):
     # per-month exceptions to interval_days, keyed by month number: {"1": 25} is slower, {"5": null} is silence.
     # null here means no exceptions at all, so the interval above holds the whole year round
     month_interval_overrides = Column(JSON, nullable=True)
+    # how many times in a row the task was pushed back without being done; care resets it to zero
+    consecutive_postponements = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(UtcDateTime, default=current_time, nullable=False)
     updated_at = Column(UtcDateTime, default=current_time, onupdate=current_time, nullable=False)
 

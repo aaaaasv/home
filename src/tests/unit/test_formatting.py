@@ -157,7 +157,9 @@ class RenderShoppingListTestCase(unittest.TestCase):
 
 
 class RenderCareCardCaptionTestCase(unittest.TestCase):
-    def build_task(self, overdue_days: int = 0, instructions: str | None = None) -> DueCareTask:
+    def build_task(
+        self, overdue_days: int = 0, instructions: str | None = None, consecutive_postponements: int = 0
+    ) -> DueCareTask:
         return DueCareTask(
             plant_id=1,
             plant_name="Кактус",
@@ -165,6 +167,7 @@ class RenderCareCardCaptionTestCase(unittest.TestCase):
             interval_days=3,
             overdue_days=overdue_days,
             instructions=instructions,
+            consecutive_postponements=consecutive_postponements,
         )
 
     def test_render_care_card_caption_heads_with_the_plant_and_lists_the_task(self):
@@ -176,6 +179,26 @@ class RenderCareCardCaptionTestCase(unittest.TestCase):
         caption = render_care_card_caption(self.build_task(overdue_days=2))
 
         self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив <i>(прострочено 2 дні)</i>")
+
+    def test_render_care_card_caption_with_one_postponement_says_nothing_about_it(self):
+        caption = render_care_card_caption(self.build_task(consecutive_postponements=1))
+
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив")
+
+    def test_render_care_card_caption_counts_a_repeated_postponement(self):
+        caption = render_care_card_caption(self.build_task(consecutive_postponements=2))
+
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив <i>(відкладено вдруге)</i>")
+
+    def test_render_care_card_caption_joins_being_late_and_being_postponed_in_one_bracket(self):
+        caption = render_care_card_caption(self.build_task(overdue_days=2, consecutive_postponements=3))
+
+        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив <i>(прострочено 2 дні, відкладено втретє)</i>")
+
+    def test_render_care_card_caption_beyond_the_named_ordinals_falls_back_to_a_number(self):
+        caption = render_care_card_caption(self.build_task(consecutive_postponements=11))
+
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив <i>(відкладено 11-й раз)</i>")
 
     def test_render_care_card_caption_puts_instructions_in_an_expandable_block(self):
         caption = render_care_card_caption(self.build_task(instructions="Поливайте рясно, але рідко."))

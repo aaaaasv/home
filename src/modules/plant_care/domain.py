@@ -24,6 +24,7 @@ class CareScheduleDetails(DomainModel):
     last_performed_at: datetime | None
     days_until_due: int
     instructions: str | None = None
+    consecutive_postponements: int = 0
 
     @classmethod
     def from_schedule(cls, schedule: CareSchedule, today: date) -> "CareScheduleDetails":
@@ -37,6 +38,7 @@ class CareScheduleDetails(DomainModel):
             last_performed_at=schedule.last_performed_at,
             days_until_due=(next_due_on - today).days,
             instructions=schedule.instructions,
+            consecutive_postponements=schedule.consecutive_postponements,
         )
 
     @property
@@ -257,6 +259,7 @@ class DueCareTask(DomainModel):
     overdue_days: int
     photo_file_id: str | None = None
     instructions: str | None = None
+    consecutive_postponements: int = 0
 
     @property
     def is_skippable(self) -> bool:
@@ -295,6 +298,7 @@ class CareDigest(DomainModel):
                     ).days,
                     photo_file_id=photo_file_ids.get(plant.id),
                     instructions=schedule.instructions,
+                    consecutive_postponements=schedule.consecutive_postponements,
                 )
                 for schedule, plant in due_schedules
                 if is_care_done_in_month(today, schedule.month_interval_overrides)
@@ -307,6 +311,7 @@ class PostponedCareTask(DomainModel):
     plant_name: str
     task_type: CareTaskType
     next_due_on: date
+    consecutive_postponements: int = 0
 
 
 class CareRecord(DomainModel):

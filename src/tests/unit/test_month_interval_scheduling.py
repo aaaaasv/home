@@ -85,6 +85,7 @@ class CareScheduleDetailsMonthTestCase(unittest.TestCase):
             last_performed_at=None,
             instructions="полий",
             month_interval_overrides=overrides,
+            consecutive_postponements=0,
         )
 
     def test_from_schedule_in_a_slowed_month_reports_the_slowed_interval(self):

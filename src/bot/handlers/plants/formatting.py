@@ -16,6 +16,9 @@ from src.bot.handlers.plants.messages import (
     PHOTO_REVIEW_STATUS_EMOJI,
     PLANT_COMFORT_RESTORED,
     PLANT_EMOJI,
+    POSTPONED_AGAIN,
+    POSTPONED_MANY,
+    POSTPONED_ORDINALS,
     SCHEDULE_REMOVE_CONFIRM,
     SCHEDULE_REMOVE_CONFIRM_INSTRUCTIONS,
 )
@@ -46,12 +49,23 @@ def task_action(task_type: CareTaskType) -> str:
     return CARE_TASK_ACTIONS[task_type]
 
 
+def render_postponements(consecutive_postponements: int) -> str:
+    """How many times in a row the task was pushed back, counted out loud only once it repeats."""
+    if consecutive_postponements < 2:
+        return ""
+    ordinal = POSTPONED_ORDINALS.get(consecutive_postponements, POSTPONED_MANY.format(count=consecutive_postponements))
+    return POSTPONED_AGAIN.format(ordinal=ordinal)
+
+
 def render_care_card_caption(task: DueCareTask) -> str:
     header_emoji = OVERDUE_EMOJI if task.overdue_days > 0 else PLANT_EMOJI
     lines = [f"{header_emoji} <b>{escape(task.plant_name)}</b>"]
     task_line = f"{task_emoji(task.task_type)} {task_label(task.task_type)}"
-    if task.overdue_days > 0:
-        task_line += f" <i>(прострочено {pluralize_days(task.overdue_days)})</i>"
+    # both notes share one bracket, so a task that is late *and* deferred does not grow a second one
+    notes = [_overdue_note(task.overdue_days), render_postponements(task.consecutive_postponements)]
+    written = [note for note in notes if note]
+    if written:
+        task_line += f" <i>({', '.join(written)})</i>"
     lines.append(task_line)
     if task.instructions:
         lines.append(f"<blockquote expandable>{escape(task.instructions)}</blockquote>")
@@ -185,12 +199,18 @@ def render_care_history(entries: list[CareHistoryEntry], calendar: HouseholdCale
     return "\n".join(lines)
 
 
+def _overdue_note(overdue_days: int) -> str:
+    return f"прострочено {pluralize_days(overdue_days)}" if overdue_days > 0 else ""
+
+
 def _render_schedule_line(schedule: CareScheduleDetails) -> str:
     emoji = OVERDUE_EMOJI if schedule.overdue_days > 0 else task_emoji(schedule.task_type)
-    return (
+    line = (
         f"{emoji} {task_label(schedule.task_type)} — раз на {pluralize_days(schedule.interval_days)}"
         f" · {format_due(schedule.days_until_due)}"
     )
+    postponements = render_postponements(schedule.consecutive_postponements)
+    return f"{line} · {postponements}" if postponements else line
 
 
 def render_plant_photo_review(review: PlantPhotoReview) -> str:
