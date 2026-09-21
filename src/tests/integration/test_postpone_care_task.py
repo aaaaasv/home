@@ -89,6 +89,27 @@ class PostponeCareTaskTestCase(BaseIntegrationTestCase):
         schedule = await self.retrieve_care_schedule(self.plant_id, CareTaskType.WATERING)
         self.assertIsNone(schedule.last_performed_at)
 
+    async def test_postpone_care_task_counts_the_deferral_on_the_schedule(self):
+        await self.seed_care_schedule(
+            plant_id=self.plant_id, task_type=CareTaskType.WATERING, interval_days=7, next_due_on=self.today
+        )
+
+        postponed = await self.postpone()
+
+        self.assertEqual(postponed.consecutive_postponements, 1)
+        schedule = await self.retrieve_care_schedule(self.plant_id, CareTaskType.WATERING)
+        self.assertEqual(schedule.consecutive_postponements, 1)
+
+    async def test_postpone_care_task_twice_in_a_row_counts_both_deferrals(self):
+        await self.seed_care_schedule(
+            plant_id=self.plant_id, task_type=CareTaskType.WATERING, interval_days=7, next_due_on=self.today
+        )
+        await self.postpone()
+
+        postponed = await self.postpone()
+
+        self.assertEqual(postponed.consecutive_postponements, 2)
+
     async def test_postpone_care_task_without_a_schedule_raises_does_not_exist(self):
         with self.assertRaises(DoesNotExistError) as context:
             await self.postpone()

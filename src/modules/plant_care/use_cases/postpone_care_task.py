@@ -25,11 +25,18 @@ class PostponeCareTaskUseCase(BaseUseCase):
 
             defer_days = calculate_defer_days(command.task_type, schedule.interval_days)
             next_due_on = self.household_calendar.next_due_on(command.postponed_at, defer_days)
-            await uow.care_schedules.update(schedule.id, {"next_due_on": next_due_on})
+            # the streak is the only trace a deferral leaves: without it a task pushed back every week for
+            # months looks exactly like one done on time, and nothing ever questions the interval
+            consecutive_postponements = schedule.consecutive_postponements + 1
+            await uow.care_schedules.update(
+                schedule.id,
+                {"next_due_on": next_due_on, "consecutive_postponements": consecutive_postponements},
+            )
 
             return PostponedCareTask(
                 plant_id=plant.id,
                 plant_name=plant.name,
                 task_type=command.task_type,
                 next_due_on=next_due_on,
+                consecutive_postponements=consecutive_postponements,
             )

@@ -41,6 +41,23 @@ class RecordCareEventTestCase(BaseIntegrationTestCase):
         self.assertEqual(record.performed_by_display_name, "Марта")
         self.assertEqual(record.next_due_on, date(2026, 7, 17))
 
+    async def test_record_care_event_clears_the_postponement_streak(self):
+        plant_id = await self.seed_plant(name="Фікус")
+        await self.seed_care_schedule(
+            plant_id=plant_id,
+            task_type=CareTaskType.WATERING,
+            interval_days=5,
+            next_due_on=self.today,
+            consecutive_postponements=3,
+        )
+
+        await self.build_use_case()(
+            RecordCareEventCommand(plant_id=plant_id, task_type=CareTaskType.WATERING, performed_at=FROZEN_NOW)
+        )
+
+        schedule = await self.retrieve_care_schedule(plant_id, CareTaskType.WATERING)
+        self.assertEqual(schedule.consecutive_postponements, 0)
+
     async def test_record_care_event_reschedules_the_next_watering_from_the_actual_care(self):
         watered_two_days_early = FROZEN_NOW - timedelta(days=2)
         command = RecordCareEventCommand(
