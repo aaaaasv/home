@@ -45,8 +45,14 @@ class RecordCareEventUseCase(BaseActorUseCase):
                 }
             )
             next_due_on = self.household_calendar.next_due_on(command.performed_at, schedule.interval_days)
+            # doing the task ends the streak of deferrals — the count is about what is being avoided now
             await uow.care_schedules.update(
-                schedule.id, {"last_performed_at": command.performed_at, "next_due_on": next_due_on}
+                schedule.id,
+                {
+                    "last_performed_at": command.performed_at,
+                    "next_due_on": next_due_on,
+                    "consecutive_postponements": 0,
+                },
             )
 
             return CareRecord(

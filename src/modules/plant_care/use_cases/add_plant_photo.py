@@ -55,5 +55,6 @@ class AddPlantPhotoUseCase(BaseActorUseCase):
             {
                 "last_performed_at": command.taken_at,
                 "next_due_on": self.household_calendar.next_due_on(command.taken_at, schedule.interval_days),
+                "consecutive_postponements": 0,
             },
         )

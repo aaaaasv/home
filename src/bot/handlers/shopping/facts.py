@@ -14,7 +14,9 @@ def render_shopping_facts(shopping_list: ShoppingList) -> str:
         return ""
     lines = ["Список покупок:"]
     lines.extend(f"— треба купити: {item.name}{_render_note(item)}" for item in shopping_list.needed_now)
-    lines.extend(f"— колись: {item.name}{_render_price(item)}{_render_note(item)}" for item in shopping_list.wanted_later)
+    lines.extend(
+        f"— колись: {item.name}{_render_price(item)}{_render_note(item)}" for item in shopping_list.wanted_later
+    )
     return "\n".join(lines)
 
 

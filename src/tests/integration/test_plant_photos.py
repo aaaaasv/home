@@ -77,6 +77,25 @@ class AddPlantPhotoTestCase(BaseIntegrationTestCase):
         self.assertEqual(schedule.next_due_on, self.today + timedelta(days=30))
         self.assertEqual(schedule.last_performed_at, FROZEN_NOW)
 
+    async def test_add_plant_photo_clears_the_postponement_streak_of_the_photo_task(self):
+        await self.seed_care_schedule(
+            plant_id=self.plant_id,
+            task_type=CareTaskType.PHOTO,
+            interval_days=30,
+            next_due_on=self.today - timedelta(days=3),
+            consecutive_postponements=4,
+        )
+        command = AddPlantPhotoCommand(
+            plant_id=self.plant_id,
+            photo=TelegramPhoto(file_id="file-abc", file_unique_id="unique-abc"),
+            taken_at=FROZEN_NOW,
+        )
+
+        await self.build_use_case()(command)
+
+        schedule = await self.retrieve_care_schedule(self.plant_id, CareTaskType.PHOTO)
+        self.assertEqual(schedule.consecutive_postponements, 0)
+
     async def test_add_plant_photo_without_a_photo_schedule_leaves_the_other_schedules_untouched(self):
         await self.seed_care_schedule(
             plant_id=self.plant_id,
