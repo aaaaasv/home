@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.1] - 2026-09-24
+
+### Виправлено
+
+- **Повзунок яскравості в Apple Home більше не відскакує назад.** Бот відповідав плитці тим рівнем, який
+  стрічка мала до команди, — вона ж розгоряється плавно, — і телефон приймав це за правду й повертав повзунок.
+
 ## [0.23.0] - 2026-09-24
 
 ### Додано
