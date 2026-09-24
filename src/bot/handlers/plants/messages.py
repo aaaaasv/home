@@ -96,6 +96,9 @@ POSTPONED_MANY = "{count}-й раз"
 # second watering, and it is the only place an accidental tap can be taken back the moment it happens
 CARE_UNDO_BUTTON = "↩️ скасувати"
 CARE_RECORDED_CARD = "✅ <b>{plant}</b> — {emoji} {action}\n<i>{who}, {time}</i>"
+# the probe saw the soil go from dry to wet and wrote the care down itself; the card below it carries the
+# usual «скасувати», so a misread costs one tap
+SOIL_WATERING_DETECTED = "💧 <i>помітив полив</i>"
 CARE_UNDONE_TOAST = "Запис скасовано"
 
 # removing a schedule is the one destructive action with nothing to undo it, and the button is a bare "➖"

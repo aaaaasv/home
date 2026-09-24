@@ -31,6 +31,7 @@ from src.bot.handlers.assistant import ASSISTANT_MODULE_NAME
 from src.bot.handlers.chores.board import CHORES_MODULE_NAME, ChoresBoard
 from src.bot.handlers.places.board import PLACES_MODULE_NAME, PlacesBoard
 from src.bot.handlers.plants import PLANTS_MODULE_NAME
+from src.bot.handlers.plants.soil import build_watering_recorder
 from src.bot.handlers.power import POWER_MODULE_NAME
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
@@ -340,6 +341,13 @@ async def run() -> None:
                 ecoflow_station=ecoflow_station,
                 room_climate_sensor=room_climate_sensor,
                 panel_light=build_panel_light(settings),
+                record_watering=build_watering_recorder(
+                    bot=bot,
+                    settings=settings,
+                    care_topic=care_topic,
+                    uow_factory=UnitOfWork,
+                    household_calendar=HouseholdCalendar(timezone=settings.timezone),
+                ),
             )
         )
         await mqtt_surface.start()

@@ -1,3 +1,4 @@
+import json
 from datetime import time
 from functools import lru_cache
 from zoneinfo import ZoneInfo
@@ -194,6 +195,17 @@ class Settings(BaseSettings):
     # the led strip on the server shelf, aimed at the switchboard: it comes on by itself when the grid drops and
     # goes off when the changeover is thrown, and that half runs on the host (home-infrastructure/pi/panel-light)
     # whether or not this container is up. the bot only offers the hand on it — a lamp tile in apple home
+    # the soil probes: which zigbee sensor sits in which plant, as {"soil-peperoni": 2}. a jump in moisture
+    # between two readings is somebody watering, and the bot records the care itself rather than waiting for
+    # the button. the map is per-home, so it lives here and not in the code
+    PLANT_SOIL_SENSORS: str = ""
+    # how many percentage points of soil moisture make a jump. watering shows up as tens of points; drift and
+    # sensor noise are a couple, so anything in between is deliberately ignored
+    PLANT_SOIL_JUMP_POINTS: float = 10.0
+    # and the level it has to reach, so a probe twitching around zero in bone-dry soil never counts as a pour
+    PLANT_SOIL_WET_MINIMUM_PERCENT: float = 15.0
+    ZIGBEE_TOPIC_PREFIX: str = "zigbee2mqtt"
+    PLANT_SOIL_ACTOR_NAME: str = "датчик"
     PANEL_LIGHT_ENABLED: bool = False
     PANEL_LIGHT_STATE_PATH: str = "/run/panel-light/state.json"
     PANEL_LIGHT_COMMAND_PATH: str = "/run/panel-light/command.json"
@@ -342,6 +354,21 @@ class Settings(BaseSettings):
     @property
     def timezone(self) -> ZoneInfo:
         return ZoneInfo(self.TIMEZONE)
+
+    @property
+    def plant_by_soil_sensor(self) -> dict[str, int]:
+        """Which plant each probe stands in; an unreadable map is no map, not a crash on boot."""
+        if not self.PLANT_SOIL_SENSORS.strip():
+            return {}
+        try:
+            return {str(sensor): int(plant_id) for sensor, plant_id in json.loads(self.PLANT_SOIL_SENSORS).items()}
+        except (ValueError, AttributeError):
+            return {}
+
+    @property
+    def sensor_actor(self) -> Actor:
+        """Who the probe records care as — nobody pressed anything, and the history must not pretend otherwise."""
+        return Actor(telegram_user_id=0, display_name=self.PLANT_SOIL_ACTOR_NAME)
 
     @property
     def web_actor(self) -> Actor:
