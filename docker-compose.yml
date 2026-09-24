@@ -63,6 +63,25 @@ services:
     volumes:
       - ./data/homebridge:/homebridge
     restart: unless-stopped
+  # a second bridge carrying the same accessories, so the flat's other phone can pair a home of its
+  # own: apple refuses to share one home without a hub, and one bridge belongs to exactly one home
+  homebridge-guest:
+    image: homebridge/homebridge:latest
+    container_name: homebridge-guest
+    # homekit is discovered over mdns/bonjour, and that does not cross a docker bridge network. on the
+    # default network the iphone simply never finds this bridge, and nothing anywhere reports an error
+    network_mode: host
+    environment:
+      TZ: ${TIMEZONE:-Europe/Kyiv}
+      PUID: ${HOST_UID:-1000}
+      PGID: ${HOST_GID:-1000}
+      HOMEBRIDGE_CONFIG_UI_PORT: 8582
+    volumes:
+      - ./data/homebridge-guest:/homebridge
+      # the plugins are code, and code can be read twice: copying them onto the sd card would be tens
+      # of thousands of small files for nothing
+      - ./data/homebridge/node_modules:/homebridge/node_modules:ro
+    restart: unless-stopped
     logging:
       driver: json-file
       options:
