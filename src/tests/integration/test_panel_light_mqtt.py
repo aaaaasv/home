@@ -118,6 +118,16 @@ class PanelLightMqttTestCase(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(self.command_path.exists())
 
+    async def test_a_slider_drag_is_answered_with_the_level_asked_for_not_the_one_still_fading(self):
+        self.write_state(on=True, percent=3.0)
+        broker = FakeBroker([(f"{PREFIX}/{SET_BRIGHTNESS}", b"40")])
+        surface = self.build_surface(broker)
+
+        await surface.serve_one_connection()
+
+        self.assertEqual(broker.last_published()[f"{PREFIX}/panel-light/brightness"], "40")
+        self.assertEqual(broker.last_published()[f"{PREFIX}/panel-light/on"], "true")
+
     async def test_the_lamp_is_not_exposed_while_the_strip_is_switched_off_in_settings(self):
         broker = FakeBroker()
         surface = MqttSurface(host="broker", port=1883, topic_prefix=PREFIX, client_factory=lambda _: broker)

@@ -47,8 +47,7 @@ class PanelLightControl:
         wanted_on = payload.strip().lower() in {"true", "1", "on"}
         # a tap carries no level, so it restores the last one only in the sense that off is zero: anything
         # else would need the bot to remember a number the host already owns
-        await self.panel_light.set_brightness(TAP_BRIGHTNESS_PERCENT if wanted_on else 0.0)
-        return render_state(await self.panel_light.read())
+        return await self.ask_for(TAP_BRIGHTNESS_PERCENT if wanted_on else 0.0)
 
     async def set_brightness(self, payload: str) -> Mapping[str, str]:
         try:
@@ -57,8 +56,19 @@ class PanelLightControl:
             logger.warning("Ignoring an unreadable brightness: %s", payload)
             return {}
 
-        await self.panel_light.set_brightness(brightness)
-        return render_state(await self.panel_light.read())
+        return await self.ask_for(brightness)
+
+    async def ask_for(self, brightness_percent: float) -> Mapping[str, str]:
+        """
+        Answer with the level that was asked for, not the one the strip is at this instant.
+
+        the host fades over a second and a half, so reading the file straight back reports the level the
+        slider was dragged *from* — and a controller takes that as the truth and snaps the slider back.
+        the periodic reading corrects this within the publish interval if the host disagrees.
+        """
+        brightness_percent = max(0.0, min(100.0, brightness_percent))
+        await self.panel_light.set_brightness(brightness_percent)
+        return render_state(PanelLightState(is_on=brightness_percent > 0, brightness_percent=brightness_percent))
 
 
 def register_listeners(surface: MqttSurface, context: MqttContext) -> None:
