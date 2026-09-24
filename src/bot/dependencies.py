@@ -26,6 +26,7 @@ from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.adapters.alarm_map_air_raid_alert_source import AlarmMapAirRaidAlertSource
 from src.infrastructure.adapters.ecoflow_ble_station import EcoFlowBleStation
+from src.infrastructure.adapters.file_panel_light import FilePanelLight
 from src.infrastructure.adapters.gemini_language_model import GeminiLanguageModel
 from src.infrastructure.adapters.gree_air_conditioner import GreeAirConditioner
 from src.infrastructure.adapters.gtfs_realtime_feed import GtfsRealtimeFeed
@@ -48,6 +49,7 @@ from src.modules.assistant.services.conversation_memory import ConversationMemor
 from src.modules.assistant.services.knowledge_source import FileKnowledgeSource
 from src.modules.assistant.services.language_model import LanguageModel
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
+from src.modules.lighting.services.panel_light import PanelLight
 from src.modules.newspaper.services.print_queue import PrintQueue
 from src.modules.newspaper.services.word_source import WordBank, WordSource
 from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
@@ -135,6 +137,17 @@ def build_ecoflow_station(settings: Settings) -> EcoFlowStation:
         ble_mac=settings.ECOFLOW_BLE_MAC,
         timezone=settings.timezone,
         scan_seconds=settings.ECOFLOW_BLE_SCAN_SECONDS,
+    )
+
+
+def build_panel_light(settings: Settings) -> PanelLight | None:
+    """Not a null object: with no host service there is no lamp to show, so the tile is simply never created."""
+    if not settings.PANEL_LIGHT_ENABLED:
+        return None
+
+    return FilePanelLight(
+        state_path=Path(settings.PANEL_LIGHT_STATE_PATH),
+        command_path=Path(settings.PANEL_LIGHT_COMMAND_PATH),
     )
 
 

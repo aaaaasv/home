@@ -16,6 +16,7 @@ import aiomqtt
 
 from src.common.config import Settings
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
+from src.modules.lighting.services.panel_light import PanelLight
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
 
@@ -39,6 +40,7 @@ class MqttContext:
     air_conditioner: AirConditioner | None = None
     ecoflow_station: EcoFlowStation | None = None
     room_climate_sensor: RoomClimateSensor | None = None
+    panel_light: PanelLight | None = None
 
 
 class ListenerRegistrar(Protocol):

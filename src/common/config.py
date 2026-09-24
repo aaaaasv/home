@@ -191,6 +191,12 @@ class Settings(BaseSettings):
     # the agent republishes every few seconds — a reading older than this means it stopped, and a stale
     # "mains present" would announce the light coming back in the middle of an outage
     PI_UPS_STALE_AFTER_SECONDS: int = 120
+    # the led strip on the server shelf, aimed at the switchboard: it comes on by itself when the grid drops and
+    # goes off when the changeover is thrown, and that half runs on the host (home-infrastructure/pi/panel-light)
+    # whether or not this container is up. the bot only offers the hand on it — a lamp tile in apple home
+    PANEL_LIGHT_ENABLED: bool = False
+    PANEL_LIGHT_STATE_PATH: str = "/run/panel-light/state.json"
+    PANEL_LIGHT_COMMAND_PATH: str = "/run/panel-light/command.json"
     # the reserve board: all four backup layers on one screen, one column, and that column is hours. it needs the
     # station, the hat and the router all configured, because a row it cannot read honestly is a row it must not
     # draw — so it registers only when every source it names is there

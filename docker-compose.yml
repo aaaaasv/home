@@ -97,6 +97,9 @@ services:
       # exist anyway — and once it does, the bot needs no device node, no gpio group and no linux-only
       # extension in the test suite (inert while PI_UPS_ENABLED is false)
       - /run/x728:/run/x728:ro
+      # the switchboard strip: its host service publishes state here and takes commands back, so unlike
+      # the hat's read-only file this one is writable
+      - /run/panel-light:/run/panel-light
     # the sht31 climate sensor lives on the pi's i2c bus; the container runs as uid 1000, so it
     # needs the device node plus membership in the host's i2c group to open it (inert while
     # CLIMATE_SENSOR_ENABLED is false)
