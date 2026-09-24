@@ -16,6 +16,7 @@ from src.bot.dependencies import (
     build_media_server_disks,
     build_newspaper_print_queue,
     build_newspaper_word_sources,
+    build_panel_light,
     build_pi_health_sensor,
     build_pi_ups,
     build_presence_source,
@@ -338,6 +339,7 @@ async def run() -> None:
                 air_conditioner=air_conditioner,
                 ecoflow_station=ecoflow_station,
                 room_climate_sensor=room_climate_sensor,
+                panel_light=build_panel_light(settings),
             )
         )
         await mqtt_surface.start()
