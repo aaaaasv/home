@@ -24,6 +24,7 @@ from src.modules.plant_care.use_cases.deliver_daily_care_digest import DeliverDa
 from src.modules.plant_care.use_cases.evaluate_plant_climate import EvaluatePlantClimateUseCase
 from src.modules.plant_care.use_cases.retrieve_uncomfortable_plants import RetrieveUncomfortablePlantsUseCase
 from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
+from src.modules.room_climate.use_cases.record_room_climate import RecordRoomClimateUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +125,36 @@ class DailyCareDigestJob:
             await self.posted_message_tracker.remember(CARE_DIGEST_KIND, sent, reference=card.task_reference)
 
 
-class RoomClimateJob:
+class RecordRoomClimateJob:
     """
-    Samples the sensor every minute but speaks only when a plant CROSSES the line between comfortable and not.
+    Keeps the wired sensor's own series going — the number the digest, the air-conditioner card and the
+    herbarium chart all read. It judges nothing: which plant is comfortable is decided per room, elsewhere.
+    """
+
+    def __init__(
+        self,
+        uow_factory: Callable[[], UnitOfWork],
+        sensor: RoomClimateSensor,
+        settings: Settings,
+        household_calendar: HouseholdCalendar,
+    ):
+        self.uow_factory = uow_factory
+        self.sensor = sensor
+        self.settings = settings
+        self.household_calendar = household_calendar
+
+    async def __call__(self) -> None:
+        await RecordRoomClimateUseCase(
+            uow=self.uow_factory(),
+            sensor=self.sensor,
+            household_calendar=self.household_calendar,
+            retention_hours=self.settings.CLIMATE_ALERT_WINDOW_HOURS * 2,
+        )()
+
+
+class PlantComfortJob:
+    """
+    Speaks only when a plant CROSSES the line between comfortable and not, judged by its own room's air.
 
     each uncomfortable plant gets one standing card. the card is deleted the moment the plant is comfortable
     again, and a short "знову комфортно" line takes its place, so the topic never keeps a complaint that is no
@@ -140,7 +168,6 @@ class RoomClimateJob:
         chat_id: int,
         care_topic: ForumTopicRegistry,
         uow_factory: Callable[[], UnitOfWork],
-        sensor: RoomClimateSensor,
         settings: Settings,
         posted_message_tracker: PostedMessageTracker,
         household_calendar: HouseholdCalendar,
@@ -149,7 +176,6 @@ class RoomClimateJob:
         self.chat_id = chat_id
         self.care_topic = care_topic
         self.uow_factory = uow_factory
-        self.sensor = sensor
         self.settings = settings
         self.posted_message_tracker = posted_message_tracker
         self.household_calendar = household_calendar
@@ -157,7 +183,6 @@ class RoomClimateJob:
     async def __call__(self) -> None:
         changes = await EvaluatePlantClimateUseCase(
             uow=self.uow_factory(),
-            sensor=self.sensor,
             household_calendar=self.household_calendar,
             alert_window_hours=self.settings.CLIMATE_ALERT_WINDOW_HOURS,
             temperature_hysteresis_celsius=self.settings.CLIMATE_HYSTERESIS_TEMPERATURE_CELSIUS,
@@ -265,28 +290,43 @@ def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> Non
     """Sample the room climate while a sensor is fitted, and always keep the daily care digest coming."""
     settings = context.settings
     if settings.CLIMATE_SENSOR_ENABLED:
-        climate_job = RoomClimateJob(
-            bot=context.bot,
-            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
-            care_topic=context.care_topic,
+        record_climate_job = RecordRoomClimateJob(
             uow_factory=context.uow_factory,
             sensor=context.room_climate_sensor,
             settings=settings,
-            posted_message_tracker=context.build_posted_message_tracker(),
             household_calendar=context.household_calendar,
         )
         # pass the bound __call__, not the instance: apscheduler only awaits jobs it sees as coroutine functions,
         # and a callable instance is not one — passing the instance runs it sync and drops the coroutine unawaited
         scheduler.add_job(
-            climate_job.__call__,
+            record_climate_job.__call__,
             trigger=IntervalTrigger(seconds=settings.CLIMATE_SAMPLE_INTERVAL_SECONDS),
             id="room_climate",
+            replace_existing=True,
+        )
+
+    # comfort no longer depends on the wired sensor at all: it reads the rooms the zigbee sensors cover, so a
+    # house with no room mapped simply has nothing to judge and schedules nothing
+    if settings.room_by_sensor:
+        comfort_job = PlantComfortJob(
+            bot=context.bot,
+            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+            care_topic=context.care_topic,
+            uow_factory=context.uow_factory,
+            settings=settings,
+            posted_message_tracker=context.build_posted_message_tracker(),
+            household_calendar=context.household_calendar,
+        )
+        scheduler.add_job(
+            comfort_job.__call__,
+            trigger=IntervalTrigger(seconds=settings.CLIMATE_SAMPLE_INTERVAL_SECONDS),
+            id="plant_comfort",
             replace_existing=True,
         )
         # once a day (and once on boot), repost each still-uncomfortable plant's card silently at the bottom,
         # so a standing alert that scrolled away stays visible without a second ping
         scheduler.add_job(
-            climate_job.refresh_discomfort_cards,
+            comfort_job.refresh_discomfort_cards,
             trigger=CronTrigger(hour=settings.daily_digest_time.hour, minute=settings.daily_digest_time.minute),
             next_run_time=current_time(),
             id="plant_discomfort_refresh",

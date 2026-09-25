@@ -205,6 +205,13 @@ class Settings(BaseSettings):
     # and the level it has to reach, so a probe twitching around zero in bone-dry soil never counts as a pour
     PLANT_SOIL_WET_MINIMUM_PERCENT: float = 15.0
     ZIGBEE_TOPIC_PREFIX: str = "zigbee2mqtt"
+    # which room's air each sensor speaks for, as {"temp-bedroom": "спальня"}. a sensor missing from the map is
+    # not followed at all, which is how a probe pulled out of a pot stops writing rows the moment it is unmapped
+    SENSOR_ROOMS: str = ""
+    # how long full-resolution readings are kept. the sensors report on change, so a busy one writes tens of rows
+    # an hour — a week is enough to re-read an experiment, and everything older lives in the daily summaries
+    SENSOR_HISTORY_RAW_DAYS: int = 7
+    SENSOR_FOLD_INTERVAL_MINUTES: int = 60
     PLANT_SOIL_ACTOR_NAME: str = "датчик"
     PANEL_LIGHT_ENABLED: bool = False
     PANEL_LIGHT_STATE_PATH: str = "/run/panel-light/state.json"
@@ -364,6 +371,23 @@ class Settings(BaseSettings):
             return {str(sensor): int(plant_id) for sensor, plant_id in json.loads(self.PLANT_SOIL_SENSORS).items()}
         except (ValueError, AttributeError):
             return {}
+
+    @property
+    def room_by_sensor(self) -> dict[str, str]:
+        """Which room each sensor stands in; an unreadable map is no map, not a crash on boot."""
+        if not self.SENSOR_ROOMS.strip():
+            return {}
+        try:
+            return {str(sensor): str(room) for sensor, room in json.loads(self.SENSOR_ROOMS).items()}
+        except (ValueError, AttributeError):
+            return {}
+
+    @property
+    def recorded_sensors(self) -> dict[str, str | None]:
+        """Every sensor worth writing down, and its room — a probe stands in a pot and has none."""
+        sensors: dict[str, str | None] = {sensor: None for sensor in self.plant_by_soil_sensor}
+        sensors.update(self.room_by_sensor)
+        return sensors
 
     @property
     def sensor_actor(self) -> Actor:

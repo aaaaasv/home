@@ -48,7 +48,10 @@ class PlantPhotoReviewStatus(StrEnum):
 class PlantField(StrEnum):
     NAME = "name"
     SPECIES = "species"
+    # where the plant physically is, in prose, for a person to read on its sheet
     LOCATION = "location"
+    # which room's air it is judged by — one of the rooms a sensor actually covers, not prose
+    ROOM = "room"
     NOTES = "notes"
     TEMPERATURE_RANGE = "temperature_range"
     HUMIDITY_RANGE = "humidity_range"
@@ -79,6 +82,7 @@ TELEGRAM_CAPTION_MAX_LENGTH = 1024
 PLANT_NAME_MAX_LENGTH = 64
 PLANT_SPECIES_MAX_LENGTH = 128
 PLANT_LOCATION_MAX_LENGTH = 128
+PLANT_ROOM_MAX_LENGTH = 32
 PLANT_NOTES_MAX_LENGTH = 512
 
 # the two edit fields that carry a numeric range ("21-29"), not free text — parsed, not length-capped
@@ -88,6 +92,7 @@ PLANT_FIELD_MAX_LENGTHS: dict[PlantField, int] = {
     PlantField.NAME: PLANT_NAME_MAX_LENGTH,
     PlantField.SPECIES: PLANT_SPECIES_MAX_LENGTH,
     PlantField.LOCATION: PLANT_LOCATION_MAX_LENGTH,
+    PlantField.ROOM: PLANT_ROOM_MAX_LENGTH,
     PlantField.NOTES: PLANT_NOTES_MAX_LENGTH,
 }
 

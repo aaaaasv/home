@@ -21,6 +21,8 @@ KYIV = ZoneInfo("Europe/Kyiv")
 
 # 09:00 in Kyiv on 2026-07-12 — a fixed "now" keeps every due-date assertion unambiguous
 FROZEN_NOW = datetime(2026, 7, 12, 6, 0, tzinfo=timezone.utc)
+# past every clock a test can use, frozen or real, so clearing a table does not depend on which one it is on
+FAR_FUTURE = datetime(2100, 1, 1, tzinfo=timezone.utc)
 
 
 class BaseIntegrationTestCase(unittest.IsolatedAsyncioTestCase):
@@ -99,6 +101,35 @@ class BaseIntegrationTestCase(unittest.IsolatedAsyncioTestCase):
                     }
                 )
                 measured_at += timedelta(hours=1)
+
+    async def seed_sensor_readings(
+        self,
+        room: str,
+        since: datetime,
+        until: datetime,
+        temperature_celsius: float = 22.0,
+        humidity_percent: float = 55.0,
+        sensor: str = "temp-room",
+        every: timedelta = timedelta(hours=1),
+    ) -> None:
+        async with self.uow as uow:
+            measured_at = since
+            while measured_at <= until:
+                await uow.sensor_readings.create(
+                    {
+                        "sensor": sensor,
+                        "room": room,
+                        "temperature_celsius": temperature_celsius,
+                        "relative_humidity_percent": humidity_percent,
+                        "measured_at": measured_at,
+                    }
+                )
+                measured_at += every
+
+    async def clear_sensor_readings(self) -> None:
+        """A window replaced rather than extended — the point of a median is that the old values are gone."""
+        async with self.uow as uow:
+            await uow.sensor_readings.delete_measured_before(FAR_FUTURE)
 
     async def seed_plant_climate_alert(
         self, plant_id: int, dimension, status, value: float, notified_at: datetime

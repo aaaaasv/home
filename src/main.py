@@ -36,6 +36,7 @@ from src.bot.handlers.power import POWER_MODULE_NAME
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.handlers.power.reserve_board import ReserveBoard
+from src.bot.handlers.sensors.recording import build_sensor_recorder
 from src.bot.handlers.shopping.board import SHOPPING_MODULE_NAME, ShoppingListBoard
 from src.bot.handlers.system import SYSTEM_MODULE_NAME
 from src.bot.handlers.transit.board import TRANSIT_MODULE_NAME, TransitBoard
@@ -349,6 +350,10 @@ async def run() -> None:
                     uow_factory=UnitOfWork,
                     household_calendar=HouseholdCalendar(timezone=settings.timezone),
                     posted_message_tracker=PostedMessageTracker(bot=bot, uow_factory=UnitOfWork),
+                ),
+                record_sensor_reading=build_sensor_recorder(
+                    uow_factory=UnitOfWork,
+                    household_calendar=HouseholdCalendar(timezone=settings.timezone),
                 ),
             )
         )
