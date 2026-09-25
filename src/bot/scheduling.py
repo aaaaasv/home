@@ -16,6 +16,7 @@ from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
+from src.modules.air_threats.services.air_threat_source import AirThreatSource
 from src.modules.newspaper.services.print_queue import PrintQueue
 from src.modules.newspaper.services.word_source import WordSource
 from src.modules.power.services.ecoflow_station import EcoFlowStation
@@ -64,6 +65,7 @@ class SchedulerContext:
     shape_catalog: RouteShapeCatalog | None = None
     newspaper_print_queue: PrintQueue | None = None
     newspaper_word_sources: tuple[WordSource, ...] = ()
+    air_threat_source: AirThreatSource | None = None
 
     def build_posted_message_tracker(self) -> PostedMessageTracker:
         return PostedMessageTracker(bot=self.bot, uow_factory=self.uow_factory)
