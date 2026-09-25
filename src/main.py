@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 from datetime import timedelta
 
@@ -28,6 +29,7 @@ from src.bot.dependencies import (
     build_weather_provider,
     build_yasno_schedule_provider,
 )
+from src.bot.handlers.air_threats.watch import AirThreatWatcher
 from src.bot.handlers.assistant import ASSISTANT_MODULE_NAME
 from src.bot.handlers.chores.board import CHORES_MODULE_NAME, ChoresBoard
 from src.bot.handlers.places.board import PLACES_MODULE_NAME, PlacesBoard
@@ -49,6 +51,7 @@ from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.common.config import Settings, get_settings
 from src.common.household_calendar import HouseholdCalendar
+from src.infrastructure.adapters.neptun_air_threat_stream import NeptunAirThreatStream
 from src.infrastructure.db.uow import UnitOfWork
 from src.mqtt.app import build_mqtt_surface
 from src.mqtt.surface import MqttContext
@@ -167,6 +170,7 @@ async def run() -> None:
     # hold a reading cache, so one instance is shared by the /eco card and the poll job
     ecoflow_station = build_ecoflow_station(settings)
     room_climate_sensor = build_room_climate_sensor(settings)
+    air_threat_source = build_air_threat_source(settings)
     # the unit serves one client at a time, so the button handlers and the runtime poll must share one instance —
     # its lock only serialises binds that go through the same object
     air_conditioner = build_air_conditioner(settings)
@@ -287,7 +291,7 @@ async def run() -> None:
             shopping_topic=shopping_topic,
             chores_topic=chores_topic,
             room_climate_sensor=room_climate_sensor,
-            air_threat_source=build_air_threat_source(settings),
+            air_threat_source=air_threat_source,
             price_source=build_price_source(settings),
             weather_topic=weather_topic,
             weather_digest_board=weather_digest_board,
@@ -361,6 +365,24 @@ async def run() -> None:
         )
         await mqtt_surface.start()
 
+    # the socket that makes the threat cards immediate: it pushes, and every push runs the same watcher the
+    # slow sweep does. without this the module still works, just a whole sweep interval late
+    threat_stream_task = None
+    if (
+        settings.AIR_THREATS_ENABLED
+        and settings.AIR_THREATS_CHAT_ID
+        and isinstance(air_threat_source, NeptunAirThreatStream)
+    ):
+        air_threat_source.on_change = AirThreatWatcher(
+            bot=bot,
+            chat_id=settings.AIR_THREATS_CHAT_ID,
+            uow_factory=UnitOfWork,
+            source=air_threat_source,
+            settings=settings,
+            household_calendar=HouseholdCalendar(timezone=settings.timezone),
+        )
+        threat_stream_task = asyncio.create_task(air_threat_source.run())
+
     # the specimen sheets share this loop with polling and the scheduler, the way everything else here does
     web_runner = None
     if settings.WEB_ENABLED:
@@ -371,6 +393,10 @@ async def run() -> None:
     try:
         await dispatcher.start_polling(bot)
     finally:
+        if threat_stream_task is not None:
+            threat_stream_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await threat_stream_task
         if mqtt_surface is not None:
             await mqtt_surface.stop()
         if web_runner is not None:

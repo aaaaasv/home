@@ -9,9 +9,12 @@ from src.tests.integration.base import BaseIntegrationTestCase
 HOME_LATITUDE = 50.45
 HOME_LONGITUDE = 30.52
 
-NEAR_KILOMETRES = 70.0
+OVERHEAD_KILOMETRES = 25.0
+WARNING_MINUTES = 10.0
 APPROACH_DEGREES = 30.0
 STALE_SECONDS = 180
+SPEEDS = {"uav": 180.0, "fpv": 120.0, "missile": 800.0, "ballistic": 2400.0}
+DEFAULT_SPEED = 2400.0
 
 
 class ScriptedThreatSource:
@@ -48,8 +51,9 @@ class TrackAirThreatsTestCase(BaseIntegrationTestCase):
     """
     Which of everything in the air earns a message to one household, and what counts as news the second time.
 
-    the two rules answer different fears and must not be collapsed: «щось поруч» needs no course, and
-    «летить сюди» is worthless without one.
+    the two rules answer different fears and must not be collapsed: «щось просто тут» needs no course, and
+    «летить сюди» is measured in minutes, because the same distance is twenty minutes of a drone and forty
+    seconds of a ballistic missile.
     """
 
     def build_use_case(self, *answers) -> TrackAirThreatsUseCase:
@@ -64,9 +68,11 @@ class TrackAirThreatsTestCase(BaseIntegrationTestCase):
         defaults = dict(
             latitude=HOME_LATITUDE,
             longitude=HOME_LONGITUDE,
-            near_kilometres=NEAR_KILOMETRES,
+            overhead_kilometres=OVERHEAD_KILOMETRES,
+            warning_minutes=WARNING_MINUTES,
             approach_degrees=APPROACH_DEGREES,
-            inbound_kinds=frozenset({"missile", "ballistic"}),
+            speeds_by_kind=SPEEDS,
+            default_speed=DEFAULT_SPEED,
         )
         defaults.update(overrides)
         return TrackAirThreatsCommand(**defaults)
@@ -88,8 +94,26 @@ class TrackAirThreatsTestCase(BaseIntegrationTestCase):
         self.assertEqual(changes.appeared, [])
         self.assertEqual(changes.standing, [])
 
-    async def test_track_air_threats_with_a_missile_far_away_pointed_at_us_reports_it_as_inbound(self):
+    async def test_track_air_threats_with_a_ballistic_far_away_pointed_at_us_reports_it_as_inbound(self):
+        """150 km is under four minutes at ballistic speed — inside the window and worth the ping."""
         # south-east of Kyiv, heading north-west — that is straight at the flat
+        ballistic = build_threat(
+            tracker_id="trk_ballistic",
+            kind=ThreatKind.BALLISTIC,
+            title="Балістика",
+            latitude=49.60,
+            longitude=32.00,
+            heading_degrees=325.0,
+        )
+
+        changes = await self.build_use_case([ballistic])(self.command())
+
+        self.assertEqual([approaching.threat.tracker_id for approaching in changes.appeared], ["trk_ballistic"])
+        self.assertEqual(changes.appeared[0].is_inbound, True)
+        self.assertEqual(round(changes.appeared[0].minutes_away, 1), 3.5)
+
+    async def test_track_air_threats_with_a_cruise_missile_still_too_far_in_time_reports_nothing(self):
+        """The same 150 km is eleven minutes at cruise speed — outside the window, so it waits."""
         missile = build_threat(
             tracker_id="trk_missile",
             kind=ThreatKind.MISSILE,
@@ -101,14 +125,22 @@ class TrackAirThreatsTestCase(BaseIntegrationTestCase):
 
         changes = await self.build_use_case([missile])(self.command())
 
-        self.assertEqual([approaching.threat.tracker_id for approaching in changes.appeared], ["trk_missile"])
+        self.assertEqual(changes.appeared, [])
+
+    async def test_track_air_threats_with_a_drone_pointed_at_us_inside_the_window_reports_it_too(self):
+        """A slow thing qualifies at a short distance — the rule is time, so no kind is excluded by name."""
+        drone = build_threat(latitude=50.68, longitude=30.60, heading_degrees=190.0)
+
+        changes = await self.build_use_case([drone])(self.command())
+
+        self.assertEqual([approaching.threat.tracker_id for approaching in changes.appeared], ["trk_1"])
         self.assertEqual(changes.appeared[0].is_inbound, True)
 
     async def test_track_air_threats_with_a_missile_far_away_heading_elsewhere_reports_nothing(self):
         missile = build_threat(
             tracker_id="trk_missile",
-            kind=ThreatKind.MISSILE,
-            title="Ракета",
+            kind=ThreatKind.BALLISTIC,
+            title="Балістика",
             latitude=49.60,
             longitude=32.00,
             heading_degrees=145.0,
@@ -121,8 +153,8 @@ class TrackAirThreatsTestCase(BaseIntegrationTestCase):
     async def test_track_air_threats_with_a_missile_far_away_and_no_course_reports_nothing(self):
         missile = build_threat(
             tracker_id="trk_missile",
-            kind=ThreatKind.MISSILE,
-            title="Ракета",
+            kind=ThreatKind.BALLISTIC,
+            title="Балістика",
             latitude=49.60,
             longitude=32.00,
             heading_degrees=None,
@@ -132,13 +164,15 @@ class TrackAirThreatsTestCase(BaseIntegrationTestCase):
 
         self.assertEqual(changes.appeared, [])
 
-    async def test_track_air_threats_with_a_drone_far_away_pointed_at_us_still_reports_nothing(self):
-        """Only the kinds that cross such a distance are worth a message from it — a drone is not one."""
-        drone = build_threat(latitude=49.60, longitude=32.00, heading_degrees=325.0)
+    async def test_track_air_threats_of_an_unknown_kind_is_timed_as_the_fastest_thing_we_know(self):
+        """Warning too early costs a glance; too late costs the point — so an unfamiliar track is treated as fast."""
+        unknown = build_threat(
+            tracker_id="trk_unknown", kind=ThreatKind.UNKNOWN, latitude=49.60, longitude=32.00, heading_degrees=325.0
+        )
 
-        changes = await self.build_use_case([drone])(self.command())
+        changes = await self.build_use_case([unknown])(self.command())
 
-        self.assertEqual(changes.appeared, [])
+        self.assertEqual([approaching.threat.tracker_id for approaching in changes.appeared], ["trk_unknown"])
 
     async def test_track_air_threats_seeing_the_same_track_twice_reports_it_as_standing_not_new(self):
         overhead = build_threat(latitude=50.50, longitude=30.60)
