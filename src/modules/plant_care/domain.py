@@ -113,6 +113,7 @@ class PlantCard(DomainModel):
     name: str
     species: str | None
     location: str | None
+    room: str | None
     notes: str | None
     ideal_temperature_min_celsius: float | None = None
     ideal_temperature_max_celsius: float | None = None
@@ -138,6 +139,7 @@ class PlantCard(DomainModel):
             name=plant.name,
             species=plant.species,
             location=plant.location,
+            room=plant.room,
             notes=plant.notes,
             ideal_temperature_min_celsius=plant.ideal_temperature_min_celsius,
             ideal_temperature_max_celsius=plant.ideal_temperature_max_celsius,

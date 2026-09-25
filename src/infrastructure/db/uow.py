@@ -23,6 +23,7 @@ from src.infrastructure.repositories.room_climate import (
     RoomClimateDayRepository,
     RoomClimateReadingRepository,
 )
+from src.infrastructure.repositories.sensor import SensorDayRepository, SensorReadingRepository
 from src.infrastructure.repositories.shopping_item import ShoppingItemRepository
 
 
@@ -49,6 +50,8 @@ class UnitOfWork:
         self.posted_messages: PostedMessageRepository | None = None
         self.conservation: ConservationRepository | None = None
         self.newspaper_issues: NewspaperIssueRepository | None = None
+        self.sensor_readings: SensorReadingRepository | None = None
+        self.sensor_days: SensorDayRepository | None = None
 
     async def __aenter__(self):
         self.session = self.session_factory()
@@ -71,6 +74,8 @@ class UnitOfWork:
         self.posted_messages = PostedMessageRepository(session=self.session)
         self.conservation = ConservationRepository(session=self.session)
         self.newspaper_issues = NewspaperIssueRepository(session=self.session)
+        self.sensor_readings = SensorReadingRepository(session=self.session)
+        self.sensor_days = SensorDayRepository(session=self.session)
         return self
 
     async def __aexit__(self, exception_type, exception_value, exception_traceback):

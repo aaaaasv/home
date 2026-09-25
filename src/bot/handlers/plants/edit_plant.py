@@ -10,6 +10,7 @@ from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.keyboards import EditPlantCallback, PlantAction, PlantCallback, build_plant_edit_keyboard
 from src.bot.handlers.plants.plant_list import send_plant_card
 from src.bot.message_cleanup import delete_quietly, remember_transient_message, sweep_transient_messages
+from src.common.config import Settings
 from src.common.constants import (
     CLIMATE_FIELD_BOUNDS,
     CLIMATE_FIELD_COLUMNS,
@@ -46,14 +47,26 @@ async def choose_field(
 
 
 @router.callback_query(EditPlantCallback.filter())
-async def ask_new_value(callback: CallbackQuery, callback_data: EditPlantCallback, state: FSMContext) -> None:
+async def ask_new_value(
+    callback: CallbackQuery, callback_data: EditPlantCallback, state: FSMContext, settings: Settings
+) -> None:
     await callback.answer()
     # the field picker has done its job — drop it so only the card and the one prompt remain
     await delete_quietly(callback.message)
     await state.set_state(EditPlantStates.field_value)
     await state.update_data(plant_id=callback_data.plant_id, field=callback_data.field)
-    prompt = await callback.message.answer(messages.EDIT_FIELD_PROMPTS[callback_data.field])
+    prompt = await callback.message.answer(_prompt_for(callback_data.field, settings))
     await remember_transient_message(state, prompt)
+
+
+def _prompt_for(field: PlantField, settings: Settings) -> str:
+    """The room prompt names the rooms that exist, because a room the bot never hears about judges nothing."""
+    if field != PlantField.ROOM:
+        return messages.EDIT_FIELD_PROMPTS[field]
+    rooms = sorted(set(settings.room_by_sensor.values()))
+    if not rooms:
+        return messages.NO_ROOMS_HAVE_SENSORS
+    return messages.EDIT_FIELD_PROMPTS[PlantField.ROOM].format(rooms=", ".join(rooms))
 
 
 @router.message(EditPlantStates.field_value, Command("clear"))
@@ -86,11 +99,18 @@ async def store_new_value(
     state: FSMContext,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     collected_data = await state.get_data()
     field = collected_data["field"]
 
-    if field in PLANT_CLIMATE_FIELDS:
+    if field == PlantField.ROOM:
+        room = _resolve_room(message.text, settings)
+        if room is None:
+            await message.answer(_room_rejection(message.text, settings))
+            return
+        changes = {field: room}
+    elif field in PLANT_CLIMATE_FIELDS:
         parsed_range = parse_climate_range(message.text, *CLIMATE_FIELD_BOUNDS[field])
         if parsed_range is None:
             await message.answer(messages.CLIMATE_RANGE_INVALID)
@@ -109,6 +129,22 @@ async def store_new_value(
     await delete_quietly(message)
     await sweep_transient_messages(message.bot, message.chat.id, collected_data)
     await _apply_changes(message, collected_data["plant_id"], changes, uow_factory, household_calendar)
+
+
+def _resolve_room(typed: str, settings: Settings) -> str | None:
+    """Accept any spelling of a room that has a sensor, and store the spelling the sensors use."""
+    wanted = typed.strip().casefold()
+    for room in settings.room_by_sensor.values():
+        if room.casefold() == wanted:
+            return room
+    return None
+
+
+def _room_rejection(typed: str, settings: Settings) -> str:
+    rooms = sorted(set(settings.room_by_sensor.values()))
+    if not rooms:
+        return messages.NO_ROOMS_HAVE_SENSORS
+    return messages.ROOM_HAS_NO_SENSOR.format(room=typed.strip(), rooms=", ".join(rooms))
 
 
 async def _apply_changes(

@@ -19,6 +19,7 @@ from src.modules.air_conditioner.services.air_conditioner import AirConditioner
 from src.modules.lighting.services.panel_light import PanelLight
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
+from src.modules.sensors.commands import RecordSensorReadingCommand
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,8 @@ class MqttContext:
     panel_light: PanelLight | None = None
     # what the soil probes call when they see a pour; the mqtt side never learns what a chat is
     record_watering: Callable[[int], Awaitable[None]] | None = None
+    # where a reading goes to be remembered; None keeps the bot listening to nothing
+    record_sensor_reading: Callable[[RecordSensorReadingCommand], Awaitable[None]] | None = None
 
 
 class ListenerRegistrar(Protocol):
@@ -102,7 +105,7 @@ class MqttSurface:
         self.client_factory = client_factory or _build_client
         self._publications: list[_Publication] = []
         self._commands: dict[str, CommandHandler] = {}
-        self._readings: dict[str, ReadingHandler] = {}
+        self._readings: dict[str, list[ReadingHandler]] = {}
         self._farewell: tuple[str, str] | None = None
         self._connection: asyncio.Task | None = None
 
@@ -124,7 +127,9 @@ class MqttSurface:
         zigbee2mqtt publishes under its own prefix, and a sensor reading is not a command: nothing is
         answered and nothing is published back, the bot only learns something happened.
         """
-        self._readings[topic] = handle
+        # a list, not one handler: two modules have honest reasons to care about the same probe — one writes
+        # the measurement down, the other watches it for a watering — and the second must not replace the first
+        self._readings.setdefault(topic, []).append(handle)
 
     def announce_loss_as(self, suffix: str, payload: str) -> None:
         """Have the broker publish this the moment the bot stops answering, so no tile is left looking healthy."""
@@ -218,12 +223,15 @@ class MqttSurface:
         await self._publish(client, readings)
 
     async def _receive(self, client: BrokerClient, topic: str, payload: bytes) -> None:
-        follow = self._readings.get(topic)
-        if follow is not None:
-            try:
-                await follow(payload.decode())
-            except Exception:
-                logger.exception("An mqtt reading failed; the surface stays up")
+        followers = self._readings.get(topic)
+        if followers:
+            reading = payload.decode()
+            for follow in followers:
+                try:
+                    await follow(reading)
+                except Exception:
+                    # one follower failing must not cost the others the same reading
+                    logger.exception("An mqtt reading failed; the surface stays up")
             return
 
         suffix = topic.removeprefix(f"{self.topic_prefix}/")

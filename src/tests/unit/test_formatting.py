@@ -60,6 +60,7 @@ class RenderPlantCardTestCase(unittest.TestCase):
             name="Кактус",
             species=None,
             location=None,
+            room=None,
             notes=None,
             created_at=MOMENT,
             schedules=[],
