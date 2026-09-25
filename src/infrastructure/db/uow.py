@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.db.main import get_session_maker
 from src.infrastructure.repositories.air_conditioner_run import AirConditionerRunRepository
+from src.infrastructure.repositories.air_threat_notice import AirThreatNoticeRepository
 from src.infrastructure.repositories.care_digest_delivery import CareDigestDeliveryRepository
 from src.infrastructure.repositories.care_event import CareEventRepository
 from src.infrastructure.repositories.care_schedule import CareScheduleRepository
@@ -52,6 +53,7 @@ class UnitOfWork:
         self.newspaper_issues: NewspaperIssueRepository | None = None
         self.sensor_readings: SensorReadingRepository | None = None
         self.sensor_days: SensorDayRepository | None = None
+        self.air_threat_notices: AirThreatNoticeRepository | None = None
 
     async def __aenter__(self):
         self.session = self.session_factory()
@@ -76,6 +78,7 @@ class UnitOfWork:
         self.newspaper_issues = NewspaperIssueRepository(session=self.session)
         self.sensor_readings = SensorReadingRepository(session=self.session)
         self.sensor_days = SensorDayRepository(session=self.session)
+        self.air_threat_notices = AirThreatNoticeRepository(session=self.session)
         return self
 
     async def __aexit__(self, exception_type, exception_value, exception_traceback):

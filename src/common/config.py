@@ -213,6 +213,20 @@ class Settings(BaseSettings):
     SENSOR_HISTORY_RAW_DAYS: int = 7
     SENSOR_FOLD_INTERVAL_MINUTES: int = 60
     PLANT_SOIL_ACTOR_NAME: str = "датчик"
+    # ── повітряні загрози ─────────────────────────────────────────────────────
+    AIR_THREATS_ENABLED: bool = False
+    # куди писати: особистий чат власника, а не сімейна група — потік галасливий і цікавий одній людині
+    AIR_THREATS_CHAT_ID: int = 0
+    AIR_THREATS_LATITUDE: float = 0.0
+    AIR_THREATS_LONGITUDE: float = 0.0
+    # усе, що ближче за це, варте повідомлення саме по собі — дрон над головою не потребує курсу
+    AIR_THREATS_NEAR_KILOMETRES: float = 70.0
+    # а далі — лише те, що справді націлене сюди, і лише ті типи, що долають сотні кілометрів
+    AIR_THREATS_APPROACH_DEGREES: float = 30.0
+    AIR_THREATS_INBOUND_KINDS: str = "missile,ballistic"
+    AIR_THREATS_POLL_SECONDS: int = 30
+    # скільки ціль має не показуватись на мапі, перш ніж вважати, що вона зникла
+    AIR_THREATS_STALE_SECONDS: int = 180
     PANEL_LIGHT_ENABLED: bool = False
     PANEL_LIGHT_STATE_PATH: str = "/run/panel-light/state.json"
     PANEL_LIGHT_COMMAND_PATH: str = "/run/panel-light/command.json"
@@ -371,6 +385,11 @@ class Settings(BaseSettings):
             return {str(sensor): int(plant_id) for sensor, plant_id in json.loads(self.PLANT_SOIL_SENSORS).items()}
         except (ValueError, AttributeError):
             return {}
+
+    @property
+    def inbound_threat_kinds(self) -> frozenset[str]:
+        """Which kinds are worth a message from far away — the rest matter only when already close."""
+        return frozenset(kind.strip().lower() for kind in self.AIR_THREATS_INBOUND_KINDS.split(",") if kind.strip())
 
     @property
     def room_by_sensor(self) -> dict[str, str]:

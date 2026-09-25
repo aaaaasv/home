@@ -394,3 +394,25 @@ class SensorDay(Base):
     maximum_soil_moisture_percent = Column(Float, nullable=True)
     average_soil_moisture_percent = Column(Float, nullable=True)
     minimum_battery_percent = Column(Float, nullable=True)
+
+
+class AirThreatNotice(Base):
+    """
+    One row per tracked object the household was told about, so a restart cannot announce the same drone twice.
+
+    the row outlives the track on purpose: `closed_at` marks a thing that faded from the map, and keeping it
+    means a track that flickers out and back does not ping a second time.
+    """
+
+    __tablename__ = "air_threat_notices"
+    __table_args__ = (Index("ix_air_threat_notices_closed_at", "closed_at"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tracker_id = Column(String(48), nullable=False, unique=True)
+    chat_id = Column(BigInteger, nullable=True)
+    message_id = Column(Integer, nullable=True)
+    # what the card currently says, so an unchanged track is not rewritten every poll
+    rendered_text = Column(Text, nullable=True)
+    first_seen_at = Column(UtcDateTime, nullable=False)
+    last_seen_at = Column(UtcDateTime, nullable=False)
+    closed_at = Column(UtcDateTime, nullable=True)
