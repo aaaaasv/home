@@ -341,3 +341,53 @@ class NewspaperIssue(Base):
     crossword = Column(JSON, nullable=False)
     printed_at = Column(UtcDateTime, nullable=True)
     created_at = Column(UtcDateTime, default=current_time, nullable=False)
+
+
+class SensorReading(Base):
+    """
+    One measurement from one sensor, at full resolution, kept for a few days and then folded away.
+
+    the zigbee sensors report on change rather than on a clock, so a busy one writes tens of rows an hour and a
+    quiet one none — which is exactly the shape that makes a raw table unaffordable to keep and a daily summary
+    worth folding. what a row carries depends on the sensor: a room sensor has air, a probe has soil as well.
+    """
+
+    __tablename__ = "sensor_readings"
+    __table_args__ = (Index("ix_sensor_readings_sensor_measured_at", "sensor", "measured_at"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sensor = Column(String(48), nullable=False)
+    # the room whose air this sensor speaks for; a soil probe stands in a pot and speaks for no room
+    room = Column(String(32), nullable=True)
+    temperature_celsius = Column(Float, nullable=True)
+    relative_humidity_percent = Column(Float, nullable=True)
+    soil_moisture_percent = Column(Float, nullable=True)
+    battery_percent = Column(Float, nullable=True)
+    measured_at = Column(UtcDateTime, nullable=False)
+
+
+class SensorDay(Base):
+    """
+    One row per sensor per household day, folded from that day's raw readings before they are pruned.
+
+    a year of six sensors is two thousand rows this way and several million the other, and every question worth
+    asking months later — what the winter did to a room, when the flat is coldest — is a question about days.
+    """
+
+    __tablename__ = "sensor_days"
+    __table_args__ = (Index("ix_sensor_days_day", "day"),)
+
+    sensor = Column(String(48), primary_key=True)
+    day = Column(Date, primary_key=True, autoincrement=False)
+    room = Column(String(32), nullable=True)
+    reading_count = Column(Integer, nullable=False)
+    minimum_temperature_celsius = Column(Float, nullable=True)
+    maximum_temperature_celsius = Column(Float, nullable=True)
+    average_temperature_celsius = Column(Float, nullable=True)
+    minimum_humidity_percent = Column(Float, nullable=True)
+    maximum_humidity_percent = Column(Float, nullable=True)
+    average_humidity_percent = Column(Float, nullable=True)
+    minimum_soil_moisture_percent = Column(Float, nullable=True)
+    maximum_soil_moisture_percent = Column(Float, nullable=True)
+    average_soil_moisture_percent = Column(Float, nullable=True)
+    minimum_battery_percent = Column(Float, nullable=True)

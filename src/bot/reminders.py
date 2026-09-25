@@ -7,6 +7,7 @@ from src.bot.handlers.newspaper import jobs as newspaper_jobs
 from src.bot.handlers.plants import jobs as plants_jobs
 from src.bot.handlers.power import jobs as power_jobs
 from src.bot.handlers.presence import jobs as presence_jobs
+from src.bot.handlers.sensors import jobs as sensors_jobs
 from src.bot.handlers.shopping import jobs as shopping_jobs
 from src.bot.handlers.system import jobs as system_jobs
 from src.bot.handlers.transit import jobs as transit_jobs
@@ -26,6 +27,7 @@ JOB_REGISTRARS: tuple[JobRegistrar, ...] = (
     shopping_jobs.register_jobs,
     chores_jobs.register_jobs,
     newspaper_jobs.register_jobs,
+    sensors_jobs.register_jobs,
 )
 
 
