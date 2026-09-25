@@ -126,6 +126,7 @@ PLANT_FIELD_LABELS: dict[PlantField, str] = {
     PlantField.NAME: "Назва",
     PlantField.SPECIES: "Вид",
     PlantField.LOCATION: "Місце",
+    PlantField.ROOM: "Кімната",
     PlantField.NOTES: "Нотатка",
     PlantField.TEMPERATURE_RANGE: "🌡 Температура",
     PlantField.HUMIDITY_RANGE: "💧 Вологість",
@@ -136,6 +137,10 @@ EDIT_FIELD_PROMPTS: dict[PlantField, str] = {
     PlantField.NAME: "Надішли нову назву.",
     PlantField.SPECIES: "Що це за вид? Наприклад: <i>Monstera deliciosa</i>\n\n/clear — прибрати",
     PlantField.LOCATION: "Де вона стоїть? Наприклад: <i>спальня, підвіконня</i>\n\n/clear — прибрати",
+    PlantField.ROOM: (
+        "У якій кімнаті вона стоїть? За повітрям цієї кімнати бот і судитиме, чи їй комфортно.\n\n"
+        "Доступні: {rooms}\n\n/clear — прибрати"
+    ),
     PlantField.NOTES: "Що варто пам'ятати про цю рослину?\n\n/clear — прибрати",
     PlantField.TEMPERATURE_RANGE: "Комфортна температура, °C? Наприклад: <i>18-27</i>\n\n/clear — прибрати",
     PlantField.HUMIDITY_RANGE: "Комфортна вологість, %? Наприклад: <i>50-70</i>\n\n/clear — прибрати",
@@ -143,6 +148,8 @@ EDIT_FIELD_PROMPTS: dict[PlantField, str] = {
 EDIT_VALUE_TOO_LONG = "Задовге значення — до {max_length} символів."
 CLIMATE_RANGE_INVALID = "Не зрозумів. Надішли діапазон «мін-макс», наприклад <i>18-27</i>."
 NAME_CANNOT_BE_CLEARED = "Назву прибрати не можна."
+ROOM_HAS_NO_SENSOR = "У кімнаті «{room}» немає датчика, тож судити про комфорт не буде чим.\n\nОбери з наявних: {rooms}"
+NO_ROOMS_HAVE_SENSORS = "Жодна кімната ще не має датчика — цю рослину поки нема з чим звіряти."
 
 ASK_TASK_TYPE = "Що з доглядом?"
 ASK_TASK_INTERVAL = "Раз на скільки днів?"

@@ -21,6 +21,15 @@ class SensorReadingRepository(SQLAlchemyRepository[SensorReading]):
         )
         return list(result.scalars().all())
 
+    async def list_room_measured_since(self, room: str, moment: datetime) -> list[SensorReading]:
+        """Every reading from every sensor that speaks for one room — two sensors in a room are one air."""
+        result = await self.session.execute(
+            select(SensorReading)
+            .where(SensorReading.room == room, SensorReading.measured_at >= moment)
+            .order_by(SensorReading.measured_at)
+        )
+        return list(result.scalars().all())
+
     async def list_sensors_measured_since(self, moment: datetime) -> list[str]:
         """Which sensors have said anything since a moment — the fold only visits those, not a configured list."""
         result = await self.session.execute(

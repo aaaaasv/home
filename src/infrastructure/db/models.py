@@ -31,6 +31,9 @@ class Plant(Base):
     name = Column(String(64), nullable=False)
     species = Column(String(128), nullable=True)
     location = Column(String(128), nullable=True)
+    # the room whose sensor speaks for this plant's air; prose lives in location, this one has to match a
+    # room a sensor actually covers or the plant is simply not judged
+    room = Column(String(32), nullable=True)
     notes = Column(Text, nullable=True)
     ideal_temperature_min_celsius = Column(Float, nullable=True)
     ideal_temperature_max_celsius = Column(Float, nullable=True)

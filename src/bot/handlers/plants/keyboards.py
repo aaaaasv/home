@@ -237,6 +237,7 @@ def build_plant_edit_keyboard(card: PlantCard) -> InlineKeyboardMarkup:
         PlantField.NAME: card.name,
         PlantField.SPECIES: card.species,
         PlantField.LOCATION: card.location,
+        PlantField.ROOM: card.room,
         PlantField.NOTES: card.notes,
         PlantField.TEMPERATURE_RANGE: format_ideal_temperature(card),
         PlantField.HUMIDITY_RANGE: format_ideal_humidity(card),

@@ -76,6 +76,7 @@ def build_card() -> PlantCard:
         name="Непентес",
         species="Nepenthes hybrid (×ventrata)",
         location="спальня, підвіконня",
+        room="спальня",
         notes="гине від жорсткої води",
         created_at=MOMENT,
         schedules=[build_schedule(task_type) for task_type in CareTaskType],

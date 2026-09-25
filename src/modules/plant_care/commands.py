@@ -13,6 +13,7 @@ from src.common.constants import (
     PLANT_LOCATION_MAX_LENGTH,
     PLANT_NAME_MAX_LENGTH,
     PLANT_NOTES_MAX_LENGTH,
+    PLANT_ROOM_MAX_LENGTH,
     PLANT_SPECIES_MAX_LENGTH,
     CareTaskType,
     PlantPhotoFrame,
@@ -42,6 +43,7 @@ class UpdatePlantCommand(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=PLANT_NAME_MAX_LENGTH)
     species: str | None = Field(default=None, max_length=PLANT_SPECIES_MAX_LENGTH)
     location: str | None = Field(default=None, max_length=PLANT_LOCATION_MAX_LENGTH)
+    room: str | None = Field(default=None, max_length=PLANT_ROOM_MAX_LENGTH)
     notes: str | None = Field(default=None, max_length=PLANT_NOTES_MAX_LENGTH)
     ideal_temperature_min_celsius: float | None = Field(
         default=None, ge=MINIMUM_PLANT_TEMPERATURE_CELSIUS, le=MAXIMUM_PLANT_TEMPERATURE_CELSIUS
