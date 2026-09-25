@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from src.bot.handlers.air_threats.formatting import render_gone, render_threat
+from src.bot.handlers.air_threats.formatting import render_gone, render_minutes, render_threat
 from src.modules.air_threats.domain import AirThreat, ApproachingThreat, ThreatConfidence, ThreatKind
 
 HOME_LATITUDE = 50.45
@@ -38,10 +38,7 @@ class RenderThreatTestCase(unittest.TestCase):
 
         self.assertEqual(
             text,
-            "🛸 <b>БпЛА</b>\n"
-            "сходу, 20 км · біля Бровари (±4 км)\n"
-            "<i>середнє, підтверджень 3</i>\n\n"
-            "<i>за мапою NEPTUN — це не офіційне попередження</i>",
+            "🛸 <b>БпЛА</b>\n" "сходу, 20 км (±4 км) · біля Бровари\n" "<i>середнє, підтверджень 3</i>",
         )
 
     def test_render_threat_that_is_inbound_says_so_in_the_headline(self):
@@ -55,6 +52,7 @@ class RenderThreatTestCase(unittest.TestCase):
                 },
                 distance_kilometres=180.0,
                 is_inbound=True,
+                minutes_away=13.5,
             ),
             HOME_LATITUDE,
             HOME_LONGITUDE,
@@ -62,10 +60,7 @@ class RenderThreatTestCase(unittest.TestCase):
 
         self.assertEqual(
             text,
-            "🚀 <b>Ракета</b> — курсом сюди\n"
-            "сходу, 180 км\n"
-            "<i>середнє, підтверджень 3</i>\n\n"
-            "<i>за мапою NEPTUN — це не офіційне попередження</i>",
+            "🚀 <b>Ракета</b> — курсом сюди\n" "сходу, 180 км\n" "підліт ~14 хв\n" "<i>середнє, підтверджень 3</i>",
         )
 
     def test_render_threat_with_a_confirmed_position_says_so(self):
@@ -77,3 +72,13 @@ class RenderThreatTestCase(unittest.TestCase):
         text = render_gone("🛸 <b>БпЛА</b>\nсходу, 20 км")
 
         self.assertEqual(text, "🛸 <b>БпЛА</b>\nсходу, 20 км\n\n<b>зникла з мапи</b>")
+
+
+class RenderMinutesTestCase(unittest.TestCase):
+    """Under two minutes a person counts in seconds, and that is exactly when it matters most."""
+
+    def test_render_minutes_under_two_minutes_counts_in_seconds(self):
+        self.assertEqual(render_minutes(0.7), "42 с")
+
+    def test_render_minutes_above_two_minutes_counts_in_whole_minutes(self):
+        self.assertEqual(render_minutes(13.5), "14 хв")

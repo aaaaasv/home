@@ -13,10 +13,11 @@ class TrackAirThreatsUseCase(BaseUseCase):
     """
     Decides which of everything in the air is worth telling one household about, and what changed since last time.
 
-    two rules, and they answer different fears. **Near** is «щось поруч» — anything at all within the radius,
-    because a drone that is already overhead does not need a course to matter. **Inbound** is «летить сюди» —
-    only the kinds that cross hundreds of kilometres, and only while actually pointed at us; a missile over
-    another oblast is not news until its course says otherwise.
+    two rules, and they answer different fears. **Overhead** is «щось просто тут» — close enough that it matters
+    whatever it is and whichever way it points, because a drone above the roof needs no course to be a fact.
+    **Inbound** is «летить сюди», and it is measured in **minutes, not kilometres**: the same seventy kilometres
+    is twenty-three minutes of a piston Shahed and forty-one seconds of something at Mach 5, and what the person
+    does with a warning — put shoes on and go down — costs minutes either way.
 
     a track missing its heading can never be inbound. that is deliberate: guessing a course from a single
     position is exactly the invention that would make this feature lie.
@@ -40,7 +41,7 @@ class TrackAirThreatsUseCase(BaseUseCase):
             # the map is unreachable; saying nothing is right, and closing every open card would be a lie
             return None
 
-        relevant = [approaching for approaching in map(lambda t: self._weigh(t, data), threats) if approaching]
+        relevant = [approaching for approaching in (self._weigh(threat, data) for threat in threats) if approaching]
         moment = self.household_calendar.now()
 
         async with self.uow as uow:
@@ -71,14 +72,33 @@ class TrackAirThreatsUseCase(BaseUseCase):
 
     def _weigh(self, threat: AirThreat, data: TrackAirThreatsCommand) -> ApproachingThreat | None:
         distance = distance_kilometres(data.latitude, data.longitude, threat.latitude, threat.longitude)
-        if distance <= data.near_kilometres:
-            return ApproachingThreat(threat=threat, distance_kilometres=distance, is_inbound=False)
+        if distance <= data.overhead_kilometres:
+            return ApproachingThreat(
+                threat=threat,
+                distance_kilometres=distance,
+                is_inbound=False,
+                minutes_away=self._minutes_away(distance, threat, data),
+            )
 
-        if threat.kind not in data.inbound_kinds or threat.heading_degrees is None:
+        if threat.heading_degrees is None:
             return None
 
         towards_us = bearing_degrees(threat.latitude, threat.longitude, data.latitude, data.longitude)
         if angle_between_degrees(threat.heading_degrees, towards_us) > data.approach_degrees:
             return None
 
-        return ApproachingThreat(threat=threat, distance_kilometres=distance, is_inbound=True)
+        minutes = self._minutes_away(distance, threat, data)
+        if minutes > data.warning_minutes:
+            return None
+
+        return ApproachingThreat(threat=threat, distance_kilometres=distance, is_inbound=True, minutes_away=minutes)
+
+    def _minutes_away(self, distance: float, threat: AirThreat, data: TrackAirThreatsCommand) -> float:
+        """
+        How long it would take at this kind's usual speed — the map gives a course but never a speed.
+
+        an unfamiliar kind is treated as the fastest one we know rather than the slowest: warning too early
+        costs a glance at the phone, warning too late costs the whole point of the feature.
+        """
+        speed = data.speeds_by_kind.get(threat.kind, data.default_speed)
+        return distance / speed * 60

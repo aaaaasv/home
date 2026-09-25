@@ -219,14 +219,20 @@ class Settings(BaseSettings):
     AIR_THREATS_CHAT_ID: int = 0
     AIR_THREATS_LATITUDE: float = 0.0
     AIR_THREATS_LONGITUDE: float = 0.0
-    # усе, що ближче за це, варте повідомлення саме по собі — дрон над головою не потребує курсу
-    AIR_THREATS_NEAR_KILOMETRES: float = 70.0
-    # а далі — лише те, що справді націлене сюди, і лише ті типи, що долають сотні кілометрів
+    # «просто тут»: настільки близько, що важливо будь-що й у будь-якому напрямку
+    AIR_THREATS_OVERHEAD_KILOMETRES: float = 25.0
+    # а далі — лише те, що націлене сюди, і лише коли лишилось стільки хвилин підльоту. хвилини, а не
+    # кілометри: ті самі 70 км це 23 хвилини поршневого шахеда і 41 секунда чогось на М5
+    AIR_THREATS_WARNING_MINUTES: float = 10.0
     AIR_THREATS_APPROACH_DEGREES: float = 30.0
-    AIR_THREATS_INBOUND_KINDS: str = "missile,ballistic"
-    AIR_THREATS_POLL_SECONDS: int = 30
+    # мапа дає курс, але ніколи не дає швидкості — беремо типову за типом цілі, км/год
+    AIR_THREATS_SPEEDS: str = '{"uav": 180, "fpv": 120, "missile": 800, "ballistic": 2400, "kab": 900, "aircraft": 700}'
+    # незнайомий тип рахуємо найшвидшим із розумного: попередити зарано коштує погляду, запізно — усього сенсу
+    AIR_THREATS_DEFAULT_SPEED: float = 2400.0
     # скільки ціль має не показуватись на мапі, перш ніж вважати, що вона зникла
     AIR_THREATS_STALE_SECONDS: int = 180
+    # усе термінове приходить сокетом; ця джоба лише закриває картки, тому і ходить ліниво
+    AIR_THREATS_SWEEP_SECONDS: int = 120
     PANEL_LIGHT_ENABLED: bool = False
     PANEL_LIGHT_STATE_PATH: str = "/run/panel-light/state.json"
     PANEL_LIGHT_COMMAND_PATH: str = "/run/panel-light/command.json"
@@ -387,9 +393,14 @@ class Settings(BaseSettings):
             return {}
 
     @property
-    def inbound_threat_kinds(self) -> frozenset[str]:
-        """Which kinds are worth a message from far away — the rest matter only when already close."""
-        return frozenset(kind.strip().lower() for kind in self.AIR_THREATS_INBOUND_KINDS.split(",") if kind.strip())
+    def threat_speeds(self) -> dict[str, float]:
+        """How fast each kind usually flies; an unreadable map is no map, not a crash on boot."""
+        if not self.AIR_THREATS_SPEEDS.strip():
+            return {}
+        try:
+            return {str(kind): float(speed) for kind, speed in json.loads(self.AIR_THREATS_SPEEDS).items()}
+        except (ValueError, AttributeError):
+            return {}
 
     @property
     def room_by_sensor(self) -> dict[str, str]:

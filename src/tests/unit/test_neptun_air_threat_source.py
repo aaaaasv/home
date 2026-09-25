@@ -1,6 +1,6 @@
 import unittest
 
-from src.infrastructure.adapters.neptun_air_threat_source import NeptunAirThreatSource, _read_threat
+from src.infrastructure.adapters.neptun_air_threat_source import NeptunAirThreatSource, read_threat
 from src.modules.air_threats.domain import ThreatConfidence, ThreatKind
 
 # a record exactly as the map answered on 25.09.2026, kept whole so a changed payload shape fails here first
@@ -64,7 +64,7 @@ class ReadThreatTestCase(unittest.TestCase):
     """One record of somebody else's undocumented payload, read defensively — a changed field must not crash the bot."""
 
     def test_read_threat_takes_every_field_the_bot_needs(self):
-        threat = _read_threat(REAL_RECORD)
+        threat = read_threat(REAL_RECORD)
 
         self.assertEqual(threat.tracker_id, "trk_00215983")
         self.assertEqual(threat.kind, ThreatKind.UAV)
@@ -80,25 +80,25 @@ class ReadThreatTestCase(unittest.TestCase):
         self.assertEqual(threat.is_position_confirmed, False)
 
     def test_read_threat_without_a_heading_keeps_it_empty_rather_than_guessing(self):
-        threat = _read_threat(REAL_RECORD | {"heading": None})
+        threat = read_threat(REAL_RECORD | {"heading": None})
 
         self.assertEqual(threat.heading_degrees, None)
 
     def test_read_threat_with_a_confirmed_position_says_so(self):
-        threat = _read_threat(REAL_RECORD | {"positionQuality": "confirmed"})
+        threat = read_threat(REAL_RECORD | {"positionQuality": "confirmed"})
 
         self.assertEqual(threat.is_position_confirmed, True)
 
     def test_read_threat_of_a_kind_the_bot_has_never_heard_of_is_still_a_threat(self):
-        threat = _read_threat(REAL_RECORD | {"type": "something_new"})
+        threat = read_threat(REAL_RECORD | {"type": "something_new"})
 
         self.assertEqual(threat.kind, ThreatKind.UNKNOWN)
 
     def test_read_threat_that_is_no_longer_active_is_dropped(self):
-        self.assertEqual(_read_threat(REAL_RECORD | {"status": "closed"}), None)
+        self.assertEqual(read_threat(REAL_RECORD | {"status": "closed"}), None)
 
     def test_read_threat_without_a_position_is_dropped(self):
-        self.assertEqual(_read_threat(REAL_RECORD | {"lat": None}), None)
+        self.assertEqual(read_threat(REAL_RECORD | {"lat": None}), None)
 
 
 class NeptunAirThreatSourceTestCase(unittest.IsolatedAsyncioTestCase):
