@@ -18,4 +18,3 @@ CONFIDENCE_LABELS: dict[ThreatConfidence, str] = {
 
 INBOUND_NOTE = "курсом сюди"
 GONE_NOTE = "зникла з мапи"
-SOURCE_NOTE = "за мапою NEPTUN — це не офіційне попередження"

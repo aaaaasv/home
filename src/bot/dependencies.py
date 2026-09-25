@@ -35,7 +35,7 @@ from src.infrastructure.adapters.hotline_price_source import HotlinePriceSource
 from src.infrastructure.adapters.http_media_server_battery import HttpMediaServerBattery
 from src.infrastructure.adapters.http_media_server_disks import HttpMediaServerDisks
 from src.infrastructure.adapters.ipp_print_queue import IppPrintQueue
-from src.infrastructure.adapters.neptun_air_threat_source import NeptunAirThreatSource
+from src.infrastructure.adapters.neptun_air_threat_stream import NeptunAirThreatStream
 from src.infrastructure.adapters.open_meteo_weather_provider import OpenMeteoWeatherProvider
 from src.infrastructure.adapters.router_presence_source import RouterPresenceSource
 from src.infrastructure.adapters.sensor_community_air_quality import SensorCommunityAirQuality
@@ -94,11 +94,17 @@ def build_room_climate_sensor(settings: Settings) -> RoomClimateSensor:
 
 
 def build_air_threat_source(settings: Settings) -> AirThreatSource:
-    """The threat map is somebody else's service — with the module off, nothing reaches for it at all."""
+    """
+    The threat map, as a socket rather than a poll — with the module off, nothing reaches for it at all.
+
+    polling cost more warning than it was worth: thirty seconds is twenty kilometres of a ballistic missile.
+    the stream object is still an ordinary source, so the rule that decides what is worth a message never
+    learns that it is fed by a socket; the composition root is what starts it running.
+    """
     if not settings.AIR_THREATS_ENABLED:
         return NullAirThreatSource()
 
-    return NeptunAirThreatSource()
+    return NeptunAirThreatStream()
 
 
 def build_weather_provider(settings: Settings) -> WeatherProvider:

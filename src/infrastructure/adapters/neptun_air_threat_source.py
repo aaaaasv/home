@@ -64,7 +64,7 @@ class NeptunAirThreatSource:
 
         threats = []
         for record in records:
-            threat = _read_threat(record)
+            threat = read_threat(record)
             if threat is not None:
                 threats.append(threat)
         return threats
@@ -80,7 +80,7 @@ class NeptunAirThreatSource:
                 return await response.json(content_type=None)
 
 
-def _read_threat(record: dict) -> AirThreat | None:
+def read_threat(record: dict) -> AirThreat | None:
     """One record, or None — a track without a position says nothing we can use, and an unknown kind is still a kind."""
     try:
         if record.get("status") != ACTIVE_STATUS:

@@ -47,11 +47,13 @@ class AirThreat(DomainModel):
 
 
 class ApproachingThreat(DomainModel):
-    """A threat that earned a message, with the two numbers the map cannot know: how far from us, and whether at us."""
+    """A threat that earned a message, with what the map cannot know: how far, how soon, and whether at us."""
 
     threat: AirThreat
     distance_kilometres: float
     is_inbound: bool
+    # how long it would take to reach us at this kind's usual speed — None when it is not coming our way
+    minutes_away: float | None = None
 
 
 class AirThreatChanges(DomainModel):
