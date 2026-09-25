@@ -7,6 +7,7 @@ from aiogram.types import BotCommand, BotCommandScopeAllGroupChats, BotCommandSc
 from src.bot.application import build_bot, build_dispatcher
 from src.bot.dependencies import (
     build_air_conditioner,
+    build_air_threat_source,
     build_answer_question,
     build_compose_transit_report,
     build_ecoflow_station,
@@ -286,6 +287,7 @@ async def run() -> None:
             shopping_topic=shopping_topic,
             chores_topic=chores_topic,
             room_climate_sensor=room_climate_sensor,
+            air_threat_source=build_air_threat_source(settings),
             price_source=build_price_source(settings),
             weather_topic=weather_topic,
             weather_digest_board=weather_digest_board,

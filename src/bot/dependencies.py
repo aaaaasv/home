@@ -35,6 +35,7 @@ from src.infrastructure.adapters.hotline_price_source import HotlinePriceSource
 from src.infrastructure.adapters.http_media_server_battery import HttpMediaServerBattery
 from src.infrastructure.adapters.http_media_server_disks import HttpMediaServerDisks
 from src.infrastructure.adapters.ipp_print_queue import IppPrintQueue
+from src.infrastructure.adapters.neptun_air_threat_source import NeptunAirThreatSource
 from src.infrastructure.adapters.open_meteo_weather_provider import OpenMeteoWeatherProvider
 from src.infrastructure.adapters.router_presence_source import RouterPresenceSource
 from src.infrastructure.adapters.sensor_community_air_quality import SensorCommunityAirQuality
@@ -45,6 +46,7 @@ from src.infrastructure.adapters.x728_pi_ups import X728PiUps
 from src.infrastructure.adapters.yasno_schedule_provider import YasnoScheduleProvider
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner, NullAirConditioner
+from src.modules.air_threats.services.air_threat_source import AirThreatSource, NullAirThreatSource
 from src.modules.assistant.services.conversation_memory import ConversationMemory
 from src.modules.assistant.services.knowledge_source import FileKnowledgeSource
 from src.modules.assistant.services.language_model import LanguageModel
@@ -89,6 +91,14 @@ def build_room_climate_sensor(settings: Settings) -> RoomClimateSensor:
     return Sht31RoomClimateSensor(
         bus_number=settings.CLIMATE_SENSOR_I2C_BUS, address=settings.CLIMATE_SENSOR_I2C_ADDRESS
     )
+
+
+def build_air_threat_source(settings: Settings) -> AirThreatSource:
+    """The threat map is somebody else's service — with the module off, nothing reaches for it at all."""
+    if not settings.AIR_THREATS_ENABLED:
+        return NullAirThreatSource()
+
+    return NeptunAirThreatSource()
 
 
 def build_weather_provider(settings: Settings) -> WeatherProvider:
