@@ -63,6 +63,7 @@ from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFl
 from src.modules.power.services.media_server_battery import MediaServerBattery
 from src.modules.power.services.pi_ups import NullPiUps, PiUps
 from src.modules.power.services.router_link import RouterLink
+from src.modules.presence.services.family_phones import FamilyPhones
 from src.modules.presence.services.presence_source import NullPresenceSource, PresenceSource
 from src.modules.room_climate.services.room_climate_sensor import NullRoomClimateSensor, RoomClimateSensor
 from src.modules.shopping.domain import ReputabilityPolicy
@@ -294,6 +295,17 @@ def build_presence_source(settings: Settings) -> PresenceSource:
 
     return RouterPresenceSource(
         host=settings.ROUTER_HOST, username=settings.ROUTER_USERNAME, password=settings.ROUTER_PASSWORD
+    )
+
+
+def build_family_phones(settings: Settings) -> FamilyPhones:
+    """One instance for the whole process, so the arrivals and the away digest share one recognised roster."""
+    return FamilyPhones(
+        presence_source=build_presence_source(settings),
+        phone_names=settings.presence_phone_names,
+        phone_macs=settings.presence_phone_macs,
+        household_calendar=HouseholdCalendar(timezone=settings.timezone),
+        recognition_minutes=settings.PRESENCE_RECOGNITION_MINUTES,
     )
 
 

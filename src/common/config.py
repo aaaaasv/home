@@ -140,7 +140,14 @@ class Settings(BaseSettings):
     ROUTER_HOST: str = ""
     ROUTER_USERNAME: str = ""
     ROUTER_PASSWORD: str = ""
+    # names the router knows the family's phones by, matched case-insensitively as substrings. this is the
+    # identity that survives ios rotating its private wi-fi address; PRESENCE_PHONE_MACS stays as an extra
+    # allowlist for a device the router names unhelpfully
+    PRESENCE_PHONE_NAMES: str = "iPhone"
     PRESENCE_PHONE_MACS: str = ""
+    # how long the recognised roster is trusted before asking the router again; an address never seen before is
+    # looked up at once whatever this says
+    PRESENCE_RECOGNITION_MINUTES: int = 10
     PRESENCE_CHECK_MINUTES: int = 3
     # a phone deep-sleeps off Wi-Fi for minutes, so it counts as gone only after this long unseen
     PRESENCE_AWAY_GRACE_MINUTES: int = 15
@@ -395,6 +402,10 @@ class Settings(BaseSettings):
     @property
     def presence_phone_macs(self) -> set[str]:
         return {mac.strip().upper() for mac in self.PRESENCE_PHONE_MACS.split(",") if mac.strip()}
+
+    @property
+    def presence_phone_names(self) -> set[str]:
+        return {name.strip() for name in self.PRESENCE_PHONE_NAMES.split(",") if name.strip()}
 
     @property
     def timezone(self) -> ZoneInfo:

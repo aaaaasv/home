@@ -13,7 +13,7 @@ from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.config import Settings
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
 from src.modules.presence.monitor import PresenceMonitor
-from src.modules.presence.services.presence_source import PresenceSource
+from src.modules.presence.services.family_phones import FamilyPhones
 
 logger = logging.getLogger(__name__)
 
@@ -29,25 +29,22 @@ class PresenceJob:
         bot: Bot,
         chat_id: int,
         weather_topic: ForumTopicRegistry,
-        presence_source: PresenceSource,
+        family_phones: FamilyPhones,
         air_conditioner: AirConditioner,
         settings: Settings,
     ):
         self.bot = bot
         self.chat_id = chat_id
         self.weather_topic = weather_topic
-        self.presence_source = presence_source
+        self.family_phones = family_phones
         self.air_conditioner = air_conditioner
-        self.monitor = PresenceMonitor(
-            family_macs=settings.presence_phone_macs,
-            away_grace=timedelta(minutes=settings.PRESENCE_AWAY_GRACE_MINUTES),
-        )
+        self.monitor = PresenceMonitor(away_grace=timedelta(minutes=settings.PRESENCE_AWAY_GRACE_MINUTES))
 
     async def __call__(self) -> None:
-        online = await self.presence_source.online_macs()
-        if online is None:
+        roster = await self.family_phones.read_roster()
+        if roster is None:
             return
-        if not self.monitor.update(online, datetime.now(timezone.utc)):
+        if not self.monitor.update(roster, datetime.now(timezone.utc)):
             return
 
         state = await self.air_conditioner.read_state()
@@ -87,7 +84,7 @@ def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> Non
     if (
         not settings.PRESENCE_ENABLED
         or context.weather_topic is None
-        or context.presence_source is None
+        or context.family_phones is None
         or context.air_conditioner is None
     ):
         return
@@ -96,7 +93,7 @@ def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> Non
         bot=context.bot,
         chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
         weather_topic=context.weather_topic,
-        presence_source=context.presence_source,
+        family_phones=context.family_phones,
         air_conditioner=context.air_conditioner,
         settings=settings,
     )
