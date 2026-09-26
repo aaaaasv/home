@@ -7,6 +7,7 @@ from aiogram.types import BotCommand, BotCommandScopeAllGroupChats, BotCommandSc
 
 from src.bot.application import build_bot, build_dispatcher
 from src.bot.dependencies import (
+    build_air_alert_source,
     build_air_conditioner,
     build_air_threat_source,
     build_answer_question,
@@ -29,6 +30,7 @@ from src.bot.dependencies import (
     build_weather_provider,
     build_yasno_schedule_provider,
 )
+from src.bot.handlers.air_alert.light import AlertLightWatcher
 from src.bot.handlers.air_threats.watch import AirThreatWatcher
 from src.bot.handlers.assistant import ASSISTANT_MODULE_NAME
 from src.bot.handlers.chores.board import CHORES_MODULE_NAME, ChoresBoard
@@ -52,6 +54,7 @@ from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.common.config import Settings, get_settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.adapters.neptun_air_threat_stream import NeptunAirThreatStream
+from src.infrastructure.adapters.ukrainealarm_source import UkraineAlarmSource
 from src.infrastructure.db.uow import UnitOfWork
 from src.mqtt.app import build_mqtt_surface
 from src.mqtt.surface import MqttContext
@@ -171,6 +174,8 @@ async def run() -> None:
     ecoflow_station = build_ecoflow_station(settings)
     room_climate_sensor = build_room_climate_sensor(settings)
     air_threat_source = build_air_threat_source(settings)
+    air_alert_source = build_air_alert_source(settings)
+    panel_light = build_panel_light(settings)
     # the unit serves one client at a time, so the button handlers and the runtime poll must share one instance —
     # its lock only serialises binds that go through the same object
     air_conditioner = build_air_conditioner(settings)
@@ -292,6 +297,8 @@ async def run() -> None:
             chores_topic=chores_topic,
             room_climate_sensor=room_climate_sensor,
             air_threat_source=air_threat_source,
+            air_alert_source=air_alert_source,
+            panel_light=panel_light,
             price_source=build_price_source(settings),
             weather_topic=weather_topic,
             weather_digest_board=weather_digest_board,
@@ -348,7 +355,7 @@ async def run() -> None:
                 air_conditioner=air_conditioner,
                 ecoflow_station=ecoflow_station,
                 room_climate_sensor=room_climate_sensor,
-                panel_light=build_panel_light(settings),
+                panel_light=panel_light,
                 record_watering=build_watering_recorder(
                     bot=bot,
                     settings=settings,
@@ -383,6 +390,19 @@ async def run() -> None:
         )
         threat_stream_task = asyncio.create_task(air_threat_source.run())
 
+    # the alert socket: the light must answer in seconds, and the job behind it only covers the case where
+    # this connection is open, subscribed and silently dead
+    alert_socket_task = None
+    if settings.ALERT_LIGHT_ENABLED and isinstance(air_alert_source, UkraineAlarmSource):
+        alert_light_watcher = AlertLightWatcher(
+            uow_factory=UnitOfWork,
+            source=air_alert_source,
+            panel_light=panel_light,
+            settings=settings,
+            household_calendar=HouseholdCalendar(timezone=settings.timezone),
+        )
+        alert_socket_task = asyncio.create_task(air_alert_source.run(on_change=alert_light_watcher))
+
     # the specimen sheets share this loop with polling and the scheduler, the way everything else here does
     web_runner = None
     if settings.WEB_ENABLED:
@@ -393,10 +413,11 @@ async def run() -> None:
     try:
         await dispatcher.start_polling(bot)
     finally:
-        if threat_stream_task is not None:
-            threat_stream_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await threat_stream_task
+        for background_task in (threat_stream_task, alert_socket_task):
+            if background_task is not None:
+                background_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await background_task
         if mqtt_surface is not None:
             await mqtt_surface.stop()
         if web_runner is not None:

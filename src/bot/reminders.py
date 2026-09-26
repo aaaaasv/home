@@ -1,6 +1,7 @@
 """The scheduler assembly: each module registers its own work, this file only collects it."""
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from src.bot.handlers.air_alert import jobs as air_alert_jobs
 from src.bot.handlers.air_conditioner import jobs as air_conditioner_jobs
 from src.bot.handlers.air_threats import jobs as air_threats_jobs
 from src.bot.handlers.chores import jobs as chores_jobs
@@ -30,6 +31,7 @@ JOB_REGISTRARS: tuple[JobRegistrar, ...] = (
     newspaper_jobs.register_jobs,
     sensors_jobs.register_jobs,
     air_threats_jobs.register_jobs,
+    air_alert_jobs.register_jobs,
 )
 
 
