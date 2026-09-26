@@ -13,6 +13,9 @@ The price of being early is being wrong sometimes, and the router's own log show
 Six seconds, nobody walking anywhere. That is why an arrival is not «з'явився» but «не було достатньо довго»,
 and why the threshold is counted in tens of minutes rather than in seconds.
 
+Which phone counts as ours is asked of the router by name rather than read from a list of addresses, because
+iOS rotates the private address it wears on this network — see `src.modules.presence.domain`.
+
 **Every decision is written down, including every refusal.** Two reasons, and both turned up the same
 evening. The absence has to be measurable across a restart — the deploy that shipped this feature wiped an
 in-memory departure an hour before anybody came home, which would have meant a dark hallway and no
@@ -29,7 +32,7 @@ from src.common.daylight import is_dark
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.lighting.services.panel_light import PanelLight
-from src.modules.presence.services.presence_source import PresenceSource
+from src.modules.presence.services.family_phones import FamilyPhones
 from src.modules.presence.use_cases.record_presence_event import (
     JOINED,
     LEFT,
@@ -60,13 +63,13 @@ class ArrivalLightWatcher:
         self,
         uow_factory: Callable[[], UnitOfWork],
         panel_light: PanelLight,
-        presence_source: PresenceSource,
+        family_phones: FamilyPhones,
         settings: Settings,
         household_calendar: HouseholdCalendar,
     ):
         self.uow_factory = uow_factory
         self.panel_light = panel_light
-        self.presence_source = presence_source
+        self.family_phones = family_phones
         self.settings = settings
         self.household_calendar = household_calendar
         self._raised_at = None
@@ -80,8 +83,8 @@ class ArrivalLightWatcher:
         except (ValueError, KeyError, TypeError):
             return
 
-        if mac not in self.settings.presence_phone_macs or event not in (JOINED, LEFT):
-            # somebody else's device on the same wi-fi; not ours to record or to act on
+        if event not in (JOINED, LEFT) or not await self.family_phones.recognises(mac):
+            # somebody else's device on the same wi-fi, or a router that cannot say — not ours to record
             return
 
         rssi = report.get("rssi")
@@ -105,12 +108,12 @@ class ArrivalLightWatcher:
         if not is_dark(moment, self.settings.PRESENCE_LATITUDE, self.settings.PRESENCE_LONGITUDE):
             return REFUSED_DAYLIGHT
 
-        online = await self.presence_source.online_macs()
-        if online is None:
+        roster = await self.family_phones.read_roster()
+        if roster is None:
             # the router did not answer. treating that as "nobody home" would light an empty hallway, and
             # treating it as "somebody home" costs only this one arrival — so be the quiet one
             return REFUSED_ROUTER_SILENT
-        if (online & self.settings.presence_phone_macs) - {mac}:
+        if roster.somebody_else_home(mac):
             return REFUSED_SOMEBODY_HOME
 
         standing = await self.panel_light.read()

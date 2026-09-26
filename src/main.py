@@ -13,6 +13,7 @@ from src.bot.dependencies import (
     build_answer_question,
     build_compose_transit_report,
     build_ecoflow_station,
+    build_family_phones,
     build_language_model,
     build_local_air_quality,
     build_media_server_battery,
@@ -22,7 +23,6 @@ from src.bot.dependencies import (
     build_panel_light,
     build_pi_health_sensor,
     build_pi_ups,
-    build_presence_source,
     build_price_source,
     build_room_climate_sensor,
     build_router_link,
@@ -177,13 +177,13 @@ async def run() -> None:
     air_threat_source = build_air_threat_source(settings)
     air_alert_source = build_air_alert_source(settings)
     panel_light = build_panel_light(settings)
-    presence_source = build_presence_source(settings)
+    family_phones = build_family_phones(settings)
     arrival_light_watcher = None
-    if settings.ARRIVAL_LIGHT_ENABLED and presence_source is not None:
+    if settings.ARRIVAL_LIGHT_ENABLED:
         arrival_light_watcher = ArrivalLightWatcher(
             uow_factory=UnitOfWork,
             panel_light=panel_light,
-            presence_source=presence_source,
+            family_phones=family_phones,
             settings=settings,
             household_calendar=HouseholdCalendar(timezone=settings.timezone),
         )
@@ -318,7 +318,7 @@ async def run() -> None:
             tech_topic=tech_topic,
             pi_health_sensor=build_pi_health_sensor(settings),
             media_server_disks=build_media_server_disks(settings),
-            presence_source=presence_source,
+            family_phones=family_phones,
             ecoflow_station=ecoflow_station,
             pi_ups=pi_ups,
             power_topic=power_topic,
