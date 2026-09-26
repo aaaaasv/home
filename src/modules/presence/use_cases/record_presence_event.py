@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from src.common.household_calendar import HouseholdCalendar
+from src.common.time import as_utc
 from src.common.use_case import BaseUseCase
 from src.infrastructure.db.uow import UnitOfWork
 
@@ -33,7 +34,7 @@ class RecordPresenceEventUseCase(BaseUseCase):
             if event == JOINED:
                 departure = await uow.presence_events.retrieve_last_departure(mac)
                 if departure is not None:
-                    away = moment - _as_utc(departure.at)
+                    away = moment - as_utc(departure.at)
 
             await uow.presence_events.create({"mac": mac, "event": event, "rssi": rssi, "at": moment})
             await uow.presence_events.delete_before(moment - timedelta(days=RETENTION_DAYS))
@@ -48,10 +49,3 @@ class RecordArrivalOutcomeUseCase(BaseUseCase):
             recent = await uow.presence_events.retrieve_last_join(mac)
             if recent is not None:
                 recent.outcome = outcome
-
-
-def _as_utc(moment: datetime) -> datetime:
-    """SQLite keeps no offset, and the column type re-attaches it — but a fresh row may arrive naive."""
-    from datetime import timezone
-
-    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)

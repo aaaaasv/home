@@ -153,6 +153,9 @@ class Settings(BaseSettings):
     PRESENCE_AWAY_GRACE_MINUTES: int = 15
     # ── зустріч на порозі ─────────────────────────────────────────────────────
     ARRIVAL_LIGHT_ENABLED: bool = False
+    # two people walk in together and the router sees both radios seconds apart, so a phone that arrived
+    # this recently counts as a companion rather than as somebody who was already at home
+    ARRIVAL_TOGETHER_MINUTES: int = 3
     PRESENCE_LATITUDE: float = 0.0
     PRESENCE_LONGITUDE: float = 0.0
     ARRIVAL_LIGHT_PERCENT: float = 20.0
