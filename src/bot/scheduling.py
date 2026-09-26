@@ -70,6 +70,7 @@ class SchedulerContext:
     air_threat_source: AirThreatSource | None = None
     air_alert_source: AirAlertSource | None = None
     panel_light: PanelLight | None = None
+    arrival_light_watcher: object | None = None
 
     def build_posted_message_tracker(self) -> PostedMessageTracker:
         return PostedMessageTracker(bot=self.bot, uow_factory=self.uow_factory)

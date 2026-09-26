@@ -144,6 +144,15 @@ class Settings(BaseSettings):
     PRESENCE_CHECK_MINUTES: int = 3
     # a phone deep-sleeps off Wi-Fi for minutes, so it counts as gone only after this long unseen
     PRESENCE_AWAY_GRACE_MINUTES: int = 15
+    # ── зустріч на порозі ─────────────────────────────────────────────────────
+    ARRIVAL_LIGHT_ENABLED: bool = False
+    PRESENCE_LATITUDE: float = 0.0
+    PRESENCE_LONGITUDE: float = 0.0
+    ARRIVAL_LIGHT_PERCENT: float = 20.0
+    # скільки телефона має не бути, щоб поява рахувалась поверненням. у лозі роутера видно, як пристрій
+    # відпадає і вертається за три секунди — тому поріг у десятках хвилин, а не в секундах
+    ARRIVAL_AWAY_MINUTES: int = 30
+    ARRIVAL_LIGHT_MINUTES: int = 10
 
     # once a day the bot re-reads every /track-ed hotline item and speaks only on a new low; dormant until used
     # the tracked price is the cheapest offer from a shop that either clears the rating bar or is trusted by hand,

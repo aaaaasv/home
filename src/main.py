@@ -41,6 +41,7 @@ from src.bot.handlers.power import POWER_MODULE_NAME
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.handlers.power.reserve_board import ReserveBoard
+from src.bot.handlers.presence.arrival import ArrivalLightWatcher
 from src.bot.handlers.sensors.recording import build_sensor_recorder
 from src.bot.handlers.shopping.board import SHOPPING_MODULE_NAME, ShoppingListBoard
 from src.bot.handlers.system import SYSTEM_MODULE_NAME
@@ -176,6 +177,15 @@ async def run() -> None:
     air_threat_source = build_air_threat_source(settings)
     air_alert_source = build_air_alert_source(settings)
     panel_light = build_panel_light(settings)
+    presence_source = build_presence_source(settings)
+    arrival_light_watcher = None
+    if settings.ARRIVAL_LIGHT_ENABLED and presence_source is not None:
+        arrival_light_watcher = ArrivalLightWatcher(
+            panel_light=panel_light,
+            presence_source=presence_source,
+            settings=settings,
+            household_calendar=HouseholdCalendar(timezone=settings.timezone),
+        )
     # the unit serves one client at a time, so the button handlers and the runtime poll must share one instance —
     # its lock only serialises binds that go through the same object
     air_conditioner = build_air_conditioner(settings)
@@ -299,6 +309,7 @@ async def run() -> None:
             air_threat_source=air_threat_source,
             air_alert_source=air_alert_source,
             panel_light=panel_light,
+            arrival_light_watcher=arrival_light_watcher,
             price_source=build_price_source(settings),
             weather_topic=weather_topic,
             weather_digest_board=weather_digest_board,
@@ -306,7 +317,7 @@ async def run() -> None:
             tech_topic=tech_topic,
             pi_health_sensor=build_pi_health_sensor(settings),
             media_server_disks=build_media_server_disks(settings),
-            presence_source=build_presence_source(settings),
+            presence_source=presence_source,
             ecoflow_station=ecoflow_station,
             pi_ups=pi_ups,
             power_topic=power_topic,
@@ -364,6 +375,7 @@ async def run() -> None:
                     household_calendar=HouseholdCalendar(timezone=settings.timezone),
                     posted_message_tracker=PostedMessageTracker(bot=bot, uow_factory=UnitOfWork),
                 ),
+                handle_presence_event=arrival_light_watcher.handle if arrival_light_watcher else None,
                 record_sensor_reading=build_sensor_recorder(
                     uow_factory=UnitOfWork,
                     household_calendar=HouseholdCalendar(timezone=settings.timezone),

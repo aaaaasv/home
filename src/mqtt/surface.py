@@ -48,6 +48,8 @@ class MqttContext:
     record_watering: Callable[[int], Awaitable[None]] | None = None
     # where a reading goes to be remembered; None keeps the bot listening to nothing
     record_sensor_reading: Callable[[RecordSensorReadingCommand], Awaitable[None]] | None = None
+    # what to do when a phone joins or leaves the wi-fi; the mqtt side never learns what a light is
+    handle_presence_event: ReadingHandler | None = None
 
 
 class ListenerRegistrar(Protocol):
