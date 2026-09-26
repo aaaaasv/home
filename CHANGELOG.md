@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Виправлено
+
+- **Двоє, що приходять додому разом, тепер отримують світло.** Кожен телефон бачив інший уже в мережі й
+  відмовлявся з причиною «хтось уже вдома» — тобто найчастіший випадок не працював зовсім. Тепер перший
+  підіймає стрічку, другий бачить, що вона вже горить. Мешканець, чий телефон просто моргнув радіо, і далі
+  рахується як «хтось удома».
+
 ## [0.28.2] - 2026-09-26
 
 ### Виправлено
