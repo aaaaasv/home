@@ -33,6 +33,20 @@ class PresenceEventRepository(SQLAlchemyRepository[PresenceEvent]):
         )
         return result.scalars().first()
 
+    async def list_macs(self) -> list[str]:
+        """Every address the log knows — by construction only the family's phones are ever written here."""
+        result = await self.session.execute(select(PresenceEvent.mac).distinct())
+        return list(result.scalars().all())
+
+    async def retrieve_last_event_before(self, mac: str, moment: datetime) -> PresenceEvent | None:
+        """What this phone was doing when the window opened, which decides whether it starts out at home."""
+        result = await self.session.execute(
+            select(PresenceEvent)
+            .where(PresenceEvent.mac == mac, PresenceEvent.at < moment)
+            .order_by(PresenceEvent.at.desc())
+        )
+        return result.scalars().first()
+
     async def list_since(self, moment: datetime) -> list[PresenceEvent]:
         result = await self.session.execute(
             select(PresenceEvent).where(PresenceEvent.at >= moment).order_by(PresenceEvent.at)
