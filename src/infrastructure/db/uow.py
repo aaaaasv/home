@@ -19,6 +19,7 @@ from src.infrastructure.repositories.plant import PlantRepository
 from src.infrastructure.repositories.plant_climate_alert import PlantClimateAlertRepository
 from src.infrastructure.repositories.plant_photo import PlantPhotoRepository
 from src.infrastructure.repositories.posted_message import PostedMessageRepository
+from src.infrastructure.repositories.presence_event import PresenceEventRepository
 from src.infrastructure.repositories.price_check import PriceCheckRepository
 from src.infrastructure.repositories.room_climate import (
     RoomClimateAlertRepository,
@@ -56,6 +57,7 @@ class UnitOfWork:
         self.sensor_days: SensorDayRepository | None = None
         self.air_threat_notices: AirThreatNoticeRepository | None = None
         self.air_alert_state: AirAlertStateRepository | None = None
+        self.presence_events: PresenceEventRepository | None = None
 
     async def __aenter__(self):
         self.session = self.session_factory()
@@ -82,6 +84,7 @@ class UnitOfWork:
         self.sensor_days = SensorDayRepository(session=self.session)
         self.air_threat_notices = AirThreatNoticeRepository(session=self.session)
         self.air_alert_state = AirAlertStateRepository(session=self.session)
+        self.presence_events = PresenceEventRepository(session=self.session)
         return self
 
     async def __aexit__(self, exception_type, exception_value, exception_traceback):

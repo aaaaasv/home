@@ -181,6 +181,7 @@ async def run() -> None:
     arrival_light_watcher = None
     if settings.ARRIVAL_LIGHT_ENABLED and presence_source is not None:
         arrival_light_watcher = ArrivalLightWatcher(
+            uow_factory=UnitOfWork,
             panel_light=panel_light,
             presence_source=presence_source,
             settings=settings,

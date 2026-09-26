@@ -1,14 +1,11 @@
 import json
-import unittest
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from src.bot.handlers.presence.arrival import ArrivalLightWatcher
 from src.common.config import Settings
 from src.modules.lighting.domain import PanelLightState
-from src.tests.fakes import FrozenHouseholdCalendar
+from src.tests.integration.base import BaseIntegrationTestCase
 
-KYIV = ZoneInfo("Europe/Kyiv")
 # 22:00 in Kyiv in late September — the sun is eleven degrees down, which is properly dark
 NIGHT = datetime(2026, 9, 26, 19, 0, tzinfo=timezone.utc)
 # and 13:00 local on the same day, which is not
@@ -41,16 +38,21 @@ class ScriptedPresence:
         return self.online
 
 
-class ArrivalLightTestCase(unittest.IsolatedAsyncioTestCase):
+class ArrivalLightTestCase(BaseIntegrationTestCase):
     """
-    Meeting somebody at the door — and, more to the point, the four cases where it refuses to.
+    Meeting somebody at the door — and, more to the point, every case where it refuses to.
 
     the refusals are the reason this can stay switched on: the router's own log shows a phone leaving and
     rejoining inside six seconds, so a rule that simply answered «з'явився» would blink all day.
+
+    every one of them is written down, because «чи не вмикалось воно саме, поки нас не було» has to be a
+    query rather than a matter of trust.
     """
 
     def build_watcher(self, light, online=frozenset(), now=NIGHT) -> ArrivalLightWatcher:
+        self.household_calendar.frozen_now = now
         return ArrivalLightWatcher(
+            uow_factory=lambda: self.uow,
             panel_light=light,
             presence_source=ScriptedPresence(online),
             settings=Settings(
@@ -62,7 +64,7 @@ class ArrivalLightTestCase(unittest.IsolatedAsyncioTestCase):
                 ARRIVAL_AWAY_MINUTES=AWAY_MINUTES,
                 ARRIVAL_LIGHT_MINUTES=10,
             ),
-            household_calendar=FrozenHouseholdCalendar(timezone=KYIV, frozen_now=now),
+            household_calendar=self.household_calendar,
         )
 
     async def leave_then_return(self, watcher, away_minutes: int, mac: str = MY_PHONE) -> None:
@@ -71,11 +73,29 @@ class ArrivalLightTestCase(unittest.IsolatedAsyncioTestCase):
         watcher.household_calendar.frozen_now += timedelta(minutes=away_minutes)
         await watcher.handle(json.dumps({"mac": mac, "event": "joined"}))
 
+    async def outcomes(self) -> list[str | None]:
+        async with self.uow as uow:
+            events = await uow.presence_events.list_since(datetime(2000, 1, 1, tzinfo=timezone.utc))
+        return [event.outcome for event in events if event.event == "joined"]
+
     async def test_coming_home_after_a_real_absence_in_the_dark_raises_the_light(self):
         light = RecordingPanelLight()
         watcher = self.build_watcher(light)
 
         await self.leave_then_return(watcher, away_minutes=120)
+
+        self.assertEqual(light.asked_for, [ARRIVAL_PERCENT])
+        self.assertEqual(await self.outcomes(), ["raised"])
+
+    async def test_an_absence_measured_across_a_restart_still_counts(self):
+        """The departure lives in the database, so a deploy between leaving and returning changes nothing."""
+        light = RecordingPanelLight()
+        first = self.build_watcher(light)
+        first.household_calendar.frozen_now -= timedelta(minutes=120)
+        await first.handle(json.dumps({"mac": MY_PHONE, "event": "left"}))
+
+        restarted = self.build_watcher(light)
+        await restarted.handle(json.dumps({"mac": MY_PHONE, "event": "joined"}))
 
         self.assertEqual(light.asked_for, [ARRIVAL_PERCENT])
 
@@ -90,6 +110,7 @@ class ArrivalLightTestCase(unittest.IsolatedAsyncioTestCase):
         await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "joined"}))
 
         self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), ["hop"])
 
     async def test_coming_home_in_daylight_leaves_the_light_off(self):
         light = RecordingPanelLight()
@@ -98,6 +119,7 @@ class ArrivalLightTestCase(unittest.IsolatedAsyncioTestCase):
         await self.leave_then_return(watcher, away_minutes=120)
 
         self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), ["daylight"])
 
     async def test_coming_home_to_a_flat_that_is_not_empty_leaves_the_light_off(self):
         light = RecordingPanelLight()
@@ -106,6 +128,7 @@ class ArrivalLightTestCase(unittest.IsolatedAsyncioTestCase):
         await self.leave_then_return(watcher, away_minutes=120)
 
         self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), ["somebody_home"])
 
     async def test_coming_home_to_a_light_already_on_leaves_it_where_it_was(self):
         light = RecordingPanelLight(PanelLightState(is_on=True, brightness_percent=60.0))
@@ -115,23 +138,16 @@ class ArrivalLightTestCase(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(light.asked_for, [])
         self.assertEqual(light.state.brightness_percent, 60.0)
-
-    async def test_a_phone_that_is_not_ours_is_ignored(self):
-        light = RecordingPanelLight()
-        watcher = self.build_watcher(light)
-
-        await self.leave_then_return(watcher, away_minutes=120, mac="11:22:33:44:55:66")
-
-        self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), ["light_on"])
 
     async def test_a_join_with_no_remembered_departure_stays_dark(self):
-        """After a restart there is no absence to measure, and being unsure should look like doing nothing."""
         light = RecordingPanelLight()
         watcher = self.build_watcher(light)
 
         await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "joined"}))
 
         self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), ["no_departure"])
 
     async def test_an_unreachable_router_keeps_the_light_off(self):
         """Guessing "nobody home" would light an empty hallway; guessing the other way costs one arrival."""
@@ -141,6 +157,16 @@ class ArrivalLightTestCase(unittest.IsolatedAsyncioTestCase):
         await self.leave_then_return(watcher, away_minutes=120)
 
         self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), ["router_silent"])
+
+    async def test_a_phone_that_is_not_ours_is_neither_recorded_nor_acted_on(self):
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(light)
+
+        await self.leave_then_return(watcher, away_minutes=120, mac="11:22:33:44:55:66")
+
+        self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), [])
 
     async def test_a_message_that_is_not_an_event_is_survived(self):
         light = RecordingPanelLight()
@@ -149,6 +175,16 @@ class ArrivalLightTestCase(unittest.IsolatedAsyncioTestCase):
         await watcher.handle("not json at all")
 
         self.assertEqual(light.asked_for, [])
+
+    async def test_the_signal_strength_is_kept_with_the_join(self):
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(light)
+
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "joined", "rssi": -75}))
+
+        async with self.uow as uow:
+            events = await uow.presence_events.list_since(datetime(2000, 1, 1, tzinfo=timezone.utc))
+        self.assertEqual([event.rssi for event in events], [-75])
 
     async def test_the_sweep_puts_the_light_out_once_the_welcome_has_expired(self):
         light = RecordingPanelLight()
