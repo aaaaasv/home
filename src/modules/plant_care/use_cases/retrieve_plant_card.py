@@ -4,12 +4,16 @@ from src.common.household_calendar import HouseholdCalendar
 from src.common.use_case import BaseUseCase
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.domain import PlantCard
+from src.modules.plant_care.services.plant_air import read_plant_air
 
 
 class RetrievePlantCardUseCase(BaseUseCase):
-    def __init__(self, uow: UnitOfWork, household_calendar: HouseholdCalendar):
+    def __init__(
+        self, uow: UnitOfWork, household_calendar: HouseholdCalendar, sensor_by_plant: dict[int, str] | None = None
+    ):
         super().__init__(uow)
         self.household_calendar = household_calendar
+        self.sensor_by_plant = sensor_by_plant or {}
 
     async def __call__(self, plant_id: int) -> PlantCard:
         today = self.household_calendar.today()
@@ -23,4 +27,11 @@ class RetrievePlantCardUseCase(BaseUseCase):
             recent_events = await uow.care_events.list_recent_by_plant_id(plant_id, limit=PLANT_CARD_HISTORY_SIZE)
             photos = await uow.plant_photos.list_by_plant_id(plant_id)
 
-            return PlantCard.from_models(plant, schedules, recent_events, photos, today)
+            air = await read_plant_air(
+                uow,
+                sensor=self.sensor_by_plant.get(plant_id),
+                room=plant.room,
+                now=self.household_calendar.now(),
+            )
+
+            return PlantCard.from_models(plant, schedules, recent_events, photos, today, air)

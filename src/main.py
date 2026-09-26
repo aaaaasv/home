@@ -73,6 +73,7 @@ GROUP_COMMANDS = [
     BotCommand(command="later", description="🛒 покупка на колись"),
     BotCommand(command="track", description="🛒 стежити за ціною (лінк hotline)"),
     BotCommand(command="ac", description="❄️ кондиціонер"),
+    BotCommand(command="climate", description="🏠 клімат удома по кімнатах"),
     BotCommand(command="eco", description="⚡ EcoFlow Delta 2"),
     BotCommand(command="reserve", description="⚡ резерв живлення"),
     BotCommand(command="conserve", description="⚡ зберігання EcoFlow"),
@@ -160,6 +161,8 @@ async def run() -> None:
             uow_factory=UnitOfWork,
             weather_provider=weather_provider,
             timezone=settings.timezone,
+            household_calendar=HouseholdCalendar(timezone=settings.timezone),
+            settings=settings,
             local_air_quality=build_local_air_quality(settings),
         )
 

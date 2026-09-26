@@ -38,11 +38,12 @@ async def choose_field(
     callback_data: PlantCallback,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     await callback.answer()
-    card = await RetrievePlantCardUseCase(uow=uow_factory(), household_calendar=household_calendar)(
-        callback_data.plant_id
-    )
+    card = await RetrievePlantCardUseCase(
+        uow=uow_factory(), household_calendar=household_calendar, sensor_by_plant=settings.sensor_by_plant
+    )(callback_data.plant_id)
     await callback.message.answer(messages.ASK_EDIT_FIELD, reply_markup=build_plant_edit_keyboard(card))
 
 
@@ -75,6 +76,7 @@ async def clear_field(
     state: FSMContext,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     collected_data = await state.get_data()
     field = collected_data["field"]
@@ -90,7 +92,7 @@ async def clear_field(
         changes = {field: None}
     await delete_quietly(message)
     await sweep_transient_messages(message.bot, message.chat.id, collected_data)
-    await _apply_changes(message, collected_data["plant_id"], changes, uow_factory, household_calendar)
+    await _apply_changes(message, collected_data["plant_id"], changes, uow_factory, household_calendar, settings)
 
 
 @router.message(EditPlantStates.field_value, F.text)
@@ -128,7 +130,7 @@ async def store_new_value(
     await state.clear()
     await delete_quietly(message)
     await sweep_transient_messages(message.bot, message.chat.id, collected_data)
-    await _apply_changes(message, collected_data["plant_id"], changes, uow_factory, household_calendar)
+    await _apply_changes(message, collected_data["plant_id"], changes, uow_factory, household_calendar, settings)
 
 
 def _resolve_room(typed: str, settings: Settings) -> str | None:
@@ -153,10 +155,13 @@ async def _apply_changes(
     changes: dict,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     command = UpdatePlantCommand(plant_id=plant_id, **changes)
 
     await UpdatePlantUseCase(uow=uow_factory())(command)
 
-    card = await RetrievePlantCardUseCase(uow=uow_factory(), household_calendar=household_calendar)(plant_id)
+    card = await RetrievePlantCardUseCase(
+        uow=uow_factory(), household_calendar=household_calendar, sensor_by_plant=settings.sensor_by_plant
+    )(plant_id)
     await send_plant_card(message, card, household_calendar)

@@ -15,6 +15,7 @@ from src.bot.handlers.plants.keyboards import (
     build_plant_card_keyboard,
     build_plant_list_keyboard,
 )
+from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.commands import ArchivePlantCommand, RestorePlantCommand
@@ -43,7 +44,10 @@ async def send_plant_card(message: Message, card: PlantCard, household_calendar:
 
 @router.message(Command("list"))
 async def list_plants(
-    message: Message, uow_factory: Callable[[], UnitOfWork], household_calendar: HouseholdCalendar
+    message: Message,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     plants = await ListPlantsUseCase(uow=uow_factory(), household_calendar=household_calendar)()
     if not plants:
@@ -67,11 +71,12 @@ async def open_plant_card(
     callback_data: PlantCallback,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     await callback.answer()
-    card = await RetrievePlantCardUseCase(uow=uow_factory(), household_calendar=household_calendar)(
-        callback_data.plant_id
-    )
+    card = await RetrievePlantCardUseCase(
+        uow=uow_factory(), household_calendar=household_calendar, sensor_by_plant=settings.sensor_by_plant
+    )(callback_data.plant_id)
     await send_plant_card(callback.message, card, household_calendar)
 
 
@@ -81,11 +86,12 @@ async def confirm_archiving(
     callback_data: PlantCallback,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     await callback.answer()
-    card = await RetrievePlantCardUseCase(uow=uow_factory(), household_calendar=household_calendar)(
-        callback_data.plant_id
-    )
+    card = await RetrievePlantCardUseCase(
+        uow=uow_factory(), household_calendar=household_calendar, sensor_by_plant=settings.sensor_by_plant
+    )(callback_data.plant_id)
     await callback.message.answer(
         messages.ARCHIVE_CONFIRM.format(plant_name=card.name),
         reply_markup=build_archive_confirmation_keyboard(card.id),
@@ -98,6 +104,7 @@ async def archive_plant(
     callback_data: PlantCallback,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     plant_name = await ArchivePlantUseCase(uow=uow_factory(), household_calendar=household_calendar)(
         ArchivePlantCommand(plant_id=callback_data.plant_id)

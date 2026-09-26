@@ -15,7 +15,11 @@ async def gather_facts(context: FactsContext) -> str:
     calendar = context.household_calendar
     plants = await ListPlantsUseCase(uow=context.uow_factory(), household_calendar=calendar)()
     sheets = [
-        await RetrievePlantSheetUseCase(uow=context.uow_factory(), household_calendar=calendar)(str(plant.id))
+        await RetrievePlantSheetUseCase(
+            uow=context.uow_factory(),
+            household_calendar=calendar,
+            sensor_by_plant=context.settings.sensor_by_plant,
+        )(str(plant.id))
         for plant in plants
     ]
     return render_collection_facts(sheets, calendar)

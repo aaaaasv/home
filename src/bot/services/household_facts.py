@@ -3,6 +3,7 @@ import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 
+from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 
@@ -13,6 +14,7 @@ class FactsContext:
 
     household_calendar: HouseholdCalendar
     uow_factory: Callable[[], UnitOfWork]
+    settings: Settings
 
 
 FactsGatherer = Callable[[FactsContext], Awaitable[str]]

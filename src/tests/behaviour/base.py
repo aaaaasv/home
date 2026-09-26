@@ -24,6 +24,7 @@ from src.tests.telegram import (
     ASSISTANT_TOPIC,
     CHAT_ID,
     CHORES_TOPIC,
+    CLIMATE_TOPIC,
     PLACES_TOPIC,
     PLANTS_TOPIC,
     POWER_TOPIC,
@@ -76,6 +77,7 @@ def shared_dispatcher() -> tuple[Dispatcher, Bot]:
             air_conditioner=SimpleNamespace(),
             power_topic=StubForumTopic(thread_id=POWER_TOPIC),
             assistant_topic=StubForumTopic(thread_id=ASSISTANT_TOPIC),
+            weather_topic=StubForumTopic(thread_id=CLIMATE_TOPIC),
         )
     return _dispatcher, _bot
 
