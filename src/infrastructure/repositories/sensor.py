@@ -37,6 +37,25 @@ class SensorReadingRepository(SQLAlchemyRepository[SensorReading]):
         )
         return list(result.scalars().all())
 
+    async def average_between(
+        self, sensors: set[str], first: datetime, last: datetime
+    ) -> tuple[float | None, float | None]:
+        """Mean temperature and humidity across several sensors over a window, as a trend needs them."""
+        if not sensors:
+            return None, None
+        result = await self.session.execute(
+            select(
+                func.avg(SensorReading.temperature_celsius),
+                func.avg(SensorReading.relative_humidity_percent),
+            ).where(
+                SensorReading.sensor.in_(sensors),
+                SensorReading.measured_at >= first,
+                SensorReading.measured_at < last,
+            )
+        )
+        temperature, humidity = result.one()
+        return temperature, humidity
+
     async def list_hourly_averages_for_room(self, room: str, since: datetime) -> list[tuple[str, float, float]]:
         """Hourly means for one room — thousands of raw readings are unplottable, one point an hour is not."""
         hour = func.strftime("%Y-%m-%d %H", SensorReading.measured_at)
