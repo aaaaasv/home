@@ -24,7 +24,7 @@ from src.modules.newspaper.services.word_source import WordSource
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.power.services.pi_ups import PiUps
-from src.modules.presence.services.presence_source import PresenceSource
+from src.modules.presence.services.family_phones import FamilyPhones
 from src.modules.room_climate.services.room_climate_sensor import RoomClimateSensor
 from src.modules.shopping.services.price_source import PriceSource
 from src.modules.system_health.services.disk_health_source import DiskHealthSource
@@ -56,7 +56,7 @@ class SchedulerContext:
     tech_topic: ForumTopicRegistry | None = None
     pi_health_sensor: PiHealthSensor | None = None
     media_server_disks: DiskHealthSource | None = None
-    presence_source: PresenceSource | None = None
+    family_phones: FamilyPhones | None = None
     ecoflow_station: EcoFlowStation | None = None
     pi_ups: PiUps | None = None
     power_topic: ForumTopicRegistry | None = None

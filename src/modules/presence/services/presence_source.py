@@ -1,15 +1,17 @@
 from typing import Protocol
 
+from src.modules.presence.domain import NetworkClient
+
 
 class PresenceSource(Protocol):
-    """Returns the MAC addresses currently connected to the network — None when the source cannot be reached"""
+    """Reads the router's client list — None when the router cannot be reached, which is not the same as empty"""
 
-    async def online_macs(self) -> set[str] | None:
+    async def read_clients(self) -> list[NetworkClient] | None:
         ...
 
 
 class NullPresenceSource:
     """No router access configured — presence stays unknown and the bot runs fine without it"""
 
-    async def online_macs(self) -> set[str] | None:
+    async def read_clients(self) -> list[NetworkClient] | None:
         return None
