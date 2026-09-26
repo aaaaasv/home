@@ -432,3 +432,26 @@ class AirAlertState(Base):
     level = Column(String(8), nullable=False)
     reason = Column(String(160), nullable=True)
     changed_at = Column(UtcDateTime, nullable=False)
+
+
+class PresenceEvent(Base):
+    """
+    Every phone that joined or left the Wi-Fi, and what the welcome light decided about it.
+
+    two jobs in one table, and both need it to be on disk rather than in memory. measuring «не було
+    достатньо довго» across a restart is the first: the bot that forgets a departure cannot recognise the
+    return, which is exactly what happened the evening this was written. the second is being able to answer,
+    the morning after, whether the light came on by itself while nobody was home — `outcome` records the
+    refusals too, so the answer is a query rather than a guess.
+    """
+
+    __tablename__ = "presence_events"
+    __table_args__ = (Index("ix_presence_events_mac_at", "mac", "at"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    mac = Column(String(24), nullable=False)
+    event = Column(String(8), nullable=False)
+    rssi = Column(Integer, nullable=True)
+    # what the arrival rule made of it: None for a departure, otherwise "raised" or why it refused
+    outcome = Column(String(24), nullable=True)
+    at = Column(UtcDateTime, nullable=False)

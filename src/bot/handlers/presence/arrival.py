@@ -12,27 +12,45 @@ The price of being early is being wrong sometimes, and the router's own log show
 
 Six seconds, nobody walking anywhere. That is why an arrival is not «з'явився» but «не було достатньо довго»,
 and why the threshold is counted in tens of minutes rather than in seconds.
+
+**Every decision is written down, including every refusal.** Two reasons, and both turned up the same
+evening. The absence has to be measurable across a restart — the deploy that shipped this feature wiped an
+in-memory departure an hour before anybody came home, which would have meant a dark hallway and no
+explanation for it. And the morning after, «чи не вмикалось воно саме, поки нас не було» has to be
+answerable by a query rather than by trusting whoever chose the thresholds.
 """
 import json
 import logging
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from src.common.config import Settings
 from src.common.daylight import is_dark
 from src.common.household_calendar import HouseholdCalendar
+from src.infrastructure.db.uow import UnitOfWork
 from src.modules.lighting.services.panel_light import PanelLight
 from src.modules.presence.services.presence_source import PresenceSource
+from src.modules.presence.use_cases.record_presence_event import (
+    JOINED,
+    LEFT,
+    RecordArrivalOutcomeUseCase,
+    RecordPresenceEventUseCase,
+)
 
 logger = logging.getLogger(__name__)
 
-JOINED = "joined"
-LEFT = "left"
+RAISED = "raised"
+REFUSED_HOP = "hop"
+REFUSED_DAYLIGHT = "daylight"
+REFUSED_SOMEBODY_HOME = "somebody_home"
+REFUSED_LIGHT_ON = "light_on"
+REFUSED_NO_DEPARTURE = "no_departure"
+REFUSED_ROUTER_SILENT = "router_silent"
 
 
 class ArrivalLightWatcher:
     """
-    One rule with four refusals, and the refusals are what make it safe to leave switched on.
+    One rule with several refusals, and the refusals are what make it safe to leave switched on.
 
     it never touches a light that is already on, never turns one on in daylight, never turns one on when
     somebody is already home, and never treats a phone that merely hopped between bands as an arrival.
@@ -40,17 +58,18 @@ class ArrivalLightWatcher:
 
     def __init__(
         self,
+        uow_factory: Callable[[], UnitOfWork],
         panel_light: PanelLight,
         presence_source: PresenceSource,
         settings: Settings,
         household_calendar: HouseholdCalendar,
     ):
+        self.uow_factory = uow_factory
         self.panel_light = panel_light
         self.presence_source = presence_source
         self.settings = settings
         self.household_calendar = household_calendar
-        self._left_at: dict[str, datetime] = {}
-        self._raised_at: datetime | None = None
+        self._raised_at = None
 
     async def handle(self, payload: str) -> None:
         """One event from the router's log, already turned into json by the host service."""
@@ -61,51 +80,46 @@ class ArrivalLightWatcher:
         except (ValueError, KeyError, TypeError):
             return
 
-        if mac not in self.settings.presence_phone_macs:
+        if mac not in self.settings.presence_phone_macs or event not in (JOINED, LEFT):
+            # somebody else's device on the same wi-fi; not ours to record or to act on
             return
+
+        rssi = report.get("rssi")
+        away = await RecordPresenceEventUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(
+            mac, event, int(rssi) if isinstance(rssi, (int, float)) else None
+        )
+
+        if event == JOINED:
+            outcome = await self._consider_arrival(mac, away)
+            await RecordArrivalOutcomeUseCase(uow=self.uow_factory())(mac, outcome)
+            logger.info("Arrival check for %s: %s (away %s)", mac, outcome, away)
+
+    async def _consider_arrival(self, mac: str, away: timedelta | None) -> str:
+        if away is None:
+            # never seen leaving, so there is no absence to measure — staying dark is how to be unsure
+            return REFUSED_NO_DEPARTURE
+        if away < timedelta(minutes=self.settings.ARRIVAL_AWAY_MINUTES):
+            return REFUSED_HOP
 
         moment = self.household_calendar.now()
-        if event == LEFT:
-            self._left_at[mac] = moment
-            return
-        if event != JOINED:
-            return
-
-        await self._consider_arrival(mac, moment)
-
-    async def _consider_arrival(self, mac: str, moment: datetime) -> None:
-        left_at = self._left_at.pop(mac, None)
-        if left_at is None:
-            # never seen leaving, so there is no absence to measure. that happens after a restart, and
-            # staying dark is the right way to be unsure
-            return
-        away = moment - left_at
-        if away < timedelta(minutes=self.settings.ARRIVAL_AWAY_MINUTES):
-            logger.debug("%s was only away %s — a hop, not an arrival", mac, away)
-            return
-
         if not is_dark(moment, self.settings.PRESENCE_LATITUDE, self.settings.PRESENCE_LONGITUDE):
-            return
+            return REFUSED_DAYLIGHT
 
-        if await self._somebody_else_is_home(mac):
-            return
+        online = await self.presence_source.online_macs()
+        if online is None:
+            # the router did not answer. treating that as "nobody home" would light an empty hallway, and
+            # treating it as "somebody home" costs only this one arrival — so be the quiet one
+            return REFUSED_ROUTER_SILENT
+        if (online & self.settings.presence_phone_macs) - {mac}:
+            return REFUSED_SOMEBODY_HOME
 
         standing = await self.panel_light.read()
         if standing is None or standing.is_on:
-            return
+            return REFUSED_LIGHT_ON
 
         await self.panel_light.set_brightness(self.settings.ARRIVAL_LIGHT_PERCENT)
         self._raised_at = moment
-        logger.info("Arrival: %s back after %s, light raised", mac, away)
-
-    async def _somebody_else_is_home(self, arriving_mac: str) -> bool:
-        """The point is meeting someone who walks into an empty dark flat; a full one needs no meeting."""
-        online = await self.presence_source.online_macs()
-        if online is None:
-            # the router did not answer. treating that as "nobody home" would turn the light on for nothing,
-            # and treating it as "somebody home" only costs this one arrival — so be the quiet one
-            return True
-        return bool((online & self.settings.presence_phone_macs) - {arriving_mac})
+        return RAISED
 
     async def sweep(self) -> None:
         """Put the light back out once the welcome has outlived its purpose."""
@@ -123,12 +137,3 @@ class ArrivalLightWatcher:
         await self.panel_light.set_brightness(0)
         self._raised_at = None
         logger.info("Arrival light back out")
-
-
-def build_arrival_handler(watcher: ArrivalLightWatcher) -> Callable:
-    """Hand the mqtt side one thing it can call, so it never learns what a light or a router is."""
-
-    async def handle(payload: str) -> None:
-        await watcher.handle(payload)
-
-    return handle
