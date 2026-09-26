@@ -416,3 +416,19 @@ class AirThreatNotice(Base):
     first_seen_at = Column(UtcDateTime, nullable=False)
     last_seen_at = Column(UtcDateTime, nullable=False)
     closed_at = Column(UtcDateTime, nullable=True)
+
+
+class AirAlertState(Base):
+    """
+    The last alert level the bot acted on — one row, rewritten.
+
+    it exists so a restart in the middle of an alert is not mistaken for the alert beginning: the light is
+    already up, and raising it again would override whatever the person has done with it since.
+    """
+
+    __tablename__ = "air_alert_state"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    level = Column(String(8), nullable=False)
+    reason = Column(String(160), nullable=True)
+    changed_at = Column(UtcDateTime, nullable=False)

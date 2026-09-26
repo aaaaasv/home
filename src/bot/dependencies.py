@@ -42,9 +42,11 @@ from src.infrastructure.adapters.sensor_community_air_quality import SensorCommu
 from src.infrastructure.adapters.sht31_room_climate_sensor import Sht31RoomClimateSensor
 from src.infrastructure.adapters.sysfs_pi_health_sensor import SysfsPiHealthSensor
 from src.infrastructure.adapters.tcp_router_link import TcpRouterLink
+from src.infrastructure.adapters.ukrainealarm_source import UkraineAlarmSource
 from src.infrastructure.adapters.x728_pi_ups import X728PiUps
 from src.infrastructure.adapters.yasno_schedule_provider import YasnoScheduleProvider
 from src.infrastructure.db.uow import UnitOfWork
+from src.modules.air_alert.services.air_alert_source import AirAlertSource, NullAirAlertSource
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner, NullAirConditioner
 from src.modules.air_threats.services.air_threat_source import AirThreatSource, NullAirThreatSource
 from src.modules.assistant.services.conversation_memory import ConversationMemory
@@ -105,6 +107,14 @@ def build_air_threat_source(settings: Settings) -> AirThreatSource:
         return NullAirThreatSource()
 
     return NeptunAirThreatStream()
+
+
+def build_air_alert_source(settings: Settings) -> AirAlertSource:
+    """The official alert map — with the module off, nothing reaches for it at all."""
+    if not settings.ALERT_LIGHT_ENABLED:
+        return NullAirAlertSource()
+
+    return UkraineAlarmSource(region_name=settings.ALERT_LIGHT_REGION)
 
 
 def build_weather_provider(settings: Settings) -> WeatherProvider:
