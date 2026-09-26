@@ -207,8 +207,8 @@ class ArrivalLightTestCase(BaseIntegrationTestCase):
         self.assertEqual(light.asked_for, [])
         self.assertEqual(await self.outcomes(), [])
 
-    async def test_an_address_that_rotated_while_away_arrives_without_a_departure(self):
-        """A retired address cannot be matched to the new one, and staying dark is the honest way to be unsure."""
+    async def test_an_address_that_changed_while_away_is_still_met_at_the_door(self):
+        """The flat stood empty for two hours and somebody walked in — which address they wear is not the point."""
         light = RecordingPanelLight()
         watcher = self.build_watcher(light)
         watcher.household_calendar.frozen_now -= timedelta(minutes=120)
@@ -217,8 +217,8 @@ class ArrivalLightTestCase(BaseIntegrationTestCase):
 
         await watcher.handle(json.dumps({"mac": ROTATED_PHONE, "event": "joined"}))
 
-        self.assertEqual(light.asked_for, [])
-        self.assertEqual(await self.outcomes(), ["no_departure"])
+        self.assertEqual(light.asked_for, [ARRIVAL_PERCENT])
+        self.assertEqual(await self.outcomes(), ["raised"])
 
     async def test_a_phone_that_is_not_ours_is_neither_recorded_nor_acted_on(self):
         light = RecordingPanelLight()
@@ -298,17 +298,53 @@ class ArrivalLightTestCase(BaseIntegrationTestCase):
     async def test_a_phone_that_only_hopped_bands_still_counts_as_somebody_home(self):
         """Otherwise a resident's radio flicker would read as arriving beside us and light an occupied flat."""
         light = RecordingPanelLight()
-        watcher = self.build_watcher(light)
-        watcher.household_calendar.frozen_now -= timedelta(minutes=120)
+        watcher = self.build_watcher(light, now=DAY)
+        await watcher.handle(json.dumps({"mac": OTHER_PHONE, "event": "joined"}))
+        watcher.household_calendar.frozen_now = NIGHT - timedelta(minutes=120)
         await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "left"}))
-        watcher.household_calendar.frozen_now += timedelta(minutes=120) - timedelta(seconds=6)
+        watcher.household_calendar.frozen_now = NIGHT - timedelta(seconds=6)
         await watcher.handle(json.dumps({"mac": OTHER_PHONE, "event": "left"}))
-        watcher.household_calendar.frozen_now += timedelta(seconds=6)
+        watcher.household_calendar.frozen_now = NIGHT
         await watcher.handle(json.dumps({"mac": OTHER_PHONE, "event": "joined"}))
         self.router.online = {MY_PHONE, OTHER_PHONE}
-        watcher.household_calendar.frozen_now += timedelta(seconds=1)
+        watcher.household_calendar.frozen_now = NIGHT + timedelta(seconds=1)
 
         await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "joined"}))
 
         self.assertEqual(light.asked_for, [])
-        self.assertEqual(await self.outcomes(), ["hop", "somebody_home"])
+        self.assertEqual(await self.outcomes(), ["no_departure", "hop", "never_empty"])
+
+    async def test_a_phone_changing_radio_while_its_owner_is_home_alone_lights_nothing(self):
+        """
+        The address it takes up on the other SSID has been gone for hours, but nobody went anywhere.
+
+        this is the real sequence from the evening of 2026-09-26, and the reason absence is measured per
+        household: per address it reads as a four-hour absence ending at the door.
+        """
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(light, now=DAY)
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "joined"}))
+        watcher.household_calendar.frozen_now = NIGHT - timedelta(hours=4)
+        await watcher.handle(json.dumps({"mac": ROTATED_PHONE, "event": "left"}))
+        watcher.household_calendar.frozen_now = NIGHT
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "left"}))
+        watcher.household_calendar.frozen_now = NIGHT + timedelta(seconds=3)
+
+        await watcher.handle(json.dumps({"mac": ROTATED_PHONE, "event": "joined"}))
+
+        self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), ["no_departure", "hop"])
+
+    async def test_a_phone_changing_radio_before_its_departure_is_seen_lights_nothing(self):
+        """The same move with the two events the other way round, which is how the router often reports it."""
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(light, now=DAY)
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "joined"}))
+        watcher.household_calendar.frozen_now = NIGHT - timedelta(hours=4)
+        await watcher.handle(json.dumps({"mac": ROTATED_PHONE, "event": "left"}))
+        watcher.household_calendar.frozen_now = NIGHT
+
+        await watcher.handle(json.dumps({"mac": ROTATED_PHONE, "event": "joined"}))
+
+        self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), ["no_departure", "never_empty"])
