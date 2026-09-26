@@ -10,6 +10,7 @@ keeps the name it learned over DHCP even for a client that is currently away, wh
 lookup work for the moment somebody leaves and the moment they come back.
 """
 from dataclasses import dataclass
+from datetime import timedelta
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,21 @@ class PhoneRoster:
         return set((self.ours & self.online) - {mac})
 
 
+@dataclass(frozen=True)
+class HouseholdAbsence:
+    """
+    How long the flat has stood empty, as the log can tell — which is not the same as how long one address
+    has been gone.
+
+    a phone carries a **different private address on each SSID**, and this flat runs two, so walking from the
+    5 GHz radio to the 2.4 GHz one retires one address and raises another. measured per address that reads as
+    a long absence ending right now; measured per household it reads as what it is, somebody who never left.
+    """
+
+    empty_for: timedelta | None
+    somebody_stayed: bool
+
+
 # what the welcome light decided about one arrival, kept with the join so the reason survives the evening
 RAISED = "raised"
 REFUSED_HOP = "hop"
@@ -51,5 +67,6 @@ REFUSED_SOMEBODY_HOME = "somebody_home"
 REFUSED_LIGHT_ON = "light_on"
 REFUSED_NO_DEPARTURE = "no_departure"
 REFUSED_ROUTER_SILENT = "router_silent"
+REFUSED_NEVER_EMPTY = "never_empty"
 # a join that never followed a real absence says nothing about whether its owner is at home
 OUTCOMES_THAT_ARE_NOT_AN_ARRIVAL = (REFUSED_HOP, REFUSED_NO_DEPARTURE)

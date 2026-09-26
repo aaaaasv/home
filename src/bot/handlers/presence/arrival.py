@@ -37,12 +37,15 @@ from src.modules.presence.domain import (
     REFUSED_DAYLIGHT,
     REFUSED_HOP,
     REFUSED_LIGHT_ON,
+    REFUSED_NEVER_EMPTY,
     REFUSED_NO_DEPARTURE,
     REFUSED_ROUTER_SILENT,
     REFUSED_SOMEBODY_HOME,
+    HouseholdAbsence,
 )
 from src.modules.presence.services.family_phones import FamilyPhones
 from src.modules.presence.use_cases.list_phones_arriving_together import ListPhonesArrivingTogetherUseCase
+from src.modules.presence.use_cases.measure_household_absence import MeasureHouseholdAbsenceUseCase
 from src.modules.presence.use_cases.record_presence_event import (
     JOINED,
     LEFT,
@@ -89,21 +92,34 @@ class ArrivalLightWatcher:
             # somebody else's device on the same wi-fi, or a router that cannot say — not ours to record
             return
 
+        # measured before the join is written, so the replay ends with this phone still away
+        absence = await self._measure_absence() if event == JOINED else None
+
         rssi = report.get("rssi")
-        away = await RecordPresenceEventUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(
+        await RecordPresenceEventUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(
             mac, event, int(rssi) if isinstance(rssi, (int, float)) else None
         )
 
         if event == JOINED:
-            outcome = await self._consider_arrival(mac, away)
+            outcome = await self._consider_arrival(mac, absence)
             await RecordArrivalOutcomeUseCase(uow=self.uow_factory())(mac, outcome)
-            logger.info("Arrival check for %s: %s (away %s)", mac, outcome, away)
+            logger.info("Arrival check for %s: %s (flat empty for %s)", mac, outcome, absence.empty_for)
 
-    async def _consider_arrival(self, mac: str, away: timedelta | None) -> str:
-        if away is None:
-            # never seen leaving, so there is no absence to measure — staying dark is how to be unsure
+    async def _measure_absence(self) -> HouseholdAbsence:
+        return await MeasureHouseholdAbsenceUseCase(
+            uow=self.uow_factory(),
+            household_calendar=self.household_calendar,
+            together=timedelta(minutes=self.settings.ARRIVAL_TOGETHER_MINUTES),
+        )()
+
+    async def _consider_arrival(self, mac: str, absence: HouseholdAbsence) -> str:
+        if absence.somebody_stayed:
+            # a phone left and another arrived, but the flat never emptied — the same person changing radio
+            return REFUSED_NEVER_EMPTY
+        if absence.empty_for is None:
+            # never seen the flat empty, so there is nothing to measure — staying dark is how to be unsure
             return REFUSED_NO_DEPARTURE
-        if away < timedelta(minutes=self.settings.ARRIVAL_AWAY_MINUTES):
+        if absence.empty_for < timedelta(minutes=self.settings.ARRIVAL_AWAY_MINUTES):
             return REFUSED_HOP
 
         moment = self.household_calendar.now()
