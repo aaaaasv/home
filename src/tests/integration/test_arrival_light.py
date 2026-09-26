@@ -278,3 +278,37 @@ class ArrivalLightTestCase(BaseIntegrationTestCase):
 
         self.assertEqual(light.asked_for, [ARRIVAL_PERCENT])
         self.assertEqual(light.state.brightness_percent, 80.0)
+
+    async def test_two_phones_arriving_together_still_get_the_light(self):
+        """Both walk in from an empty flat, so the first must not read the second as somebody already home."""
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(light)
+        watcher.household_calendar.frozen_now -= timedelta(minutes=120)
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "left"}))
+        await watcher.handle(json.dumps({"mac": OTHER_PHONE, "event": "left"}))
+        watcher.household_calendar.frozen_now += timedelta(minutes=120)
+        self.router.online = {MY_PHONE, OTHER_PHONE}
+
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "joined"}))
+        await watcher.handle(json.dumps({"mac": OTHER_PHONE, "event": "joined"}))
+
+        self.assertEqual(light.asked_for, [ARRIVAL_PERCENT])
+        self.assertEqual(await self.outcomes(), ["raised", "light_on"])
+
+    async def test_a_phone_that_only_hopped_bands_still_counts_as_somebody_home(self):
+        """Otherwise a resident's radio flicker would read as arriving beside us and light an occupied flat."""
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(light)
+        watcher.household_calendar.frozen_now -= timedelta(minutes=120)
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "left"}))
+        watcher.household_calendar.frozen_now += timedelta(minutes=120) - timedelta(seconds=6)
+        await watcher.handle(json.dumps({"mac": OTHER_PHONE, "event": "left"}))
+        watcher.household_calendar.frozen_now += timedelta(seconds=6)
+        await watcher.handle(json.dumps({"mac": OTHER_PHONE, "event": "joined"}))
+        self.router.online = {MY_PHONE, OTHER_PHONE}
+        watcher.household_calendar.frozen_now += timedelta(seconds=1)
+
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "joined"}))
+
+        self.assertEqual(light.asked_for, [])
+        self.assertEqual(await self.outcomes(), ["hop", "somebody_home"])

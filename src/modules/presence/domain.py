@@ -38,6 +38,18 @@ class PhoneRoster:
     def includes(self, mac: str) -> bool:
         return mac in self.ours
 
-    def somebody_else_home(self, mac: str) -> bool:
-        """Whether any of our phones other than this one is on the wi-fi."""
-        return bool((self.ours & self.online) - {mac})
+    def others_online(self, mac: str) -> set[str]:
+        """Our other phones the router has on the wi-fi — each still to be judged resident or companion."""
+        return set((self.ours & self.online) - {mac})
+
+
+# what the welcome light decided about one arrival, kept with the join so the reason survives the evening
+RAISED = "raised"
+REFUSED_HOP = "hop"
+REFUSED_DAYLIGHT = "daylight"
+REFUSED_SOMEBODY_HOME = "somebody_home"
+REFUSED_LIGHT_ON = "light_on"
+REFUSED_NO_DEPARTURE = "no_departure"
+REFUSED_ROUTER_SILENT = "router_silent"
+# a join that never followed a real absence says nothing about whether its owner is at home
+OUTCOMES_THAT_ARE_NOT_AN_ARRIVAL = (REFUSED_HOP, REFUSED_NO_DEPARTURE)

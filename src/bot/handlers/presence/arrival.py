@@ -32,7 +32,17 @@ from src.common.daylight import is_dark
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.lighting.services.panel_light import PanelLight
+from src.modules.presence.domain import (
+    RAISED,
+    REFUSED_DAYLIGHT,
+    REFUSED_HOP,
+    REFUSED_LIGHT_ON,
+    REFUSED_NO_DEPARTURE,
+    REFUSED_ROUTER_SILENT,
+    REFUSED_SOMEBODY_HOME,
+)
 from src.modules.presence.services.family_phones import FamilyPhones
+from src.modules.presence.use_cases.list_phones_arriving_together import ListPhonesArrivingTogetherUseCase
 from src.modules.presence.use_cases.record_presence_event import (
     JOINED,
     LEFT,
@@ -41,14 +51,6 @@ from src.modules.presence.use_cases.record_presence_event import (
 )
 
 logger = logging.getLogger(__name__)
-
-RAISED = "raised"
-REFUSED_HOP = "hop"
-REFUSED_DAYLIGHT = "daylight"
-REFUSED_SOMEBODY_HOME = "somebody_home"
-REFUSED_LIGHT_ON = "light_on"
-REFUSED_NO_DEPARTURE = "no_departure"
-REFUSED_ROUTER_SILENT = "router_silent"
 
 
 class ArrivalLightWatcher:
@@ -113,7 +115,13 @@ class ArrivalLightWatcher:
             # the router did not answer. treating that as "nobody home" would light an empty hallway, and
             # treating it as "somebody home" costs only this one arrival — so be the quiet one
             return REFUSED_ROUTER_SILENT
-        if roster.somebody_else_home(mac):
+        others = roster.others_online(mac)
+        arriving_together = await ListPhonesArrivingTogetherUseCase(
+            uow=self.uow_factory(),
+            household_calendar=self.household_calendar,
+            together=timedelta(minutes=self.settings.ARRIVAL_TOGETHER_MINUTES),
+        )(others)
+        if others - arriving_together:
             return REFUSED_SOMEBODY_HOME
 
         standing = await self.panel_light.read()
