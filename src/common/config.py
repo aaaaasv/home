@@ -233,6 +233,15 @@ class Settings(BaseSettings):
     AIR_THREATS_STALE_SECONDS: int = 180
     # усе термінове приходить сокетом; ця джоба лише закриває картки, тому і ходить ліниво
     AIR_THREATS_SWEEP_SECONDS: int = 120
+    # ── світло на тривогу ─────────────────────────────────────────────────────
+    ALERT_LIGHT_ENABLED: bool = False
+    # тільки червоний рівень: жовта дронова загроза триває годинами кілька ночей на тиждень, і світло,
+    # яке відповідає на кожну з них, вимикають назавжди — а тоді його немає тієї ночі, коли воно потрібне
+    ALERT_LIGHT_REGION: str = "м. Київ"
+    ALERT_LIGHT_PERCENT: float = 20.0
+    # сокет дає секунди, але мовчить, коли в країні нічого не змінюється — і тоді тиша не відрізняється
+    # від обриву. ця перевірка ходить резервним опитуванням і задає найгіршу можливу затримку
+    ALERT_LIGHT_CHECK_SECONDS: int = 30
     PANEL_LIGHT_ENABLED: bool = False
     PANEL_LIGHT_STATE_PATH: str = "/run/panel-light/state.json"
     PANEL_LIGHT_COMMAND_PATH: str = "/run/panel-light/command.json"

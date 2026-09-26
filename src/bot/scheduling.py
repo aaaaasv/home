@@ -15,8 +15,10 @@ from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
+from src.modules.air_alert.services.air_alert_source import AirAlertSource
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
 from src.modules.air_threats.services.air_threat_source import AirThreatSource
+from src.modules.lighting.services.panel_light import PanelLight
 from src.modules.newspaper.services.print_queue import PrintQueue
 from src.modules.newspaper.services.word_source import WordSource
 from src.modules.power.services.ecoflow_station import EcoFlowStation
@@ -66,6 +68,8 @@ class SchedulerContext:
     newspaper_print_queue: PrintQueue | None = None
     newspaper_word_sources: tuple[WordSource, ...] = ()
     air_threat_source: AirThreatSource | None = None
+    air_alert_source: AirAlertSource | None = None
+    panel_light: PanelLight | None = None
 
     def build_posted_message_tracker(self) -> PostedMessageTracker:
         return PostedMessageTracker(bot=self.bot, uow_factory=self.uow_factory)
