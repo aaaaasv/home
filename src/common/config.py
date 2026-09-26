@@ -425,6 +425,11 @@ class Settings(BaseSettings):
             return {}
 
     @property
+    def sensor_by_plant(self) -> dict[int, str]:
+        """The probe standing in each plant — the configuration is written the other way round."""
+        return {plant_id: sensor for sensor, plant_id in self.plant_by_soil_sensor.items()}
+
+    @property
     def threat_speeds(self) -> dict[str, float]:
         """How fast each kind usually flies; an unreadable map is no map, not a crash on boot."""
         if not self.AIR_THREATS_SPEEDS.strip():

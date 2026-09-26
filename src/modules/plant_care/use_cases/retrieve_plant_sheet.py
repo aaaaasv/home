@@ -6,6 +6,7 @@ from src.common.household_calendar import HouseholdCalendar
 from src.common.use_case import BaseUseCase
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.domain import PlantSheet
+from src.modules.plant_care.services.plant_air import read_plant_air
 
 CLIMATE_WINDOW_HOURS = 48
 SHEET_HISTORY_SIZE = 40
@@ -19,9 +20,12 @@ class RetrievePlantSheetUseCase(BaseUseCase):
     things a card has no room for: who tends it, the rhythm they actually keep, and the room's own weather.
     """
 
-    def __init__(self, uow: UnitOfWork, household_calendar: HouseholdCalendar):
+    def __init__(
+        self, uow: UnitOfWork, household_calendar: HouseholdCalendar, sensor_by_plant: dict[int, str] | None = None
+    ):
         super().__init__(uow)
         self.household_calendar = household_calendar
+        self.sensor_by_plant = sensor_by_plant or {}
 
     async def __call__(self, reference: str) -> PlantSheet:
         """Reference is the slug a tag carries, or a plain id for anything written before slugs existed."""
@@ -42,8 +46,12 @@ class RetrievePlantSheetUseCase(BaseUseCase):
             photos = await uow.plant_photos.list_by_plant_id(plant_id)
             carers = await uow.care_events.count_by_carer(plant_id, CareTaskType.WATERING)
             waterings = await uow.care_events.list_performed_at(plant_id, CareTaskType.WATERING)
-            climate = await uow.room_climate_readings.list_hourly_averages(since)
-            latest_climate = await uow.room_climate_readings.retrieve_latest()
+            # the sheet is opened by a guest standing next to the pot, so the numbers on it have to be that
+            # pot's — the board on the hall shelf reads five degrees off and speaks for nowhere in particular
+            air = await read_plant_air(
+                uow, sensor=self.sensor_by_plant.get(plant_id), room=plant.room, now=self.household_calendar.now()
+            )
+            climate = await uow.sensor_readings.list_hourly_averages_for_room(plant.room, since) if plant.room else []
             current_names = await uow.family_members.map_current_names()
             parent = (
                 await uow.plants.retrieve(plant.propagated_from_plant_id) if plant.propagated_from_plant_id else None
@@ -58,7 +66,7 @@ class RetrievePlantSheetUseCase(BaseUseCase):
             carers=carers,
             waterings=waterings,
             climate=climate,
-            latest_climate=latest_climate,
+            air=air,
             today=today,
             current_names=current_names,
             parent=parent,

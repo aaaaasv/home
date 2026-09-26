@@ -147,6 +147,9 @@ def render_plant_card(card: PlantCard, calendar: HouseholdCalendar) -> str:
     ideal_climate = _render_ideal_climate_line(card)
     if ideal_climate:
         lines.append(ideal_climate)
+    measured = _render_measured_climate_line(card)
+    if measured:
+        lines.append(measured)
 
     lines.extend(["", "<b>Догляд</b>"])
     for schedule in card.schedules:
@@ -241,3 +244,28 @@ def render_schedule_remove_confirm(plant_name: str, schedule: CareScheduleDetail
     if schedule.instructions:
         return question + SCHEDULE_REMOVE_CONFIRM_INSTRUCTIONS
     return question
+
+
+def _render_measured_climate_line(card: PlantCard) -> str:
+    """
+    What it is actually like where this plant stands, as opposed to the range it would like.
+
+    the source is named rather than implied: a probe in the pot and the room's air are five degrees apart in
+    this flat, so a bare number would be read as the pot's whichever it happened to be.
+    """
+    air = card.air
+    if air is None:
+        return ""
+
+    parts = []
+    if air.temperature_celsius is not None:
+        parts.append(f"{air.temperature_celsius:.0f}°")
+    if air.soil_moisture_percent is not None:
+        parts.append(f"ґрунт {air.soil_moisture_percent:.0f}%")
+    if air.relative_humidity_percent is not None:
+        parts.append(f"вологість {air.relative_humidity_percent:.0f}%")
+    if not parts:
+        return ""
+
+    where = f"у кімнаті «{escape(air.room)}»" if air.room else "у горщику"
+    return f"🌡 зараз {where}: {' · '.join(parts)}"

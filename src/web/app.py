@@ -37,7 +37,11 @@ def build_web_app(uow_factory, household_calendar: HouseholdCalendar, settings) 
     async def plant_sheet(request: web.Request) -> web.Response:
         reference = request.match_info["reference"]
         try:
-            sheet = await RetrievePlantSheetUseCase(uow=uow_factory(), household_calendar=household_calendar)(reference)
+            sheet = await RetrievePlantSheetUseCase(
+                uow=uow_factory(),
+                household_calendar=household_calendar,
+                sensor_by_plant=settings.sensor_by_plant,
+            )(reference)
         except DomainError:
             raise web.HTTPNotFound(text="Немає такої рослини")
         entries = await RetrieveDrawerUseCase(uow=uow_factory(), household_calendar=household_calendar)()

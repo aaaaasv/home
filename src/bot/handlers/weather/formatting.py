@@ -1,6 +1,8 @@
 """How the weather digest renders."""
 from datetime import datetime
+from html import escape
 
+from src.bot.handlers.sensors.formatting import render_trend_summary
 from src.bot.handlers.weather.messages import (
     AIR_QUALITY_BANDS,
     AIR_QUALITY_WORST_LABEL,
@@ -20,6 +22,7 @@ from src.bot.handlers.weather.messages import (
     WEATHER_EVENING_SUFFIX,
     WEATHER_FROST_LINE,
     WEATHER_INDOOR_LINE,
+    WEATHER_INDOOR_ROOMS_TITLE,
     WEATHER_OUTDOOR_LINE,
     WEATHER_OUTDOOR_LINE_WITH_FEELS_LIKE,
     WEATHER_POLLEN_LINE,
@@ -37,6 +40,7 @@ from src.bot.handlers.weather.messages import (
     WIND_STRONGEST_LABEL,
 )
 from src.modules.room_climate.domain import RoomClimate
+from src.modules.sensors.domain import ClimateTrend, SensorNow
 from src.modules.weather.domain import LocalAirQuality, PollenReading, VentilationEffect, WeatherReport
 
 
@@ -46,15 +50,21 @@ def render_climate_digest(
     ventilation: VentilationEffect | None = None,
     generated_at: datetime | None = None,
     local_air: LocalAirQuality | None = None,
+    rooms: list[SensorNow] | None = None,
+    trend: ClimateTrend | None = None,
 ) -> str:
     lines = [WEATHER_DIGEST_TITLE, ""]
 
     if indoor is not None:
-        lines.append(
-            WEATHER_INDOOR_LINE.format(
-                temperature=f"{indoor.temperature_celsius:.0f}", humidity=f"{indoor.relative_humidity_percent:.0f}"
-            )
+        indoor_line = WEATHER_INDOOR_LINE.format(
+            temperature=f"{indoor.temperature_celsius:.0f}", humidity=f"{indoor.relative_humidity_percent:.0f}"
         )
+        movement = render_trend_summary(trend) if trend is not None else ""
+        lines.append(f"{indoor_line} · {movement}" if movement else indoor_line)
+        rooms_block = _render_rooms(rooms or [])
+        if rooms_block:
+            # four rooms would push the forecast off a glance, so they fold away until somebody wants them
+            lines.append(rooms_block)
 
     if outdoor is not None:
         lines.append(_render_outdoor(outdoor))
@@ -174,3 +184,21 @@ def _render_pollen(readings: list[PollenReading]) -> str | None:
     if not notable:
         return None
     return WEATHER_POLLEN_LINE.format(details=", ".join(notable))
+
+
+def _render_rooms(rooms: list[SensorNow]) -> str:
+    speaking = [room for room in rooms if room.room and not room.is_stale]
+    if len(speaking) < 2:
+        # one room is not a breakdown, it is the same number again
+        return ""
+    lines = "\n".join(f"{escape(room.room)} — {_room_values(room)}" for room in speaking)
+    return f"<blockquote expandable>{WEATHER_INDOOR_ROOMS_TITLE}\n{lines}</blockquote>"
+
+
+def _room_values(room: SensorNow) -> str:
+    parts = []
+    if room.temperature_celsius is not None:
+        parts.append(f"{room.temperature_celsius:.1f}°")
+    if room.relative_humidity_percent is not None:
+        parts.append(f"{room.relative_humidity_percent:.0f}%")
+    return " · ".join(parts) or "—"

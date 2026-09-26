@@ -4,6 +4,7 @@ from src.modules.weather.domain import PollenSpecies, VentilationEffect
 
 WEATHER_DIGEST_TITLE = "🌤 <b>Погода</b>"
 WEATHER_INDOOR_LINE = "🏠 вдома: {temperature}° · {humidity}%"
+WEATHER_INDOOR_ROOMS_TITLE = "по кімнатах"
 WEATHER_OUTDOOR_LINE = "🌍 надворі: {temperature}°, удень до {maximum}°"
 WEATHER_OUTDOOR_LINE_WITH_FEELS_LIKE = "🌍 надворі: {temperature}° (відчувається як {feels_like}°), удень до {maximum}°"
 WEATHER_WIND_LINE = "💨 {label}"

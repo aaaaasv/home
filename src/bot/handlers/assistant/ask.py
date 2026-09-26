@@ -7,6 +7,7 @@ from aiogram.types import Message
 from src.bot.handlers.assistant import messages
 from src.bot.markdown import render_markdown_as_html
 from src.bot.services.household_facts import FactsContext, HouseholdFacts
+from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
@@ -23,6 +24,7 @@ async def answer_a_question(
     household_facts: HouseholdFacts,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     # plain text in this topic is a question; a leading "/" is a command for start.router or wrong_topic to claim
     thinking = await message.answer(messages.ASSISTANT_THINKING)
@@ -30,7 +32,7 @@ async def answer_a_question(
         thinking,
         answer_question,
         message.text,
-        extra_facts=await gather_household_facts(household_facts, uow_factory, household_calendar),
+        extra_facts=await gather_household_facts(household_facts, uow_factory, household_calendar, settings),
     )
 
 
@@ -41,6 +43,7 @@ async def answer_about_a_photo(
     household_facts: HouseholdFacts,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     # the caption is the question; a bare photo just asks what is on it
     thinking = await message.answer(messages.ASSISTANT_THINKING)
@@ -50,7 +53,7 @@ async def answer_about_a_photo(
         answer_question,
         message.caption or messages.ASSISTANT_DESCRIBE_PHOTO,
         images=[ImageAttachment(data=downloaded_photo.read())],
-        extra_facts=await gather_household_facts(household_facts, uow_factory, household_calendar),
+        extra_facts=await gather_household_facts(household_facts, uow_factory, household_calendar, settings),
     )
 
 
@@ -58,9 +61,12 @@ async def gather_household_facts(
     household_facts: HouseholdFacts,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> str:
     """This topic is the one with no subject of its own, so it gets what every other topic knows."""
-    return await household_facts.gather(FactsContext(household_calendar=household_calendar, uow_factory=uow_factory))
+    return await household_facts.gather(
+        FactsContext(household_calendar=household_calendar, uow_factory=uow_factory, settings=settings)
+    )
 
 
 async def answer_in_place(

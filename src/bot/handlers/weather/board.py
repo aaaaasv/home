@@ -9,9 +9,13 @@ from src.bot.handlers.weather.formatting import render_climate_digest
 from src.bot.handlers.weather.keyboards import build_weather_digest_keyboard
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import WEATHER_DIGEST_KIND, PostedMessageTracker
+from src.common.config import Settings
+from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.room_climate.domain import RoomClimate
-from src.modules.room_climate.use_cases.retrieve_room_climate import RetrieveRoomClimateUseCase
+from src.modules.sensors.domain import ClimateSnapshot, ClimateTrend
+from src.modules.sensors.use_cases.measure_climate_trend import MeasureClimateTrendUseCase
+from src.modules.sensors.use_cases.retrieve_climate_snapshot import RetrieveClimateSnapshotUseCase
 from src.modules.weather.domain import LocalAirQuality, VentilationEffect, WeatherReport
 from src.modules.weather.services.local_air_quality import LocalAirQualitySource
 from src.modules.weather.services.ventilation import resolve_ventilation_effect
@@ -43,6 +47,8 @@ class WeatherDigestBoard:
         uow_factory: Callable[[], UnitOfWork],
         weather_provider: WeatherProvider,
         timezone: tzinfo,
+        household_calendar: HouseholdCalendar,
+        settings: Settings,
         local_air_quality: LocalAirQualitySource | None = None,
     ):
         self.bot = bot
@@ -51,6 +57,8 @@ class WeatherDigestBoard:
         self.uow_factory = uow_factory
         self.weather_provider = weather_provider
         self.timezone = timezone
+        self.household_calendar = household_calendar
+        self.settings = settings
         self.local_air_quality = local_air_quality
         self.tracker = PostedMessageTracker(bot=bot, uow_factory=uow_factory)
 
@@ -99,17 +107,38 @@ class WeatherDigestBoard:
         return True
 
     async def _render(self) -> str | None:
-        indoor, outdoor, ventilation, local_air = await self._compose()
+        indoor, outdoor, ventilation, local_air, snapshot, trend = await self._compose()
         if indoor is None and outdoor is None:
             return None
         return render_climate_digest(
-            indoor, outdoor, ventilation, generated_at=datetime.now(self.timezone), local_air=local_air
+            indoor,
+            outdoor,
+            ventilation,
+            generated_at=datetime.now(self.timezone),
+            local_air=local_air,
+            rooms=snapshot.air,
+            trend=trend,
         )
 
     async def _compose(
         self,
-    ) -> tuple[RoomClimate | None, WeatherReport | None, VentilationEffect | None, LocalAirQuality | None]:
-        indoor = await RetrieveRoomClimateUseCase(uow=self.uow_factory())()
+    ) -> tuple[
+        RoomClimate | None,
+        WeatherReport | None,
+        VentilationEffect | None,
+        LocalAirQuality | None,
+        ClimateSnapshot,
+        ClimateTrend,
+    ]:
+        # the flat's air is the average of its rooms, not the sht31 on the hall shelf: that board sits beside
+        # the router and reads five degrees off a pot by the window, so it never spoke for the flat
+        snapshot = await RetrieveClimateSnapshotUseCase(
+            uow=self.uow_factory(), household_calendar=self.household_calendar, rooms=self.settings.room_by_sensor
+        )(soil_sensors=set(self.settings.plant_by_soil_sensor))
+        trend = await MeasureClimateTrendUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(
+            sensors=set(self.settings.room_by_sensor)
+        )
+        indoor = _as_room_climate(snapshot)
         # open-meteo throws transient 503s; on a miss show the last good reading (minutes old) rather than
         # blanking the digest to «погода недоступна» — the weather barely moves between 15-min refreshes
         outdoor = await self.weather_provider.fetch() or self.weather_provider.recent()
@@ -125,9 +154,17 @@ class WeatherDigestBoard:
         # a measurement three streets away beats a model over eleven kilometres; when the volunteer
         # sensors are quiet the modelled index in `outdoor` stands in, which is what used to be shown
         local_air = await self.local_air_quality.read() if self.local_air_quality is not None else None
-        return indoor, outdoor, ventilation, local_air
+        return indoor, outdoor, ventilation, local_air, snapshot, trend
 
     async def _remembered_message_id(self) -> int | None:
         async with self.uow_factory() as uow:
             posted = await uow.posted_messages.list_by_kind(WEATHER_DIGEST_KIND)
         return posted[-1].message_id if posted else None
+
+
+def _as_room_climate(snapshot: ClimateSnapshot) -> RoomClimate | None:
+    temperature = snapshot.average_temperature_celsius
+    humidity = snapshot.average_humidity_percent
+    if temperature is None or humidity is None:
+        return None
+    return RoomClimate(temperature_celsius=temperature, relative_humidity_percent=humidity)
