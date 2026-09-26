@@ -38,6 +38,8 @@ class SchedulerJobsAreAwaitableTestCase(unittest.TestCase):
                 uow_factory=UnitOfWork,
                 weather_provider=NullWeatherProvider(),
                 timezone=KYIV,
+                household_calendar=HouseholdCalendar(timezone=KYIV),
+                settings=settings,
             )
         return build_scheduler(
             SchedulerContext(

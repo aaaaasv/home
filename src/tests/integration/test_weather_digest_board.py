@@ -1,4 +1,5 @@
 from src.bot.handlers.weather.board import WeatherDigestBoard
+from src.common.config import Settings
 from src.infrastructure.db.uow import UnitOfWork
 from src.tests.integration.base import KYIV, BaseIntegrationTestCase
 
@@ -31,13 +32,15 @@ class WeatherDigestFallbackTestCase(BaseIntegrationTestCase):
             uow_factory=self.uow_factory,
             weather_provider=provider,
             timezone=KYIV,
+            household_calendar=self.household_calendar,
+            settings=Settings(TELEGRAM_BOT_TOKEN="123:abc"),
         )
 
     async def test_compose_falls_back_to_the_cached_reading_when_the_live_fetch_fails(self):
         cached = object()
         provider = StubWeatherProvider(fetch_result=None, recent_result=cached)
 
-        _, outdoor, _, _ = await self.build_board(provider)._compose()
+        _, outdoor, *_ = await self.build_board(provider)._compose()
 
         self.assertIs(outdoor, cached)
         self.assertEqual((provider.fetch_calls, provider.recent_calls), (1, 1))
@@ -46,7 +49,7 @@ class WeatherDigestFallbackTestCase(BaseIntegrationTestCase):
         live = object()
         provider = StubWeatherProvider(fetch_result=live, recent_result=object())
 
-        _, outdoor, _, _ = await self.build_board(provider)._compose()
+        _, outdoor, *_ = await self.build_board(provider)._compose()
 
         self.assertIs(outdoor, live)
         self.assertEqual((provider.fetch_calls, provider.recent_calls), (1, 0))

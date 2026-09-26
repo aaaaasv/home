@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from src.infrastructure.db.models import SensorDay, SensorReading
 from src.infrastructure.repositories.base import SQLAlchemyRepository
@@ -36,6 +36,25 @@ class SensorReadingRepository(SQLAlchemyRepository[SensorReading]):
             select(SensorReading.sensor).where(SensorReading.measured_at >= moment).distinct()
         )
         return list(result.scalars().all())
+
+    async def list_hourly_averages_for_room(self, room: str, since: datetime) -> list[tuple[str, float, float]]:
+        """Hourly means for one room — thousands of raw readings are unplottable, one point an hour is not."""
+        hour = func.strftime("%Y-%m-%d %H", SensorReading.measured_at)
+        result = await self.session.execute(
+            select(
+                hour,
+                func.avg(SensorReading.temperature_celsius),
+                func.avg(SensorReading.relative_humidity_percent),
+            )
+            .where(
+                SensorReading.room == room,
+                SensorReading.measured_at >= since,
+                SensorReading.temperature_celsius.isnot(None),
+            )
+            .group_by(hour)
+            .order_by(hour)
+        )
+        return [(stamp, round(temperature, 2), round(humidity or 0.0, 2)) for stamp, temperature, humidity in result]
 
     async def retrieve_latest(self, sensor: str) -> SensorReading | None:
         result = await self.session.execute(

@@ -9,11 +9,14 @@ from src.tests.factories import OWNER, PARTNER
 from src.tests.integration.base import FROZEN_NOW, BaseIntegrationTestCase
 from src.web.rendering import render_plant_sheet, roman_date
 
+ROOM = "вітальня"
+
 
 class PlantSheetTestCase(BaseIntegrationTestCase):
     async def asyncSetUp(self):
         await super().asyncSetUp()
         self.plant_id = await self.seed_plant(
+            room=ROOM,
             name="Кактус",
             species="Nepenthes",
             created_at=FROZEN_NOW - timedelta(days=30),
@@ -60,8 +63,12 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         self.assertEqual(sheet.watering_gaps_days, [3.0, 4.0])
 
     async def test_sheet_reports_humidity_below_the_ideal_minimum(self):
-        await self.seed_room_climate_readings(
-            humidity_percent=41.0, since=FROZEN_NOW - timedelta(hours=2), until=FROZEN_NOW, temperature_celsius=25.0
+        await self.seed_sensor_readings(
+            room=ROOM,
+            since=FROZEN_NOW - timedelta(hours=2),
+            until=FROZEN_NOW,
+            temperature_celsius=25.0,
+            humidity_percent=41.0,
         )
 
         sheet = await self.sheet()
@@ -230,7 +237,7 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         self.assertNotIn('id="wipe"', page)
 
     async def test_render_hands_the_climate_readings_to_the_page_for_scrubbing(self):
-        await self.seed_room_climate_readings(44.0, FROZEN_NOW - timedelta(hours=6), FROZEN_NOW)
+        await self.seed_sensor_readings(ROOM, FROZEN_NOW - timedelta(hours=6), FROZEN_NOW, humidity_percent=44.0)
 
         page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Домовик")
 
@@ -301,7 +308,7 @@ class PlantSheetTestCase(BaseIntegrationTestCase):
         self.assertNotIn("У межах бажаного", page)
 
     async def test_render_still_names_the_reading_that_fell_below_its_band(self):
-        await self.seed_room_climate_readings(20.0, FROZEN_NOW - timedelta(hours=3), FROZEN_NOW)
+        await self.seed_sensor_readings(ROOM, FROZEN_NOW - timedelta(hours=3), FROZEN_NOW, humidity_percent=20.0)
 
         page = render_plant_sheet(await self.sheet(), lambda photo_id: "", "Система")
 

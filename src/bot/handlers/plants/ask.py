@@ -8,6 +8,7 @@ from src.bot.handlers.assistant.ask import answer_in_place
 from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.facts import gather_facts
 from src.bot.services.household_facts import FactsContext
+from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
@@ -22,6 +23,7 @@ async def answer_about_the_plants(
     message: Message,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
     answer_question: AnswerQuestionUseCase | None = None,
 ) -> None:
     """
@@ -34,5 +36,7 @@ async def answer_about_the_plants(
         return
 
     thinking = await message.answer(messages.PLANT_QUESTION_THINKING)
-    facts = await gather_facts(FactsContext(household_calendar=household_calendar, uow_factory=uow_factory))
+    facts = await gather_facts(
+        FactsContext(household_calendar=household_calendar, uow_factory=uow_factory, settings=settings)
+    )
     await answer_in_place(thinking, answer_question, message.text, extra_facts=facts)

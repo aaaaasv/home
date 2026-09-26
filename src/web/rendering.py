@@ -544,6 +544,8 @@ def render_plant_sheet(
         "%",
         sheet.humidity_is_low,
     )
+    # the probe in this pot, where there is one — the thing a guest standing over it actually wants
+    soil_gauge = _gauge("Вологість ґрунту", sheet.current_soil_moisture_percent, 0, 100, None, None, "%", False)
     watering = sheet.watering
     rhythm = _rhythm_plate(sheet.watering_gaps_days, watering.interval_days) if watering else ""
     # the room's air and the care ahead belong to a plant that is still here; the history stays either way
@@ -551,7 +553,8 @@ def render_plant_sheet(
         ""
         if sheet.is_archived
         else (
-            f'<section class="readings">{temperature_gauge}{humidity_gauge}</section>'
+            f'<section class="readings">{temperature_gauge}{humidity_gauge}{soil_gauge}</section>'
+            f"{_climate_source_note(sheet)}"
             f"{_regimen(sheet)}"
             f"{_climate_plate(sheet.climate, sheet.ideal_humidity_min_percent)}"
         )
@@ -613,3 +616,13 @@ def render_plant_sheet(
 <script>{SCRIPT}</script>
 </body>
 </html>"""
+
+
+def _climate_source_note(sheet) -> str:
+    """Whose air these numbers are. A pot and its room are five degrees apart here, so it has to be said."""
+    if sheet.current_temperature_celsius is None:
+        return ""
+    where = (
+        f"повітря кімнати «{escape(sheet.climate_source_room)}»" if sheet.climate_source_room else "датчик у горщику"
+    )
+    return f'<p class="sub readings-source">{where}</p>'

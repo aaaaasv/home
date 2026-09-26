@@ -15,6 +15,7 @@ from src.common.constants import (
 )
 from src.common.domain import DomainModel
 from src.infrastructure.db.models import CareEvent, CareSchedule, Plant, PlantPhoto
+from src.modules.plant_care.services.plant_air import PlantAir
 
 
 class CareScheduleDetails(DomainModel):
@@ -124,6 +125,8 @@ class PlantCard(DomainModel):
     recent_events: list[CareEventDetails]
     cover_photo: PlantPhotoDetails | None
     photo_count: int
+    # what the pot's own probe says, or the room's air when it has none — see services/plant_air.py
+    air: PlantAir | None = None
 
     @classmethod
     def from_models(
@@ -133,6 +136,7 @@ class PlantCard(DomainModel):
         recent_events: list[CareEvent],
         photos: list[PlantPhoto],
         today: date,
+        air: PlantAir | None = None,
     ) -> "PlantCard":
         return cls(
             id=plant.id,
@@ -149,6 +153,7 @@ class PlantCard(DomainModel):
             schedules=[CareScheduleDetails.from_schedule(schedule, today) for schedule in schedules],
             recent_events=[CareEventDetails.from_event(event) for event in recent_events],
             cover_photo=find_cover_photo([PlantPhotoDetails.from_photo(photo) for photo in photos]),
+            air=air,
             photo_count=len(photos),
         )
 
@@ -487,6 +492,9 @@ class PlantSheet(DomainModel):
     ideal_humidity_max_percent: float | None
     current_temperature_celsius: float | None
     current_humidity_percent: float | None
+    current_soil_moisture_percent: float | None = None
+    # the room whose air these numbers are, or None when they come from the pot's own probe
+    climate_source_room: str | None = None
     schedules: list[CareScheduleDetails]
     recent_events: list[CareEventDetails]
     photos: list[PlantPhotoDetails]
@@ -513,7 +521,7 @@ class PlantSheet(DomainModel):
         carers,
         waterings,
         climate,
-        latest_climate,
+        air: PlantAir | None,
         today,
         current_names,
         parent=None,
@@ -541,8 +549,10 @@ class PlantSheet(DomainModel):
             ideal_temperature_max_celsius=plant.ideal_temperature_max_celsius,
             ideal_humidity_min_percent=plant.ideal_humidity_min_percent,
             ideal_humidity_max_percent=plant.ideal_humidity_max_percent,
-            current_temperature_celsius=latest_climate.temperature_celsius if latest_climate else None,
-            current_humidity_percent=latest_climate.relative_humidity_percent if latest_climate else None,
+            current_temperature_celsius=air.temperature_celsius if air else None,
+            current_humidity_percent=air.relative_humidity_percent if air else None,
+            current_soil_moisture_percent=air.soil_moisture_percent if air else None,
+            climate_source_room=air.room if air else None,
             schedules=[CareScheduleDetails.from_schedule(s, today) for s in schedules],
             recent_events=[CareEventDetails.from_event(e, current_names) for e in recent_events],
             photos=[PlantPhotoDetails.from_photo(p) for p in photos],

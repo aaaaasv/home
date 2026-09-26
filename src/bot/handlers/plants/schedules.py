@@ -17,6 +17,7 @@ from src.bot.handlers.plants.keyboards import (
 )
 from src.bot.handlers.plants.plant_list import send_plant_card
 from src.bot.message_cleanup import delete_quietly, remember_transient_message, sweep_transient_messages
+from src.common.config import Settings
 from src.common.constants import CARE_INSTRUCTIONS_MAX_LENGTH, CareTaskType
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
@@ -45,11 +46,12 @@ async def choose_task_type(
     callback_data: ScheduleCallback,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     await callback.answer()
-    card = await RetrievePlantCardUseCase(uow=uow_factory(), household_calendar=household_calendar)(
-        callback_data.plant_id
-    )
+    card = await RetrievePlantCardUseCase(
+        uow=uow_factory(), household_calendar=household_calendar, sensor_by_plant=settings.sensor_by_plant
+    )(callback_data.plant_id)
     await callback.message.answer(messages.ASK_TASK_TYPE, reply_markup=build_task_type_keyboard(card))
 
 
@@ -71,6 +73,7 @@ async def set_schedule(
     state: FSMContext,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     if callback_data.interval_days == CUSTOM_INTERVAL_MARKER:
         await callback.answer()
@@ -99,6 +102,7 @@ async def store_custom_interval(
     state: FSMContext,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     interval_days = parse_interval_days(message.text)
     if interval_days is None:
@@ -136,6 +140,7 @@ async def store_instructions(
     state: FSMContext,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     text = message.text.strip()
     instructions = None if text == "/clear" else text
@@ -162,10 +167,11 @@ async def confirm_remove_schedule(
     callback_data: ScheduleCallback,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
-    card = await RetrievePlantCardUseCase(uow=uow_factory(), household_calendar=household_calendar)(
-        callback_data.plant_id
-    )
+    card = await RetrievePlantCardUseCase(
+        uow=uow_factory(), household_calendar=household_calendar, sensor_by_plant=settings.sensor_by_plant
+    )(callback_data.plant_id)
     schedule = next(item for item in card.schedules if item.task_type == callback_data.task_type)
 
     await callback.answer()
@@ -182,6 +188,7 @@ async def remove_schedule(
     callback_data: ScheduleCallback,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     await RemoveCareScheduleUseCase(uow=uow_factory())(
         RemoveCareScheduleCommand(plant_id=callback_data.plant_id, task_type=callback_data.task_type)
@@ -197,6 +204,7 @@ async def _set_care_schedule(
     interval_days: int,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
     await SetCareScheduleUseCase(uow=uow_factory(), household_calendar=household_calendar)(
         SetCareScheduleCommand(plant_id=plant_id, task_type=task_type, interval_days=interval_days)
@@ -208,6 +216,9 @@ async def _resend_plant_card(
     plant_id: int,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
 ) -> None:
-    card = await RetrievePlantCardUseCase(uow=uow_factory(), household_calendar=household_calendar)(plant_id)
+    card = await RetrievePlantCardUseCase(
+        uow=uow_factory(), household_calendar=household_calendar, sensor_by_plant=settings.sensor_by_plant
+    )(plant_id)
     await send_plant_card(message, card, household_calendar)
