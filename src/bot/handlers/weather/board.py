@@ -116,7 +116,6 @@ class WeatherDigestBoard:
             ventilation,
             generated_at=datetime.now(self.timezone),
             local_air=local_air,
-            rooms=snapshot.air,
             trend=trend,
         )
 

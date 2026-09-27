@@ -52,11 +52,14 @@ tag-release:
 	@{ printf "Release v%s\n\n" "$(BOT_VERSION)"; awk -v v="$(BOT_VERSION)" '/^## \[/{p=($$0 ~ "\\["v"\\]")} p' CHANGELOG.md; } | git tag -a v$(BOT_VERSION) -F -
 	git push origin v$(BOT_VERSION)
 
-# no code travels: the pi is told which already-built image to run, and pulls it
+# no code travels: the pi is told which already-built image to run, and pulls it.
+# the image is pulled by its full name BEFORE .env is touched, and only a successful pull moves the version
+# there — the other order once left the pi pointing at an image that the push had failed to upload, which
+# nothing noticed until the next restart would have found no bot to start
 deploy:
 	ssh $(PI) 'cd $(REMOTE_DIR) \
+	  && docker pull $(BOT_IMAGE):$(BOT_VERSION)-$(GIT_SHA) \
 	  && sed -i "s|^BOT_VERSION=.*|BOT_VERSION=$(BOT_VERSION)-$(GIT_SHA)|" .env \
-	  && docker compose pull \
 	  && docker compose up -d'
 	@echo "running $(BOT_VERSION)-$(GIT_SHA)"
 
