@@ -161,7 +161,10 @@ class Settings(BaseSettings):
     ARRIVAL_LIGHT_PERCENT: float = 20.0
     # скільки телефона має не бути, щоб поява рахувалась поверненням. у лозі роутера видно, як пристрій
     # відпадає і вертається за три секунди — тому поріг у десятках хвилин, а не в секундах
-    ARRIVAL_AWAY_MINUTES: int = 30
+    # the threshold exists to filter a phone hopping between radios, and those last seconds — the longest
+    # measured was 64. half an hour was a guess with a wild margin, and it swallowed every real errand:
+    # three arrivals on 27.09 were away 17, 21 and 24 minutes and none of them lit anything
+    ARRIVAL_AWAY_MINUTES: int = 5
     ARRIVAL_LIGHT_MINUTES: int = 10
 
     # once a day the bot re-reads every /track-ed hotline item and speaks only on a new low; dormant until used
