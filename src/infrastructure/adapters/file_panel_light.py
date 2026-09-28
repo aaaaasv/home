@@ -20,13 +20,29 @@ class FilePanelLight:
     def __init__(self, state_path: Path, command_path: Path):
         self.state_path = state_path
         self.command_path = command_path
+        self._was_readable = True
 
     async def read(self) -> PanelLightState | None:
+        """
+        The service's last published state, or None when it cannot be read.
+
+        None greys the lamp out in the phone's home app, so it must leave a trace. it used to leave none: the
+        one time somebody reached for the tile and found it dead, there was nothing in any log to say why.
+        only the change is logged, because a service that is genuinely down would otherwise fill the log at
+        the polling interval for as long as it stays down.
+        """
         try:
             published = json.loads(self.state_path.read_text())
-        except (OSError, ValueError):
+        except (OSError, ValueError) as error:
+            if self._was_readable:
+                logger.warning("the panel light state is unreadable, so the lamp goes unavailable: %s", error)
+                self._was_readable = False
             # the service is down or has not written yet; saying nothing is better than saying "off"
             return None
+
+        if not self._was_readable:
+            logger.info("the panel light state is readable again")
+            self._was_readable = True
         return PanelLightState(is_on=bool(published.get("on")), brightness_percent=float(published.get("percent", 0)))
 
     async def set_brightness(self, brightness_percent: float) -> None:
