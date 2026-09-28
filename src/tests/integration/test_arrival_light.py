@@ -19,7 +19,7 @@ OTHER_PHONE = "AA:BB:CC:DD:EE:02"
 ROTATED_PHONE = "AA:BB:CC:DD:EE:0A"
 LAPTOP = "AA:BB:CC:DD:EE:F0"
 ARRIVAL_PERCENT = 20.0
-AWAY_MINUTES = 30
+AWAY_MINUTES = 5
 
 
 class RecordingPanelLight:
@@ -348,3 +348,25 @@ class ArrivalLightTestCase(BaseIntegrationTestCase):
 
         self.assertEqual(light.asked_for, [])
         self.assertEqual(await self.outcomes(), ["no_departure", "never_empty"])
+
+    async def test_an_errand_of_twenty_minutes_counts_as_coming_home(self):
+        """
+        The real shape of leaving this flat, from the log of 27.09: three arrivals after 17, 21 and 24 minutes
+        away, every one of them refused as a hop because the threshold was half an hour.
+
+        the threshold is only there to filter a phone stepping between radios, and the longest such step ever
+        measured here lasted 64 seconds — so anything counted in tens of minutes swallows errands whole.
+        """
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(light)
+        watcher.household_calendar.frozen_now -= timedelta(minutes=21)
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "left"}))
+        await watcher.handle(json.dumps({"mac": OTHER_PHONE, "event": "left"}))
+        watcher.household_calendar.frozen_now += timedelta(minutes=21)
+        self.router.online = {MY_PHONE, OTHER_PHONE}
+
+        await watcher.handle(json.dumps({"mac": MY_PHONE, "event": "joined"}))
+        await watcher.handle(json.dumps({"mac": OTHER_PHONE, "event": "joined"}))
+
+        self.assertEqual(light.asked_for, [ARRIVAL_PERCENT])
+        self.assertEqual(await self.outcomes(), ["raised", "light_on"])
