@@ -21,6 +21,7 @@ from src.bot.message_cleanup import (
     remember_transient_message,
     sweep_transient_messages,
 )
+from src.bot.prompts import ask_for_text
 from src.bot.services.posted_message_tracker import CHORE_DEADLINE_KIND, PostedMessageTracker
 from src.common.domain import Actor
 from src.common.household_calendar import HouseholdCalendar
@@ -213,8 +214,11 @@ async def rename_chore(
     await callback.answer()
     chore = await _find_chore(callback_data.chore_id, uow_factory)
     await delete_quietly(callback.message)
-    prompt = await callback.message.answer(
-        messages.CHORES_ASK_NEW_NAME.format(name=chore.name if chore else ""), disable_notification=True
+    prompt = await ask_for_text(
+        callback.message,
+        callback.from_user,
+        messages.CHORES_ASK_NEW_NAME.format(name=chore.name if chore else ""),
+        messages.CHORES_NEW_NAME_PLACEHOLDER,
     )
     await state.set_state(ChoreStates.new_name)
     await state.update_data(chore_id=callback_data.chore_id)
@@ -229,7 +233,9 @@ async def ask_deadline(
 ) -> None:
     await callback.answer()
     await delete_quietly(callback.message)
-    prompt = await callback.message.answer(messages.CHORES_ASK_DEADLINE, disable_notification=True)
+    prompt = await ask_for_text(
+        callback.message, callback.from_user, messages.CHORES_ASK_DEADLINE, messages.CHORES_DEADLINE_PLACEHOLDER
+    )
     await state.set_state(ChoreStates.new_deadline)
     await state.update_data(chore_id=callback_data.chore_id)
     await remember_transient_message(state, prompt)
@@ -276,7 +282,12 @@ async def set_assignee(
         )
     )
     await callback.answer(messages.CHORES_ASSIGNED_TOAST if assignee_id else messages.CHORES_UNASSIGNED_TOAST)
-    await delete_quietly(callback.message)
+    # the picker was opened in place, so it closes in place — back to the chore's own menu
+    chore = next((candidate for candidate in chores.open_chores if candidate.id == callback_data.chore_id), None)
+    if chore is None:
+        await delete_quietly(callback.message)
+    else:
+        await callback.message.edit_reply_markup(reply_markup=build_chore_item_keyboard(chore))
     await chores_board.refresh(chores)
 
 

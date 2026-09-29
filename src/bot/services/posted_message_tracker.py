@@ -4,7 +4,6 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message
 
-from src.common.constants import CareTaskType
 from src.infrastructure.db.uow import UnitOfWork
 
 CARE_DIGEST_KIND = "care_digest"
@@ -19,6 +18,7 @@ CONSERVATION_CARD_KIND = "conservation_card"
 # the standing reserve board — every backup layer on one screen, edited in place and never notifying
 RESERVE_BOARD_KIND = "reserve_board"
 WEATHER_DIGEST_KIND = "weather_digest"
+CLIMATE_CARD_KIND = "climate_card"
 # one standing card per uncomfortable plant, referenced by plant id, deleted the moment the plant is comfortable
 PLANT_DISCOMFORT_KIND = "plant_discomfort"
 # one standing card per chore near its deadline, referenced by chore id, deleted the moment the chore is done
@@ -29,11 +29,6 @@ TRANSIT_CARD_KIND = "transit_card"
 SHOPPING_LIST_KIND = "shopping_list"
 PLACES_LIST_KIND = "places_list"
 CHORES_LIST_KIND = "chores_list"
-
-
-def build_care_task_reference(plant_id: int, task_type: CareTaskType) -> str:
-    """Names the one task a digest card is about, so that card can be dropped without touching the others"""
-    return f"{task_type}:{plant_id}"
 
 
 class PostedMessageTracker:

@@ -36,6 +36,7 @@ from src.modules.plant_care.domain import (
     PlantComfortChange,
     PlantPhotoReview,
 )
+from src.modules.plant_care.services.plant_air import PlantAir
 from src.modules.room_climate.domain import RoomClimate
 from src.modules.shopping.constants import ShoppingHorizon
 from src.modules.shopping.domain import PriceDropAnnouncement, ShoppingItemDetails, ShoppingList
@@ -159,52 +160,91 @@ class RenderShoppingListTestCase(unittest.TestCase):
 
 class RenderCareCardCaptionTestCase(unittest.TestCase):
     def build_task(
-        self, overdue_days: int = 0, instructions: str | None = None, consecutive_postponements: int = 0
+        self,
+        task_type: CareTaskType = CareTaskType.WATERING,
+        overdue_days: int = 0,
+        instructions: str | None = None,
+        consecutive_postponements: int = 0,
     ) -> DueCareTask:
         return DueCareTask(
             plant_id=1,
             plant_name="Кактус",
-            task_type=CareTaskType.WATERING,
+            task_type=task_type,
             interval_days=3,
             overdue_days=overdue_days,
             instructions=instructions,
             consecutive_postponements=consecutive_postponements,
         )
 
+    def build_probe_air(self, temperature_celsius: float | None, soil_moisture_percent: float | None) -> PlantAir:
+        return PlantAir(
+            temperature_celsius=temperature_celsius,
+            relative_humidity_percent=None,
+            soil_moisture_percent=soil_moisture_percent,
+            measured_at=datetime(2026, 7, 14, 9, 0, tzinfo=timezone.utc),
+            room=None,
+        )
+
     def test_render_care_card_caption_heads_with_the_plant_and_lists_the_task(self):
-        caption = render_care_card_caption(self.build_task())
+        caption = render_care_card_caption([self.build_task()])
 
         self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив")
 
-    def test_render_care_card_caption_marks_an_overdue_task(self):
-        caption = render_care_card_caption(self.build_task(overdue_days=2))
+    def test_render_care_card_caption_marks_an_overdue_task_with_its_days(self):
+        caption = render_care_card_caption([self.build_task(overdue_days=2)])
 
-        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив <i>(прострочено 2 дні)</i>")
+        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив · 2 дні")
 
     def test_render_care_card_caption_with_one_postponement_says_nothing_about_it(self):
-        caption = render_care_card_caption(self.build_task(consecutive_postponements=1))
+        caption = render_care_card_caption([self.build_task(consecutive_postponements=1)])
 
         self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив")
 
     def test_render_care_card_caption_counts_a_repeated_postponement(self):
-        caption = render_care_card_caption(self.build_task(consecutive_postponements=2))
+        caption = render_care_card_caption([self.build_task(consecutive_postponements=2)])
 
-        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив <i>(відкладено вдруге)</i>")
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив · відкладено вдруге")
 
-    def test_render_care_card_caption_joins_being_late_and_being_postponed_in_one_bracket(self):
-        caption = render_care_card_caption(self.build_task(overdue_days=2, consecutive_postponements=3))
+    def test_render_care_card_caption_joins_being_late_and_being_postponed_on_one_line(self):
+        caption = render_care_card_caption([self.build_task(overdue_days=2, consecutive_postponements=3)])
 
-        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив <i>(прострочено 2 дні, відкладено втретє)</i>")
+        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив · 2 дні · відкладено втретє")
 
     def test_render_care_card_caption_beyond_the_named_ordinals_falls_back_to_a_number(self):
-        caption = render_care_card_caption(self.build_task(consecutive_postponements=11))
+        caption = render_care_card_caption([self.build_task(consecutive_postponements=11)])
 
-        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив <i>(відкладено 11-й раз)</i>")
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив · відкладено 11-й раз")
 
     def test_render_care_card_caption_puts_instructions_in_an_expandable_block(self):
-        caption = render_care_card_caption(self.build_task(instructions="Поливайте рясно, але рідко."))
+        caption = render_care_card_caption([self.build_task(instructions="Поливайте рясно, але рідко.")])
 
-        self.assertIn("<blockquote expandable>Поливайте рясно, але рідко.</blockquote>", caption)
+        self.assertEqual(
+            caption, "🪴 <b>Кактус</b>\n💧 полив\n<blockquote expandable>Поливайте рясно, але рідко.</blockquote>"
+        )
+
+    def test_render_care_card_caption_lists_every_need_of_the_plant_under_one_header(self):
+        tasks = [
+            self.build_task(task_type=CareTaskType.WATERING, overdue_days=3),
+            self.build_task(task_type=CareTaskType.PHOTO, overdue_days=18),
+        ]
+
+        caption = render_care_card_caption(
+            tasks, self.build_probe_air(temperature_celsius=21.2, soil_moisture_percent=12)
+        )
+
+        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив · 3 дні\n📸 фото · 18 днів\n🌡 у горщику 21° · ґрунт 12%")
+
+    def test_render_care_card_caption_without_a_probe_has_no_sensor_line(self):
+        caption = render_care_card_caption([self.build_task()], probe_air=None)
+
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив")
+
+    def test_render_care_card_caption_with_a_probe_that_reports_only_soil_names_only_soil(self):
+        caption = render_care_card_caption(
+            [self.build_task()], self.build_probe_air(temperature_celsius=None, soil_moisture_percent=40)
+        )
+
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив\n🌡 у горщику ґрунт 40%")
 
 
 class RenderClimateDigestTestCase(unittest.TestCase):
@@ -235,7 +275,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         self.assertIn("🏠 вдома: 28° · 33%", rendered)
         self.assertIn("🌍 надворі: 28°, удень до 31°", rendered)
-        self.assertIn("☔ дощ: 45%", rendered)
+        self.assertIn("⚠️ дощ 45%", rendered)
         self.assertIn("🌫 повітря: добре (AQI 39)", rendered)
 
     def test_render_climate_digest_names_the_evening_temperature_when_it_is_still_ahead(self):
@@ -248,7 +288,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         rendered = render_climate_digest(None, self.build_report(), generated_at=moment)
 
-        self.assertTrue(rendered.endswith("\n\n<i>станом на 14:35</i>"))
+        self.assertTrue(rendered.endswith('\n\n<i><tg-time unix="1785162900" format="r">станом на 14:35</tg-time></i>'))
 
     def test_render_climate_digest_omits_the_as_of_time_by_default(self):
         rendered = render_climate_digest(None, self.build_report())
@@ -258,12 +298,12 @@ class RenderClimateDigestTestCase(unittest.TestCase):
     def test_render_climate_digest_warns_about_a_thunderstorm(self):
         rendered = render_climate_digest(None, self.build_report(is_thunderstorm_expected=True))
 
-        self.assertIn("⛈️ можлива гроза", rendered)
+        self.assertIn("⚠️ можлива гроза", rendered)
 
     def test_render_climate_digest_warns_about_frost_ahead(self):
         rendered = render_climate_digest(None, self.build_report(temperature_min_celsius=-2.0))
 
-        self.assertIn("❄️ вночі до -2° — заносьте рослини з балкона", rendered)
+        self.assertIn("⚠️ вночі до -2°, заносьте рослини з балкона", rendered)
 
     def test_render_climate_digest_stays_silent_about_frost_above_the_threshold(self):
         rendered = render_climate_digest(None, self.build_report(temperature_min_celsius=1.6))
@@ -273,7 +313,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
     def test_render_climate_digest_warns_about_high_uv(self):
         rendered = render_climate_digest(None, self.build_report(uv_index_max=6.35))
 
-        self.assertIn("☀️ УФ високий — крем і кепка", rendered)
+        self.assertIn("⚠️ УФ високий, потрібні крем і кепка", rendered)
 
     def test_render_climate_digest_stays_silent_about_low_uv(self):
         rendered = render_climate_digest(None, self.build_report(uv_index_max=5.9))
@@ -293,7 +333,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
     def test_render_climate_digest_on_a_calm_day_has_no_wind_line(self):
         rendered = render_climate_digest(None, self.build_report(wind_speed_meters_per_second=7.9))
 
-        self.assertNotIn("💨", rendered)
+        self.assertNotIn("⚠️", rendered)
 
     def test_render_climate_digest_grades_the_wind_by_band(self):
         bands = {
@@ -309,12 +349,12 @@ class RenderClimateDigestTestCase(unittest.TestCase):
         }
 
         for speed, label in bands.items():
-            self.assertIn(f"💨 {label}", rendered[speed])
+            self.assertIn(f"⚠️ {label}", rendered[speed])
 
     def test_render_climate_digest_without_a_wind_reading_has_no_wind_line(self):
         rendered = render_climate_digest(None, self.build_report(wind_speed_meters_per_second=None))
 
-        self.assertNotIn("💨", rendered)
+        self.assertNotIn("⚠️", rendered)
 
     def test_render_climate_digest_shows_the_feels_like_when_it_differs_enough(self):
         report = self.build_report(temperature_celsius=8.0, apparent_temperature_celsius=3.0)
@@ -345,7 +385,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         rendered = render_climate_digest(None, report)
 
-        self.assertIn("☔ дощ: 63% — найімовірніше 08:00–09:00", rendered)
+        self.assertIn("⚠️ дощ 63%, найімовірніше 08:00–09:00", rendered)
 
     def test_render_climate_digest_with_a_single_hour_rain_window_names_that_hour(self):
         report = self.build_report(
@@ -354,18 +394,18 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         rendered = render_climate_digest(None, report)
 
-        self.assertIn("☔ дощ: 80% — найімовірніше о 17:00", rendered)
+        self.assertIn("⚠️ дощ 80%, найімовірніше о 17:00", rendered)
 
     def test_render_climate_digest_without_a_rain_window_shows_the_bare_probability(self):
         rendered = render_climate_digest(None, self.build_report(precipitation_probability_percent=45))
 
-        self.assertIn("☔ дощ: 45%", rendered)
+        self.assertIn("⚠️ дощ 45%", rendered)
         self.assertNotIn("найімовірніше", rendered)
 
     def test_render_climate_digest_stays_silent_about_an_unlikely_rain(self):
         rendered = render_climate_digest(None, self.build_report(precipitation_probability_percent=5))
 
-        self.assertNotIn("☔", rendered)
+        self.assertNotIn("дощ", rendered)
 
     def test_render_climate_digest_lists_pollen_above_the_threshold_with_levels(self):
         report = self.build_report(
@@ -377,7 +417,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         rendered = render_climate_digest(None, report)
 
-        self.assertIn("🌾 пилок: амброзія помірно, трава високо", rendered)
+        self.assertIn("⚠️ пилок: амброзія помірно, трава високо", rendered)
 
     def test_render_climate_digest_hides_pollen_below_the_threshold(self):
         report = self.build_report(pollen=[PollenReading(species=PollenSpecies.GRASS, grains_per_cubic_meter=5.0)])
@@ -385,6 +425,46 @@ class RenderClimateDigestTestCase(unittest.TestCase):
         rendered = render_climate_digest(None, report)
 
         self.assertNotIn("пилок", rendered)
+
+    def test_render_climate_digest_with_many_thresholds_crossed_joins_them_into_one_warning_line(self):
+        indoor = RoomClimate(temperature_celsius=24.0, relative_humidity_percent=45.0)
+        report = self.build_report(
+            precipitation_probability_percent=70,
+            rain_window=RainWindow(start_hour=13, end_hour=15),
+            is_thunderstorm_expected=True,
+            wind_speed_meters_per_second=9.0,
+            uv_index_max=7.0,
+            temperature_min_celsius=-2.0,
+            pollen=[PollenReading(species=PollenSpecies.GRASS, grains_per_cubic_meter=80.0)],
+        )
+
+        rendered = render_climate_digest(indoor, report)
+
+        self.assertEqual(
+            rendered,
+            "🌤 <b>Погода</b>\n\n"
+            "🏠 вдома: 24° · 45%\n"
+            "🌍 надворі: 28°, удень до 31°\n"
+            "⚠️ дощ 70%, найімовірніше 13:00–15:00 · можлива гроза · вітряно · УФ високий, потрібні крем і кепка"
+            " · пилок: трава високо · вночі до -2°, заносьте рослини з балкона\n"
+            "🌫 повітря: добре (AQI 39)",
+        )
+
+    def test_render_climate_digest_on_a_quiet_day_has_no_warning_line(self):
+        rendered = render_climate_digest(None, self.build_report())
+
+        self.assertNotIn("⚠️", rendered)
+
+    def test_render_climate_digest_keeps_the_ventilation_fact_out_of_the_warnings(self):
+        report = self.build_report(precipitation_probability_percent=45)
+
+        rendered = render_climate_digest(None, report, VentilationEffect.WETTER)
+
+        self.assertEqual(
+            rendered,
+            "🌤 <b>Погода</b>\n\n🌍 надворі: 28°, удень до 31°\n⚠️ дощ 45%\n🪟 надворі вологіше\n"
+            "🌫 повітря: добре (AQI 39)",
+        )
 
     def test_render_climate_digest_without_outdoor_says_the_forecast_is_unavailable(self):
         indoor = RoomClimate(temperature_celsius=28.5, relative_humidity_percent=33.0)
@@ -862,7 +942,7 @@ class RenderTransitCardTestCase(unittest.TestCase):
         self.assertEqual(
             card,
             "найближчий: 🚎 3 за ~4 хв (~1.1 км) · 🚌 69 ~9 хв · 🚎 9К поки не видно\n\n"
-            "<i>станом на 09:00 · 🔄 щоб оновити</i>",
+            "<i>станом на 09:00 · натисни «Оновити»</i>",
         )
 
 

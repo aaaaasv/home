@@ -20,6 +20,7 @@ from src.bot.message_cleanup import (
     replace_prompt,
     sweep_transient_messages,
 )
+from src.bot.prompts import ask_for_text
 from src.common.constants import PLANT_NAME_MAX_LENGTH, CareTaskType
 from src.common.domain import Actor
 from src.common.household_calendar import HouseholdCalendar
@@ -45,7 +46,7 @@ class AddPlantStates(StatesGroup):
 async def start_adding_plant(message: Message, state: FSMContext) -> None:
     await delete_quietly(message)
     await state.set_state(AddPlantStates.name)
-    await _ask(message, state, messages.ADD_PLANT_ASK_NAME)
+    await _ask(message, state, messages.ADD_PLANT_ASK_NAME, messages.ADD_PLANT_NAME_PLACEHOLDER)
 
 
 @router.message(AddPlantStates.name, F.text)
@@ -53,7 +54,7 @@ async def store_name(message: Message, state: FSMContext) -> None:
     name = message.text.strip()
     await delete_quietly(message)
     if len(name) > PLANT_NAME_MAX_LENGTH:
-        await _ask(message, state, messages.ADD_PLANT_NAME_TOO_LONG)
+        await _ask(message, state, messages.ADD_PLANT_NAME_TOO_LONG, messages.ADD_PLANT_NAME_PLACEHOLDER)
         return
 
     await state.update_data(name=name)
@@ -150,7 +151,9 @@ async def store_watering_interval(
     await callback.answer()
     if callback_data.interval_days == CUSTOM_INTERVAL_MARKER:
         await state.set_state(AddPlantStates.custom_watering_interval)
-        await _ask(callback.message, state, messages.ADD_PLANT_ASK_CUSTOM_INTERVAL)
+        await _ask(
+            callback.message, state, messages.ADD_PLANT_ASK_CUSTOM_INTERVAL, messages.ADD_PLANT_INTERVAL_PLACEHOLDER
+        )
         return
 
     await state.update_data(watering_interval_days=callback_data.interval_days)
@@ -169,7 +172,7 @@ async def store_custom_watering_interval(
     interval_days = parse_interval_days(message.text)
     await delete_quietly(message)
     if interval_days is None:
-        await _ask(message, state, messages.INVALID_INTERVAL)
+        await _ask(message, state, messages.INVALID_INTERVAL, messages.ADD_PLANT_INTERVAL_PLACEHOLDER)
         return
 
     await state.update_data(watering_interval_days=interval_days)
@@ -215,8 +218,12 @@ async def _create_plant(
     await send_plant_card(message, card, household_calendar)
 
 
-async def _ask(message: Message, state: FSMContext, text: str) -> None:
-    prompt = await message.answer(text)
+async def _ask(message: Message, state: FSMContext, text: str, placeholder: str | None = None) -> None:
+    """Posts the wizard's next question; a placeholder opens the input field on it for a text answer."""
+    if placeholder is None:
+        prompt = await message.answer(text)
+    else:
+        prompt = await ask_for_text(message, message.from_user, text, placeholder)
     await replace_prompt(state, prompt)
 
 

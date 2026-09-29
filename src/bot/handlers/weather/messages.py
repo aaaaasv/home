@@ -6,19 +6,21 @@ WEATHER_DIGEST_TITLE = "🌤 <b>Погода</b>"
 WEATHER_INDOOR_LINE = "🏠 вдома: {temperature}° · {humidity}%"
 WEATHER_OUTDOOR_LINE = "🌍 надворі: {temperature}°, удень до {maximum}°"
 WEATHER_OUTDOOR_LINE_WITH_FEELS_LIKE = "🌍 надворі: {temperature}° (відчувається як {feels_like}°), удень до {maximum}°"
-WEATHER_WIND_LINE = "💨 {label}"
 WEATHER_EVENING_SUFFIX = ", ввечері {temperature}°"
-WEATHER_FROST_LINE = "❄️ вночі до {temperature}° — заносьте рослини з балкона"
-WEATHER_THUNDERSTORM_LINE = "⛈️ можлива гроза"
-WEATHER_UV_LINE = "☀️ УФ високий — крем і кепка"
+# what is worth knowing about today shares one line, so each phrase stands without an emoji of its own
+WEATHER_WARNINGS_LINE = "⚠️ {warnings}"
+WEATHER_WARNINGS_SEPARATOR = " · "
+WEATHER_FROST_WARNING = "вночі до {temperature}°, заносьте рослини з балкона"
+WEATHER_THUNDERSTORM_WARNING = "можлива гроза"
+WEATHER_UV_WARNING = "УФ високий, потрібні крем і кепка"
 # the bare fact about outside, not a recommendation — with the 🪟 it already says which way a window would move
 # the flat's humidity, and the reader knows if they want that (the plants may want the opposite of comfortable)
 WEATHER_VENTILATION_LINES: dict[VentilationEffect, str] = {
     VentilationEffect.DRIER: "🪟 надворі сухіше",
     VentilationEffect.WETTER: "🪟 надворі вологіше",
 }
-WEATHER_RAIN_LINE = "☔ дощ: {probability}%"
-WEATHER_RAIN_LINE_WITH_WINDOW = "☔ дощ: {probability}% — найімовірніше {window}"
+WEATHER_RAIN_WARNING = "дощ {probability}%"
+WEATHER_RAIN_WARNING_WITH_WINDOW = "дощ {probability}%, найімовірніше {window}"
 WEATHER_RAIN_WINDOW_RANGE = "{start:02d}:00–{end:02d}:00"
 WEATHER_RAIN_WINDOW_SINGLE_HOUR = "о {start:02d}:00"
 # a low chance of rain is just noise — mention it only when rain is actually plausible
@@ -27,10 +29,12 @@ WEATHER_AIR_QUALITY_LINE = "🌫 повітря: {label} (AQI {index})"
 # used whenever a sensor a few streets away is answering: it names the measured number instead of an index,
 # because the index is modelled over ~11 km and averages away exactly the local spikes worth knowing about
 WEATHER_AIR_QUALITY_MEASURED = "🌫 повітря: {label} · PM2.5 {value} мкг/м³"
-WEATHER_POLLEN_LINE = "🌾 пилок: {details}"
+WEATHER_POLLEN_WARNING = "пилок: {details}"
 WEATHER_UNAVAILABLE = "🌤 Погода зараз недоступна."
-# a quiet footer that says how fresh the reading is, so an open topic never looks like a morning snapshot
-WEATHER_DIGEST_AS_OF = "<i>станом на {time}</i>"
+# a quiet footer that says how fresh the reading is, so an open topic never looks like a morning snapshot.
+# the client renders the tag as «2 години тому» in its own language and keeps it current without an edit;
+# the text inside is what a client that does not know the tag shows
+WEATHER_DIGEST_AS_OF = '<i><tg-time unix="{unix}" format="r">станом на {time}</tg-time></i>'
 WEATHER_DIGEST_BUTTON_REFRESH = "🔄 Оновити"
 WEATHER_DIGEST_REFRESHED = "Оновлено"
 # shown at once when 🔄 is tapped, while the forecast is fetched — a status banner, not a blocking wait

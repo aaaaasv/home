@@ -53,6 +53,8 @@ def build_ecoflow_keyboard(state: EcoFlowState) -> InlineKeyboardMarkup:
     builder.button(
         text=POWER_ECOFLOW_BUTTON_AC_OFF if state.ac_output_on else POWER_ECOFLOW_BUTTON_AC_ON,
         callback_data=EcoFlowCallback(action=EcoFlowAction.TOGGLE_AC, turn_on=not state.ac_output_on),
+        # switching the outlets on is what saves the fridge in a blackout, so it must not look like the rest
+        style=None if state.ac_output_on else "primary",
     )
     builder.button(
         text=POWER_ECOFLOW_BUTTON_USB_OFF if state.usb_output_on else POWER_ECOFLOW_BUTTON_USB_ON,

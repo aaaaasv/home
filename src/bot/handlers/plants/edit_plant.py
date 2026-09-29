@@ -10,6 +10,7 @@ from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.keyboards import EditPlantCallback, PlantAction, PlantCallback, build_plant_edit_keyboard
 from src.bot.handlers.plants.plant_list import send_plant_card
 from src.bot.message_cleanup import delete_quietly, remember_transient_message, sweep_transient_messages
+from src.bot.prompts import ask_for_text
 from src.common.config import Settings
 from src.common.constants import (
     CLIMATE_FIELD_BOUNDS,
@@ -56,7 +57,12 @@ async def ask_new_value(
     await delete_quietly(callback.message)
     await state.set_state(EditPlantStates.field_value)
     await state.update_data(plant_id=callback_data.plant_id, field=callback_data.field)
-    prompt = await callback.message.answer(_prompt_for(callback_data.field, settings))
+    prompt = await ask_for_text(
+        callback.message,
+        callback.from_user,
+        _prompt_for(callback_data.field, settings),
+        messages.EDIT_FIELD_PLACEHOLDERS[callback_data.field],
+    )
     await remember_transient_message(state, prompt)
 
 

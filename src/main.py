@@ -51,7 +51,6 @@ from src.bot.preflight import verify_reminder_chat
 from src.bot.reminders import build_scheduler
 from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
-from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.common.config import Settings, get_settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.adapters.neptun_air_threat_stream import NeptunAirThreatStream
@@ -66,8 +65,8 @@ logger = logging.getLogger(__name__)
 # telegram scopes the command menu per chat at best — never per topic — so the group menu is one flat list
 # and the wording of a shared command has to hold in every topic
 GROUP_COMMANDS = [
-    BotCommand(command="list", description="показати список цього топіка"),
-    BotCommand(command="add", description="додати запис у цей топік"),
+    BotCommand(command="list", description="список: рослини, покупки, місця чи справи — залежно від топіка"),
+    BotCommand(command="add", description="додати рослину чи покупку (у справах і місцях просто напиши текстом)"),
     BotCommand(command="today", description="🪴 що треба зробити сьогодні"),
     BotCommand(command="history", description="🪴 останні дії"),
     BotCommand(command="later", description="🛒 покупка на колись"),
@@ -78,8 +77,8 @@ GROUP_COMMANDS = [
     BotCommand(command="reserve", description="⚡ резерв живлення"),
     BotCommand(command="conserve", description="⚡ зберігання EcoFlow"),
     BotCommand(command="pi", description="🩺 стан Raspberry Pi"),
-    BotCommand(command="bus", description="🚌 коли транспорт із зупинки"),
-    BotCommand(command="help", description="що в якому топіку"),
+    BotCommand(command="bus", description="🚌 коли транспорт із зупинки (можна й /транспорт)"),
+    BotCommand(command="help", description="що вміє цей топік (у загальній — усе)"),
     BotCommand(command="cancel", description="скасувати поточну дію"),
 ]
 
@@ -377,7 +376,6 @@ async def run() -> None:
                     care_topic=care_topic,
                     uow_factory=UnitOfWork,
                     household_calendar=HouseholdCalendar(timezone=settings.timezone),
-                    posted_message_tracker=PostedMessageTracker(bot=bot, uow_factory=UnitOfWork),
                 ),
                 handle_presence_event=arrival_light_watcher.handle if arrival_light_watcher else None,
                 record_sensor_reading=build_sensor_recorder(

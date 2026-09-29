@@ -22,3 +22,9 @@ MEDIA_SERVER_DISK_PENDING = "⚠️ {model} — секторів в очікув
 MEDIA_SERVER_DISK_UNCORRECTABLE = "⚠️ {model} — невиправних помилок: {value}"
 MEDIA_SERVER_DISK_WORN = "⌛ {model} — витрачено {value}% ресурсу"
 MEDIA_SERVER_DISK_SPARE = "⌛ {model} — резервних блоків лишилось {value}%"
+
+# one card per sensor, posted once when its battery runs low and deleted when a fresh cell reads well again
+SENSOR_BATTERY_LOW_ROOM = "🔋 <b>Датчик «{place}»</b> — лишилось {percent}% батареї. Час поміняти елемент живлення."
+SENSOR_BATTERY_LOW_POT = (
+    "🔋 <b>Датчик у горщику «{place}»</b> — лишилось {percent}% батареї. Час поміняти елемент живлення."
+)

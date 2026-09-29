@@ -17,6 +17,7 @@ from src.bot.handlers.plants.keyboards import (
 )
 from src.bot.handlers.plants.plant_list import send_plant_card
 from src.bot.message_cleanup import delete_quietly, remember_transient_message, sweep_transient_messages
+from src.bot.prompts import ask_for_text
 from src.common.config import Settings
 from src.common.constants import CARE_INSTRUCTIONS_MAX_LENGTH, CareTaskType
 from src.common.household_calendar import HouseholdCalendar
@@ -80,7 +81,12 @@ async def set_schedule(
         await delete_quietly(callback.message)
         await state.set_state(SetCareScheduleStates.custom_interval)
         await state.update_data(plant_id=callback_data.plant_id, task_type=callback_data.task_type)
-        prompt = await callback.message.answer(messages.ASK_CUSTOM_TASK_INTERVAL)
+        prompt = await ask_for_text(
+            callback.message,
+            callback.from_user,
+            messages.ASK_CUSTOM_TASK_INTERVAL,
+            messages.ADD_PLANT_INTERVAL_PLACEHOLDER,
+        )
         await remember_transient_message(state, prompt)
         return
 
@@ -93,7 +99,7 @@ async def set_schedule(
     )
     await callback.answer(messages.CARE_RECORDED_TOAST)
     await delete_quietly(callback.message)
-    await _resend_plant_card(callback.message, callback_data.plant_id, uow_factory, household_calendar)
+    await _resend_plant_card(callback.message, callback_data.plant_id, uow_factory, household_calendar, settings)
 
 
 @router.message(SetCareScheduleStates.custom_interval, F.text)
@@ -121,7 +127,7 @@ async def store_custom_interval(
     )
     await delete_quietly(message)
     await sweep_transient_messages(message.bot, message.chat.id, collected_data)
-    await _resend_plant_card(message, collected_data["plant_id"], uow_factory, household_calendar)
+    await _resend_plant_card(message, collected_data["plant_id"], uow_factory, household_calendar, settings)
 
 
 @router.callback_query(ScheduleCallback.filter(F.action == ScheduleAction.EDIT_INSTRUCTIONS))
@@ -130,7 +136,9 @@ async def edit_instructions(callback: CallbackQuery, callback_data: ScheduleCall
     await delete_quietly(callback.message)
     await state.set_state(SetCareScheduleStates.instructions)
     await state.update_data(plant_id=callback_data.plant_id, task_type=callback_data.task_type)
-    prompt = await callback.message.answer(messages.ASK_CARE_INSTRUCTIONS)
+    prompt = await ask_for_text(
+        callback.message, callback.from_user, messages.ASK_CARE_INSTRUCTIONS, messages.CARE_INSTRUCTIONS_PLACEHOLDER
+    )
     await remember_transient_message(state, prompt)
 
 
@@ -158,7 +166,7 @@ async def store_instructions(
     )
     await delete_quietly(message)
     await sweep_transient_messages(message.bot, message.chat.id, collected_data)
-    await _resend_plant_card(message, collected_data["plant_id"], uow_factory, household_calendar)
+    await _resend_plant_card(message, collected_data["plant_id"], uow_factory, household_calendar, settings)
 
 
 @router.callback_query(ScheduleCallback.filter(F.action == ScheduleAction.CONFIRM_REMOVE))
@@ -195,7 +203,7 @@ async def remove_schedule(
     )
     await callback.answer()
     await delete_quietly(callback.message)
-    await _resend_plant_card(callback.message, callback_data.plant_id, uow_factory, household_calendar)
+    await _resend_plant_card(callback.message, callback_data.plant_id, uow_factory, household_calendar, settings)
 
 
 async def _set_care_schedule(
@@ -204,7 +212,6 @@ async def _set_care_schedule(
     interval_days: int,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
-    settings: Settings,
 ) -> None:
     await SetCareScheduleUseCase(uow=uow_factory(), household_calendar=household_calendar)(
         SetCareScheduleCommand(plant_id=plant_id, task_type=task_type, interval_days=interval_days)

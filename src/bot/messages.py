@@ -1,87 +1,92 @@
-WELCOME = (
-    "🏠 <b>Домашній бот</b>\n\n"
-    "Кожен розділ — у своєму топіку, і команди там означають своє.\n\n"
-    "<b>🪴 Рослини</b>\n"
-    "/list — усі рослини\n"
-    "/add — додати рослину\n"
-    "/today — що треба зробити сьогодні\n"
-    "/history — останні дії\n\n"
-    "<b>🛒 шо треба</b>\n"
-    "просто напиши, що купити\n"
-    "/list — список покупок\n"
-    "/later — покупка на колись\n"
-    "/track — стежити за ціною (лінк hotline)\n\n"
-    "<b>📍 куди сходити</b>\n"
-    "напиши місце, куди хочеться\n"
-    "/list — список місць\n\n"
-    "<b>📋 справи</b>\n"
-    "напиши, що треба зробити (з датою — «до 31.07»)\n"
-    "/list — список справ\n\n"
-    "<b>❄️ клімат</b>\n"
-    "/ac — кондиціонер\n"
-    "щоранку — погода\n\n"
-    "<b>⚡ Світло</b>\n"
-    "/eco — EcoFlow Delta 2\n"
-    "/reserve — резерв живлення\n"
-    "/conserve — режим зберігання станції\n\n"
-    "<b>🚌 транспорт</b>\n"
-    "/bus — коли наступний 3 / 9К / 69\n\n"
-    "<b>🤖 спитати</b>\n"
-    "напиши питання про дім (метро, рослини…)\n\n"
-    "<b>🩺 сервіс</b>\n"
-    "/pi — стан Raspberry Pi\n\n"
-    "/cancel — скасувати поточну дію"
-)
-WRONG_TOPIC = (
-    "Ця команда працює в іншому топіку:\n\n"
-    "🪴 <b>Рослини</b> — /list, /add, /today, /history\n"
-    "🛒 <b>шо треба</b> — /list, /later, або просто напиши, що купити\n"
-    "📍 <b>куди сходити</b> — /list, або просто напиши місце\n"
-    "📋 <b>справи</b> — /list, або напиши, що треба зробити\n"
-    "❄️ <b>клімат</b> — /ac\n"
-    "⚡ <b>Світло</b> — /eco, /reserve, /conserve\n"
-    "🚌 <b>транспорт</b> — /bus\n"
-    "🩺 <b>сервіс</b> — /pi"
-)
+# every module's topic name as the family reads it. the TOPIC_TITLE defaults in config.py must spell the same,
+# because a topic that was deleted is recreated under exactly that name
+MODULE_TITLES = {
+    "plants": "🪴 рослини",
+    "shopping": "🛒 шо треба",
+    "places": "📍 куди сходити",
+    "chores": "📋 справи",
+    "weather": "❄️ клімат",
+    "power": "⚡ світло",
+    "transit": "🚌 транспорт",
+    "assistant": "🤖 спитати",
+    "system": "🩺 сервіс",
+}
 
-# /help shows only the current topic's commands when sent inside a module topic (resolved via the forum_topics
-# table); outside a topic it falls back to the full WELCOME. keys are each module's own MODULE_NAME
-TOPIC_HELP = {
+# what each module's topic answers to, keyed by the module's own MODULE_NAME — the one text that /help, /start
+# and the full welcome are all built from
+MODULE_HELP = {
     "plants": (
-        "🪴 <b>Рослини</b>\n"
         "/list — усі рослини\n"
         "/add — додати рослину\n"
         "/today — що треба зробити сьогодні\n"
-        "/history — останні дії"
+        "/history — останні дії\n"
+        "або просто напиши питання про рослину — «чому жовтіє листя Тігла» — і я відповім з історії її поливів"
     ),
     "shopping": (
-        "🛒 <b>шо треба</b>\n"
         "просто напиши, що купити\n"
         "/list — список покупок\n"
+        "/add — додати покупку\n"
         "/later — покупка на колись\n"
         "/track — стежити за ціною (лінк hotline)"
     ),
-    "places": ("📍 <b>куди сходити</b>\n" "напиши місце, куди хочеться\n" "/list — список місць"),
-    "chores": ("📋 <b>справи</b>\n" "напиши, що треба зробити (з датою — «до 31.07»)\n" "/list — список справ"),
-    "weather": ("❄️ <b>клімат</b>\n" "/ac — кондиціонер\n" "щоранку — погода"),
+    "places": "напиши місце, куди хочеться\n/list — список місць",
+    "chores": "напиши, що треба зробити (з датою — «до 31.07»)\n/list — список справ",
+    "weather": "/climate — клімат удома по кімнатах\n/ac — кондиціонер\nщоранку — погода",
     "power": (
-        "⚡ <b>Світло</b>\n"
         "/eco — EcoFlow Delta 2: заряд і керування\n"
         "/reserve — резерв живлення: скільки тримає кожен шар\n"
         "/conserve — режим зберігання станції\n"
         "графік відключень зʼявляється сам, коли є"
     ),
-    "system": ("🩺 <b>сервіс</b>\n" "/pi — стан Raspberry Pi"),
-    "transit": ("🚌 <b>транспорт</b>\n" "/bus — коли наступний 3 / 9К / 69 з нашої зупинки"),
-    "assistant": ("🤖 <b>спитати</b>\n" "просто напиши питання про дім — метро, рослини тощо"),
+    "transit": "/bus або /транспорт — коли наступний 3 / 9К / 69 з нашої зупинки",
+    "assistant": (
+        "просто напиши питання про дім — метро, рослини, «коли вчора була тривога», "
+        "«о котрій ми вчора прийшли», «чому вночі горіло світло»"
+    ),
+    "system": "/pi — стан Raspberry Pi\nпро розряджену батарею датчика напишу сам",
 }
+
+# the commands each module's own router answers to. wrong_topic reads this to tell «ця команда з іншого топіка»
+# from «тут такої команди немає», so it has to move together with the routers
+MODULE_COMMANDS = {
+    "plants": ("list", "add", "today", "history"),
+    "shopping": ("list", "add", "later", "track"),
+    "places": ("list",),
+    "chores": ("list",),
+    "weather": ("climate", "ac"),
+    "power": ("eco", "reserve", "conserve"),
+    "transit": ("bus", "транспорт"),
+    "system": ("pi",),
+}
+
+
+def render_module_help(module_name: str) -> str:
+    return f"<b>{MODULE_TITLES[module_name]}</b>\n{MODULE_HELP[module_name]}"
+
+
+WELCOME = (
+    "🏠 <b>Домашній бот</b>\n\n"
+    "Кожен розділ — у своєму топіку, і команди там означають своє. "
+    "У будь-якому топіку /help покаже, що вміє саме він.\n\n"
+    + "\n".join(f"<blockquote expandable>{render_module_help(module_name)}</blockquote>" for module_name in MODULE_HELP)
+    + "\n\n/cancel — скасувати поточну дію"
+)
+WRONG_TOPIC = "Ця команда працює в іншому топіку:\n\n" + "\n".join(
+    f"<b>{MODULE_TITLES[module_name]}</b> — " + ", ".join(f"/{command}" for command in commands)
+    for module_name, commands in MODULE_COMMANDS.items()
+)
+# said inside a module's own topic where the command does not exist — pointing to another topic would be true
+# and useless there, so the topic's own help follows
+NO_SUCH_COMMAND_HERE = "У цьому топіку команди /{command} немає.\n\n{topic_help}\n\n/{command} працює тут: {places}."
+
+# /help and /start show only the current topic's commands when sent inside a module topic (resolved via the
+# forum_topics table); in General they fall back to the full WELCOME
+TOPIC_HELP = {module_name: render_module_help(module_name) for module_name in MODULE_HELP}
 ONLY_IN_THE_GROUP = "Я працюю в сімейній групі — кожен розділ у своєму топіку. Пиши команди там."
-STALE_BUTTON = "Ця кнопка вже застара 🙃 Надішли команду топіка ще раз — /list або /ac."
+STALE_BUTTON = "Ця кнопка вже застара 🙃 Напиши /help — там усе, що вміє цей топік."
 PRIVATE_WELCOME = "🏠 <b>Домашній бот</b>\n\nЯ працюю в сімейній групі — кожен розділ у своєму топіку. Пиши команди там."
 
 # item and place menus share the same edit/remove/back verbs
-RENAME_BUTTON = "✏️ Перейменувати"
-REMOVE_BUTTON = "✖️ Прибрати"
 BACK_BUTTON = "← Назад"
 
 # the error router is the last-resort net under every module, so its wording must fit any of them: it once said

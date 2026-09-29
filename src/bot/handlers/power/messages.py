@@ -14,15 +14,14 @@ POWER_ECOFLOW_OUTPUT = "⚡ віддає {watts} Вт"
 POWER_ECOFLOW_AS_OF = "<i>станом на {time}</i>"
 POWER_ECOFLOW_UNREACHABLE = "🔋 Delta 2 не відповідає — увімкнена й поряд?"
 POWER_ECOFLOW_CARD_EXPIRED = "Готово, але ця картка застаріла — надішли /eco"
-POWER_ECOFLOW_REFRESHED = "Оновлено"
 # each button names the end state it brings about, decided when the card is drawn, so a stale tap can't toggle back
-POWER_ECOFLOW_BUTTON_AC_ON = "🔌 Розетки увімкнути"
-POWER_ECOFLOW_BUTTON_AC_OFF = "🔌 Розетки вимкнути"
+POWER_ECOFLOW_BUTTON_AC_ON = "Розетки увімкнути"
+POWER_ECOFLOW_BUTTON_AC_OFF = "Розетки вимкнути"
 POWER_ECOFLOW_BUTTON_USB_ON = "USB увімкнути"
 POWER_ECOFLOW_BUTTON_USB_OFF = "USB вимкнути"
 POWER_ECOFLOW_BUTTON_DC_ON = "DC 12В увімкнути"
 POWER_ECOFLOW_BUTTON_DC_OFF = "DC 12В вимкнути"
-POWER_ECOFLOW_BUTTON_REFRESH = "🔄 Оновити"
+POWER_ECOFLOW_BUTTON_REFRESH = "Оновити"
 # shown the instant a slow ble button is tapped, so it does not feel dead during the ~15s round-trip
 POWER_ECOFLOW_WORKING_TOAST = "🔄 читаю Delta 2…"
 
@@ -48,8 +47,8 @@ POWER_OUTAGE_SHORTFALL = (
 POWER_CONSERVATION_IN_USE = "▶️ <b>Delta 2</b> — у користуванні"
 POWER_CONSERVATION_IN_USE_PERCENT = "▶️ <b>Delta 2</b> — у користуванні (~{percent}%)"
 POWER_CONSERVATION_STORED = "🗄 <b>Delta 2</b> — на зберіганні (~{percent}%)"
-POWER_CONSERVATION_BUTTON_STORE = "🗄 Позначити на зберігання"
-POWER_CONSERVATION_BUTTON_IN_USE = "▶️ Позначити у користуванні"
+POWER_CONSERVATION_BUTTON_STORE = "Позначити на зберігання"
+POWER_CONSERVATION_BUTTON_IN_USE = "Позначити у користуванні"
 POWER_CONSERVATION_STORED_TOAST = "🗄 Delta 2 на зберіганні"
 POWER_CONSERVATION_IN_USE_TOAST = "▶️ Delta 2 у користуванні"
 
@@ -59,7 +58,7 @@ POWER_SCHEDULE_TITLE = "🗓 <b>Графік відключень</b> — сьо
 POWER_SCHEDULE_INTERVAL = "🕯 {start}–{end}"
 POWER_SCHEDULE_EMERGENCY_NOTE = "⚠️ аварійні відключення"
 POWER_SCHEDULE_AS_OF = "<i>станом на {time}</i>"
-POWER_SCHEDULE_BUTTON_REFRESH = "🔄 Оновити"
+POWER_SCHEDULE_BUTTON_REFRESH = "Оновити"
 POWER_SCHEDULE_REFRESHED = "Оновлено"
 POWER_SCHEDULE_REFRESHING = "🔄 оновлюю…"
 # a bare fact, no nudge — the design forbids "charge your phone" style advice

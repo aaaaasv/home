@@ -3,7 +3,7 @@ import json
 from src.bot.handlers.plants import messages
 from src.common.config import Settings
 from src.tests.behaviour.base import BaseBehaviourTestCase, build_settings
-from src.tests.telegram import callback_update, message_update
+from src.tests.telegram import ASKER_MENTION, callback_update, message_update
 
 BEDROOM = "спальня"
 LIVING_ROOM = "кухня-вітальня"
@@ -39,7 +39,7 @@ class PlantRoomFlowTestCase(BaseBehaviourTestCase):
 
         self.assertEqual(
             self.session.sent_texts()[-1],
-            messages.EDIT_FIELD_PROMPTS["room"].format(rooms=f"{LIVING_ROOM}, {BEDROOM}"),
+            ASKER_MENTION + messages.EDIT_FIELD_PROMPTS["room"].format(rooms=f"{LIVING_ROOM}, {BEDROOM}"),
         )
 
     async def test_the_room_prompt_says_so_when_no_room_has_a_sensor(self):
@@ -47,7 +47,7 @@ class PlantRoomFlowTestCase(BaseBehaviourTestCase):
 
         await self.open_the_room_prompt(plant_id, build_settings())
 
-        self.assertEqual(self.session.sent_texts()[-1], messages.NO_ROOMS_HAVE_SENSORS)
+        self.assertEqual(self.session.sent_texts()[-1], ASKER_MENTION + messages.NO_ROOMS_HAVE_SENSORS)
 
     async def test_naming_a_room_that_has_a_sensor_stores_it(self):
         plant_id = await self.seed_plant_to_edit()
