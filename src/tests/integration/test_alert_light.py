@@ -15,7 +15,10 @@ class ScriptedAlertSource:
     """Answers with the levels the test lines up, and with None when the feed is meant to be unreachable."""
 
     def __init__(self, *levels):
-        self.answers = [None if level is None else AirAlert(level=level, reason="Ракетна загроза") for level in levels]
+        self.answers = [
+            None if level is None else AirAlert(level=level, reason="Ракетна загроза", source="socket")
+            for level in levels
+        ]
 
     async def read_current(self):
         return self.answers.pop(0) if self.answers else None
@@ -178,6 +181,17 @@ class AlertLightTestCase(BaseIntegrationTestCase):
             journal = await uow.air_alert_events.list_since(FAR_PAST)
         self.assertEqual([event.level for event in journal], ["red", "yellow", "none"])
         self.assertEqual([event.outcome for event in journal], ["raised", "cleared", "unchanged"])
+
+    async def test_the_journal_records_which_feed_answered(self):
+        """Two feeds disagreeing is this module's one real failure, and it cannot be told apart without this."""
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(ScriptedAlertSource(AlertLevel.RED), light)
+
+        await watcher()
+
+        async with self.uow as uow:
+            journal = await uow.air_alert_events.list_since(FAR_PAST)
+        self.assertEqual([event.source for event in journal], ["socket"])
 
 
 async def _none():

@@ -56,7 +56,13 @@ class FollowAirAlertUseCase(BaseUseCase):
             if alert.level != previous:
                 # only the changes, or a journal of one row every thirty seconds would answer nothing
                 await uow.air_alert_events.create(
-                    {"level": alert.level, "reason": alert.reason, "outcome": transition, "at": moment}
+                    {
+                        "level": alert.level,
+                        "reason": alert.reason,
+                        "outcome": transition,
+                        "source": alert.source,
+                        "at": moment,
+                    }
                 )
                 await uow.air_alert_events.delete_before(moment - timedelta(days=RETENTION_DAYS))
 
