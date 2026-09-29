@@ -7,28 +7,30 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from src.bot.formatting import pluralize_days, shorten_for_button
+from src.bot.handlers.plants.care_card_reference import TASK_TYPE_ORDER, build_care_card_reference
 from src.bot.handlers.plants.formatting import (
     format_ideal_humidity,
     format_ideal_temperature,
     render_care_card_caption,
     task_action,
-    task_emoji,
     task_label,
 )
 from src.bot.handlers.plants.messages import (
     CARE_POSTPONE_BUTTON,
-    CARE_SKIP_BUTTON,
     CARE_TASK_LABELS,
     CARE_UNDO_BUTTON,
-    OVERDUE_EMOJI,
-    PLANT_EMOJI,
     PLANT_FIELD_LABELS,
     PLANT_RESTORE_BUTTON,
     SCHEDULE_REMOVE_BUTTON,
 )
-from src.bot.services.posted_message_tracker import build_care_task_reference
 from src.common.constants import CareTaskType, PlantField
 from src.modules.plant_care.domain import CareDigest, DueCareTask, PlantCard, PlantSummary
+from src.modules.plant_care.services.plant_air import PlantAir
+
+# telegram colours a button instead of decorating it: green for the action the card exists for, red for the
+# one that cannot be taken back
+SUCCESS_STYLE = "success"
+DANGER_STYLE = "danger"
 
 INTERVAL_PRESET_DAYS = (1, 3, 7, 14, 30)
 CUSTOM_INTERVAL_MARKER = 0
@@ -62,6 +64,10 @@ class CareCallback(CallbackData, prefix="care"):
     plant_id: int
     task_type: CareTaskType
     force: bool = False
+    # a plant's own card is a page somebody opened on purpose, so recording redraws it instead of settling it
+    # like a digest card, which is about one to-do list. a flag on the payload also covers /today, which no
+    # tracker remembers, and the confirmation that arrives on a different message
+    from_plant_card: bool = False
 
 
 class PlantCallback(CallbackData, prefix="plant"):
@@ -89,48 +95,66 @@ class CareCard(NamedTuple):
     photo_file_id: str | None
     caption: str
     keyboard: InlineKeyboardMarkup
-    task_reference: str
+    plant_id: int
+    task_types: frozenset[CareTaskType]
+
+    @property
+    def reference(self) -> str:
+        return build_care_card_reference(self.plant_id, self.task_types)
 
 
-def build_care_cards(digest: CareDigest) -> list[CareCard]:
-    # one card per due task: the plant's photo, a caption with the how-to, and two ways out — do it, or defer it
+def build_care_cards(digest: CareDigest, probe_air_by_plant: dict[int, PlantAir] | None = None) -> list[CareCard]:
+    """One card per plant, in the order the plants first appear: the photo, every need, and a pair of buttons each."""
+    probe_air_by_plant = probe_air_by_plant or {}
+    tasks_by_plant: dict[int, list[DueCareTask]] = {}
+    for task in digest.tasks:
+        tasks_by_plant.setdefault(task.plant_id, []).append(task)
+    for tasks in tasks_by_plant.values():
+        # the same order every morning, or an edit in place would shuffle the lines the family is used to reading
+        tasks.sort(key=lambda task: TASK_TYPE_ORDER.index(task.task_type))
+
     return [
         CareCard(
-            photo_file_id=task.photo_file_id,
-            caption=render_care_card_caption(task),
-            keyboard=build_care_card_keyboard(task),
-            task_reference=build_care_task_reference(task.plant_id, task.task_type),
+            photo_file_id=tasks[0].photo_file_id,
+            caption=render_care_card_caption(tasks, probe_air_by_plant.get(plant_id)),
+            keyboard=build_care_card_keyboard(tasks),
+            plant_id=plant_id,
+            task_types=frozenset(task.task_type for task in tasks),
         )
-        for task in digest.tasks
+        for plant_id, tasks in tasks_by_plant.items()
     ]
 
 
-def build_care_card_keyboard(task: DueCareTask) -> InlineKeyboardMarkup:
+def build_care_card_keyboard(tasks: list[DueCareTask]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text=f"{task_emoji(task.task_type)} {task_action(task.task_type)}",
-        callback_data=_build_care_card_callback(task),
-    )
-    # both defer via POSTPONE; the use case turns a skippable task's defer into a full cycle, so the label just
-    # promises "skip" instead of naming a day count
-    defer_text = (
-        CARE_SKIP_BUTTON if task.is_skippable else CARE_POSTPONE_BUTTON.format(days=pluralize_days(task.postpone_days))
-    )
-    builder.button(
-        text=defer_text,
-        callback_data=ScheduleCallback(
-            action=ScheduleAction.POSTPONE, plant_id=task.plant_id, task_type=task.task_type
-        ),
-    )
-    # one per row: side by side, "нагадати через 14 днів" gets squeezed against the short record button
-    builder.adjust(1)
+    for task in tasks:
+        # a pair per task: do it, or defer it — there is deliberately no "defer everything"
+        builder.row(
+            InlineKeyboardButton(
+                text=build_task_button_text(task.task_type),
+                callback_data=_build_care_card_callback(task).pack(),
+                style=SUCCESS_STYLE,
+            ),
+            InlineKeyboardButton(
+                text=CARE_POSTPONE_BUTTON,
+                callback_data=ScheduleCallback(
+                    action=ScheduleAction.POSTPONE, plant_id=task.plant_id, task_type=task.task_type
+                ).pack(),
+            ),
+        )
     return builder.as_markup()
+
+
+def build_task_button_text(task_type: CareTaskType) -> str:
+    return task_action(task_type).capitalize()
 
 
 def build_archived_plant_keyboard(plant_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
-        text=PLANT_RESTORE_BUTTON, callback_data=PlantCallback(action=PlantAction.RESTORE, plant_id=plant_id)
+        text=PLANT_RESTORE_BUTTON,
+        callback_data=PlantCallback(action=PlantAction.RESTORE, plant_id=plant_id),
+        style=SUCCESS_STYLE,
     )
     return builder.as_markup()
 
@@ -140,6 +164,7 @@ def build_schedule_remove_keyboard(plant_id: int, task_type: CareTaskType) -> In
     builder.button(
         text=SCHEDULE_REMOVE_BUTTON,
         callback_data=ScheduleCallback(action=ScheduleAction.REMOVE, plant_id=plant_id, task_type=task_type),
+        style=DANGER_STYLE,
     )
     builder.button(text="Ні", callback_data=PlantCallback(action=PlantAction.OPEN, plant_id=plant_id))
     return builder.as_markup()
@@ -161,11 +186,14 @@ def _build_care_card_callback(task: DueCareTask) -> CallbackData:
     return CareCallback(plant_id=task.plant_id, task_type=task.task_type)
 
 
-def build_force_care_keyboard(plant_id: int, task_type: CareTaskType) -> InlineKeyboardMarkup:
+def build_force_care_keyboard(
+    plant_id: int, task_type: CareTaskType, from_plant_card: bool = False
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
         text="Так, записати",
-        callback_data=CareCallback(plant_id=plant_id, task_type=task_type, force=True),
+        callback_data=CareCallback(plant_id=plant_id, task_type=task_type, force=True, from_plant_card=from_plant_card),
+        style=SUCCESS_STYLE,
     )
     builder.button(text="Ні", callback_data=PlantCallback(action=PlantAction.OPEN, plant_id=plant_id))
     return builder.as_markup()
@@ -175,35 +203,38 @@ def build_plant_list_keyboard(plants: list[PlantSummary]) -> InlineKeyboardMarku
     builder = InlineKeyboardBuilder()
     for plant in plants:
         builder.button(
-            text=f"{_plant_status_emoji(plant)} {plant.name}",
+            text=plant.name,
             callback_data=PlantCallback(action=PlantAction.OPEN, plant_id=plant.id),
         )
     builder.adjust(2)
     return builder.as_markup()
 
 
-def build_plant_card_keyboard(card: PlantCard) -> InlineKeyboardMarkup:
+def build_plant_card_keyboard(
+    card: PlantCard, recorded_task_types: frozenset[CareTaskType] = frozenset()
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for schedule in card.schedules:
         # photo is scheduled like care but recorded by the upload button below, so it gets no record button here
-        if schedule.task_type == CareTaskType.PHOTO:
+        if schedule.task_type == CareTaskType.PHOTO or schedule.task_type in recorded_task_types:
             continue
         builder.button(
-            text=f"{task_emoji(schedule.task_type)} {task_action(schedule.task_type)}",
-            callback_data=CareCallback(plant_id=card.id, task_type=schedule.task_type),
+            text=build_task_button_text(schedule.task_type),
+            callback_data=CareCallback(plant_id=card.id, task_type=schedule.task_type, from_plant_card=True),
+            style=SUCCESS_STYLE,
         )
     builder.adjust(2)
 
     photo_row = [
         InlineKeyboardButton(
-            text="📸 Додати фото",
+            text="Додати фото",
             callback_data=PlantCallback(action=PlantAction.ADD_PHOTO, plant_id=card.id).pack(),
         )
     ]
     if card.photo_count:
         photo_row.append(
             InlineKeyboardButton(
-                text=f"🖼 Фото ({card.photo_count})",
+                text=f"Фото ({card.photo_count})",
                 callback_data=PlantCallback(action=PlantAction.PHOTOS, plant_id=card.id).pack(),
             )
         )
@@ -211,25 +242,40 @@ def build_plant_card_keyboard(card: PlantCard) -> InlineKeyboardMarkup:
 
     builder.row(
         InlineKeyboardButton(
-            text="➕ Догляд",
+            text="Додати догляд",
             callback_data=ScheduleCallback(action=ScheduleAction.CHOOSE_TASK, plant_id=card.id).pack(),
         ),
         InlineKeyboardButton(
-            text="✏️ Змінити",
+            text="Змінити",
             callback_data=PlantCallback(action=PlantAction.EDIT, plant_id=card.id).pack(),
         ),
         InlineKeyboardButton(
-            text="🗑 Прибрати",
+            text="Прибрати",
             callback_data=PlantCallback(action=PlantAction.ARCHIVE, plant_id=card.id).pack(),
+            style=DANGER_STYLE,
         ),
     )
     builder.row(
         InlineKeyboardButton(
-            text="⬅️ До списку",
+            text="До списку",
             callback_data=PlantCallback(action=PlantAction.LIST).pack(),
         )
     )
     return builder.as_markup()
+
+
+def find_recorded_task_types(card: PlantCard, keyboard: InlineKeyboardMarkup | None) -> frozenset[CareTaskType]:
+    """The tasks whose record button an earlier tap already took off this card, read back from the card itself."""
+    if keyboard is None:
+        return frozenset()
+
+    offered = {
+        CareCallback.unpack(button.callback_data).task_type
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.callback_data and button.callback_data.startswith(f"{CareCallback.__prefix__}:")
+    }
+    return frozenset(schedule.task_type for schedule in card.schedules) - offered
 
 
 def build_plant_edit_keyboard(card: PlantCard) -> InlineKeyboardMarkup:
@@ -246,14 +292,14 @@ def build_plant_edit_keyboard(card: PlantCard) -> InlineKeyboardMarkup:
     for field, label in PLANT_FIELD_LABELS.items():
         builder.row(
             InlineKeyboardButton(
-                text=f"✏️ {label}: {shorten_for_button(current_values[field])}",
+                text=f"{label}: {shorten_for_button(current_values[field])}",
                 callback_data=EditPlantCallback(plant_id=card.id, field=field).pack(),
             )
         )
 
     builder.row(
         InlineKeyboardButton(
-            text="⬅️ Назад",
+            text="Назад",
             callback_data=PlantCallback(action=PlantAction.OPEN, plant_id=card.id).pack(),
         )
     )
@@ -269,7 +315,7 @@ def build_task_type_keyboard(card: PlantCard) -> InlineKeyboardMarkup:
         if schedule is None:
             builder.row(
                 InlineKeyboardButton(
-                    text=f"➕ {task_emoji(task_type)} {task_label(task_type)}",
+                    text=f"Додати: {task_label(task_type)}",
                     callback_data=_choose_interval_callback(card.id, task_type),
                 )
             )
@@ -278,12 +324,12 @@ def build_task_type_keyboard(card: PlantCard) -> InlineKeyboardMarkup:
         current_interval = pluralize_days(schedule.interval_days)
         builder.row(
             InlineKeyboardButton(
-                text=f"✏️ {task_emoji(task_type)} {task_label(task_type)} — раз на {current_interval}",
+                text=f"{task_label(task_type).capitalize()} — раз на {current_interval}",
                 callback_data=_choose_interval_callback(card.id, task_type),
             )
         )
 
-        instructions_label = "📝 інструкція ✓" if schedule.instructions else "📝 інструкція"
+        instructions_label = "Інструкція ✓" if schedule.instructions else "Інструкція"
         second_row = [
             InlineKeyboardButton(
                 text=instructions_label,
@@ -295,17 +341,18 @@ def build_task_type_keyboard(card: PlantCard) -> InlineKeyboardMarkup:
         if task_type != CareTaskType.WATERING:
             second_row.append(
                 InlineKeyboardButton(
-                    text="➖",
+                    text="Прибрати",
                     callback_data=ScheduleCallback(
                         action=ScheduleAction.CONFIRM_REMOVE, plant_id=card.id, task_type=task_type
                     ).pack(),
+                    style=DANGER_STYLE,
                 )
             )
         builder.row(*second_row)
 
     builder.row(
         InlineKeyboardButton(
-            text="⬅️ Назад",
+            text="Назад",
             callback_data=PlantCallback(action=PlantAction.OPEN, plant_id=card.id).pack(),
         )
     )
@@ -329,7 +376,7 @@ def build_schedule_interval_keyboard(plant_id: int, task_type: CareTaskType) -> 
             ),
         )
     builder.button(
-        text="✏️ свій інтервал",
+        text="Свій інтервал",
         callback_data=ScheduleCallback(
             action=ScheduleAction.SET,
             plant_id=plant_id,
@@ -348,9 +395,7 @@ def build_new_plant_interval_keyboard() -> InlineKeyboardMarkup:
             text=f"раз на {pluralize_days(interval_days)}",
             callback_data=NewPlantIntervalCallback(interval_days=interval_days),
         )
-    builder.button(
-        text="✏️ свій інтервал", callback_data=NewPlantIntervalCallback(interval_days=CUSTOM_INTERVAL_MARKER)
-    )
+    builder.button(text="Свій інтервал", callback_data=NewPlantIntervalCallback(interval_days=CUSTOM_INTERVAL_MARKER))
     builder.adjust(2)
     return builder.as_markup()
 
@@ -358,19 +403,9 @@ def build_new_plant_interval_keyboard() -> InlineKeyboardMarkup:
 def build_archive_confirmation_keyboard(plant_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="🗑 Так, прибрати",
+        text="Так, прибрати",
         callback_data=PlantCallback(action=PlantAction.ARCHIVE_CONFIRM, plant_id=plant_id),
+        style=DANGER_STYLE,
     )
     builder.button(text="Ні", callback_data=PlantCallback(action=PlantAction.OPEN, plant_id=plant_id))
     return builder.as_markup()
-
-
-def _plant_status_emoji(plant: PlantSummary) -> str:
-    most_urgent_schedule = plant.most_urgent_schedule
-    if most_urgent_schedule is None:
-        return PLANT_EMOJI
-    if most_urgent_schedule.overdue_days > 0:
-        return OVERDUE_EMOJI
-    if most_urgent_schedule.is_due:
-        return task_emoji(most_urgent_schedule.task_type)
-    return PLANT_EMOJI

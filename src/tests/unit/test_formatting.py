@@ -36,6 +36,7 @@ from src.modules.plant_care.domain import (
     PlantComfortChange,
     PlantPhotoReview,
 )
+from src.modules.plant_care.services.plant_air import PlantAir
 from src.modules.room_climate.domain import RoomClimate
 from src.modules.shopping.constants import ShoppingHorizon
 from src.modules.shopping.domain import PriceDropAnnouncement, ShoppingItemDetails, ShoppingList
@@ -159,52 +160,91 @@ class RenderShoppingListTestCase(unittest.TestCase):
 
 class RenderCareCardCaptionTestCase(unittest.TestCase):
     def build_task(
-        self, overdue_days: int = 0, instructions: str | None = None, consecutive_postponements: int = 0
+        self,
+        task_type: CareTaskType = CareTaskType.WATERING,
+        overdue_days: int = 0,
+        instructions: str | None = None,
+        consecutive_postponements: int = 0,
     ) -> DueCareTask:
         return DueCareTask(
             plant_id=1,
             plant_name="Кактус",
-            task_type=CareTaskType.WATERING,
+            task_type=task_type,
             interval_days=3,
             overdue_days=overdue_days,
             instructions=instructions,
             consecutive_postponements=consecutive_postponements,
         )
 
+    def build_probe_air(self, temperature_celsius: float | None, soil_moisture_percent: float | None) -> PlantAir:
+        return PlantAir(
+            temperature_celsius=temperature_celsius,
+            relative_humidity_percent=None,
+            soil_moisture_percent=soil_moisture_percent,
+            measured_at=datetime(2026, 7, 14, 9, 0, tzinfo=timezone.utc),
+            room=None,
+        )
+
     def test_render_care_card_caption_heads_with_the_plant_and_lists_the_task(self):
-        caption = render_care_card_caption(self.build_task())
+        caption = render_care_card_caption([self.build_task()])
 
         self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив")
 
-    def test_render_care_card_caption_marks_an_overdue_task(self):
-        caption = render_care_card_caption(self.build_task(overdue_days=2))
+    def test_render_care_card_caption_marks_an_overdue_task_with_its_days(self):
+        caption = render_care_card_caption([self.build_task(overdue_days=2)])
 
-        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив <i>(прострочено 2 дні)</i>")
+        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив · 2 дні")
 
     def test_render_care_card_caption_with_one_postponement_says_nothing_about_it(self):
-        caption = render_care_card_caption(self.build_task(consecutive_postponements=1))
+        caption = render_care_card_caption([self.build_task(consecutive_postponements=1)])
 
         self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив")
 
     def test_render_care_card_caption_counts_a_repeated_postponement(self):
-        caption = render_care_card_caption(self.build_task(consecutive_postponements=2))
+        caption = render_care_card_caption([self.build_task(consecutive_postponements=2)])
 
-        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив <i>(відкладено вдруге)</i>")
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив · відкладено вдруге")
 
-    def test_render_care_card_caption_joins_being_late_and_being_postponed_in_one_bracket(self):
-        caption = render_care_card_caption(self.build_task(overdue_days=2, consecutive_postponements=3))
+    def test_render_care_card_caption_joins_being_late_and_being_postponed_on_one_line(self):
+        caption = render_care_card_caption([self.build_task(overdue_days=2, consecutive_postponements=3)])
 
-        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив <i>(прострочено 2 дні, відкладено втретє)</i>")
+        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив · 2 дні · відкладено втретє")
 
     def test_render_care_card_caption_beyond_the_named_ordinals_falls_back_to_a_number(self):
-        caption = render_care_card_caption(self.build_task(consecutive_postponements=11))
+        caption = render_care_card_caption([self.build_task(consecutive_postponements=11)])
 
-        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив <i>(відкладено 11-й раз)</i>")
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив · відкладено 11-й раз")
 
     def test_render_care_card_caption_puts_instructions_in_an_expandable_block(self):
-        caption = render_care_card_caption(self.build_task(instructions="Поливайте рясно, але рідко."))
+        caption = render_care_card_caption([self.build_task(instructions="Поливайте рясно, але рідко.")])
 
-        self.assertIn("<blockquote expandable>Поливайте рясно, але рідко.</blockquote>", caption)
+        self.assertEqual(
+            caption, "🪴 <b>Кактус</b>\n💧 полив\n<blockquote expandable>Поливайте рясно, але рідко.</blockquote>"
+        )
+
+    def test_render_care_card_caption_lists_every_need_of_the_plant_under_one_header(self):
+        tasks = [
+            self.build_task(task_type=CareTaskType.WATERING, overdue_days=3),
+            self.build_task(task_type=CareTaskType.PHOTO, overdue_days=18),
+        ]
+
+        caption = render_care_card_caption(
+            tasks, self.build_probe_air(temperature_celsius=21.2, soil_moisture_percent=12)
+        )
+
+        self.assertEqual(caption, "🔴 <b>Кактус</b>\n💧 полив · 3 дні\n📸 фото · 18 днів\n🌡 у горщику 21° · ґрунт 12%")
+
+    def test_render_care_card_caption_without_a_probe_has_no_sensor_line(self):
+        caption = render_care_card_caption([self.build_task()], probe_air=None)
+
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив")
+
+    def test_render_care_card_caption_with_a_probe_that_reports_only_soil_names_only_soil(self):
+        caption = render_care_card_caption(
+            [self.build_task()], self.build_probe_air(temperature_celsius=None, soil_moisture_percent=40)
+        )
+
+        self.assertEqual(caption, "🪴 <b>Кактус</b>\n💧 полив\n🌡 у горщику ґрунт 40%")
 
 
 class RenderClimateDigestTestCase(unittest.TestCase):

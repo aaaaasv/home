@@ -4,11 +4,12 @@ from collections.abc import Callable
 
 from aiogram import Bot
 
+from src.bot.handlers.plants.care_cards import refresh_care_cards
 from src.bot.handlers.plants.formatting import render_recorded_care
 from src.bot.handlers.plants.keyboards import build_recorded_care_keyboard
 from src.bot.handlers.plants.messages import SOIL_WATERING_DETECTED
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
-from src.bot.services.posted_message_tracker import CARE_DIGEST_KIND, PostedMessageTracker, build_care_task_reference
+from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.common.config import Settings
 from src.common.constants import CareTaskType
 from src.common.exceptions import DomainError, RecentCareExistsError
@@ -59,10 +60,8 @@ def build_watering_recorder(
             text=f"{SOIL_WATERING_DETECTED}\n{render_recorded_care(record, moment, household_calendar)}",
             reply_markup=build_recorded_care_keyboard(plant_id, CareTaskType.WATERING),
         )
-        # the task is done, so its reminder card must go — a list that keeps settled cards is a list people
-        # stop reading, and then a real reminder goes unnoticed among the stale ones
-        await posted_message_tracker.clear_one(
-            CARE_DIGEST_KIND, build_care_task_reference(plant_id, CareTaskType.WATERING)
-        )
+        # the task is done, so the watering leaves the plant's reminder card, and the card with it if that was
+        # all it listed — a list that keeps settled needs is a list people stop reading
+        await refresh_care_cards(bot, uow_factory, household_calendar, settings, plant_id)
 
     return record_watering
