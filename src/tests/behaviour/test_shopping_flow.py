@@ -4,7 +4,7 @@ from src.bot.handlers.shopping import messages
 from src.modules.shopping.constants import ShoppingHorizon
 from src.tests.behaviour.base import BaseBehaviourTestCase
 from src.tests.fakes import ScriptedPriceSource
-from src.tests.telegram import ACTOR_ID, SHOPPING_TOPIC, callback_update, message_update
+from src.tests.telegram import ASKER_MENTION, SHOPPING_TOPIC, callback_update, message_update
 
 HOTLINE_URL = "https://hotline.ua/ua/mobile-x/dyson-v15/"
 
@@ -50,7 +50,7 @@ class ShoppingFlowTestCase(BaseBehaviourTestCase):
         await self.feed(message_update("/add", topic=SHOPPING_TOPIC))
 
         prompt = self.session.calls_named("SendMessage")[-1]
-        self.assertEqual(prompt.text, f'<a href="tg://user?id={ACTOR_ID}">\u200b</a>{messages.SHOPPING_ASK_NEW_ITEM}')
+        self.assertEqual(prompt.text, ASKER_MENTION + messages.SHOPPING_ASK_NEW_ITEM)
         self.assertEqual(prompt.reply_markup, ForceReply(selective=True, input_field_placeholder="що купити"))
         self.assertTrue(prompt.disable_notification)
 
@@ -98,7 +98,7 @@ class ShoppingFlowTestCase(BaseBehaviourTestCase):
         await self.feed(message_update("/track", topic=SHOPPING_TOPIC))
 
         prompt = self.session.calls_named("SendMessage")[-1]
-        self.assertEqual(prompt.text, f'<a href="tg://user?id={ACTOR_ID}">\u200b</a>{messages.TRACK_ASK_LINK}')
+        self.assertEqual(prompt.text, ASKER_MENTION + messages.TRACK_ASK_LINK)
         self.assertEqual(
             prompt.reply_markup, ForceReply(selective=True, input_field_placeholder="посилання з hotline.ua")
         )

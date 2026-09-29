@@ -4,7 +4,6 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message
 
-from src.common.constants import CareTaskType
 from src.infrastructure.db.uow import UnitOfWork
 
 CARE_DIGEST_KIND = "care_digest"
@@ -30,11 +29,6 @@ TRANSIT_CARD_KIND = "transit_card"
 SHOPPING_LIST_KIND = "shopping_list"
 PLACES_LIST_KIND = "places_list"
 CHORES_LIST_KIND = "chores_list"
-
-
-def build_care_task_reference(plant_id: int, task_type: CareTaskType) -> str:
-    """Names the one task a digest card is about, so that card can be dropped without touching the others"""
-    return f"{task_type}:{plant_id}"
 
 
 class PostedMessageTracker:

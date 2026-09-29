@@ -51,7 +51,6 @@ from src.bot.preflight import verify_reminder_chat
 from src.bot.reminders import build_scheduler
 from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
-from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.common.config import Settings, get_settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.adapters.neptun_air_threat_stream import NeptunAirThreatStream
@@ -377,7 +376,6 @@ async def run() -> None:
                     care_topic=care_topic,
                     uow_factory=UnitOfWork,
                     household_calendar=HouseholdCalendar(timezone=settings.timezone),
-                    posted_message_tracker=PostedMessageTracker(bot=bot, uow_factory=UnitOfWork),
                 ),
                 handle_presence_event=arrival_light_watcher.handle if arrival_light_watcher else None,
                 record_sensor_reading=build_sensor_recorder(

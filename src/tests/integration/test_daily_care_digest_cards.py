@@ -7,6 +7,8 @@ from aiogram.methods import EditMessageCaption, EditMessageText
 from sqlalchemy import update
 
 from src.bot.handlers.plants.jobs import DailyCareDigestJob
+from src.bot.handlers.plants.messages import SOIL_WATERING_DETECTED
+from src.bot.handlers.plants.soil import build_watering_recorder
 from src.bot.services.posted_message_tracker import CARE_DIGEST_KIND, PostedMessageTracker
 from src.common.config import Settings, get_settings
 from src.common.constants import CareTaskType
@@ -292,3 +294,84 @@ class DailyCareDigestCardsTestCase(BaseIntegrationTestCase):
         await self.run_digest(bot, days_later=1)
 
         self.assertEqual((len(bot.sent), [edit["message_id"] for edit in bot.edited], bot.deleted), (1, [500], []))
+
+
+class SoilWateringOnTheStandingCardTestCase(DailyCareDigestCardsTestCase):
+    """
+    The probe writes a watering down by itself, and the card asking for that watering has to notice.
+
+    this is the seam between two features built weeks apart: nobody taps anything, so the only thing that can
+    settle the card is the recorder. the detection has its own tests and they stub the recorder out, which left
+    the half that touches the card with no test at all.
+    """
+
+    async def detect_watering(self, bot: RecordingBot, plant_id: int) -> None:
+        await build_watering_recorder(
+            bot=bot,
+            settings=get_settings(),
+            care_topic=StubForumTopic(),
+            uow_factory=self.uow_factory,
+            household_calendar=self.household_calendar,
+        )(plant_id)
+
+    async def test_detect_watering_of_a_plant_that_needs_nothing_else_takes_its_card_away(self):
+        plant_id = await self.seed_plant(name="Кактус")
+        await self.seed_due_task(plant_id, CareTaskType.WATERING)
+        bot = RecordingBot()
+        await self.run_digest(bot)
+
+        await self.detect_watering(bot, plant_id)
+
+        async with self.uow as uow:
+            standing = await uow.posted_messages.list_by_kind(CARE_DIGEST_KIND)
+        self.assertEqual((bot.deleted, standing), ([500], []))
+
+    async def test_detect_watering_of_a_plant_that_still_needs_a_photo_leaves_the_photo_on_the_card(self):
+        plant_id = await self.seed_plant(name="Кактус")
+        await self.seed_due_task(plant_id, CareTaskType.WATERING)
+        await self.seed_due_task(plant_id, CareTaskType.PHOTO)
+        bot = RecordingBot()
+        await self.run_digest(bot)
+
+        await self.detect_watering(bot, plant_id)
+
+        async with self.uow as uow:
+            standing = await uow.posted_messages.list_by_kind(CARE_DIGEST_KIND)
+        self.assertEqual(
+            (bot.edited, bot.deleted, [(posted.message_id, posted.reference) for posted in standing]),
+            (
+                [{"chat_id": CHAT_ID, "message_id": 500, "text": "🪴 <b>Кактус</b>\n📸 фото"}],
+                [],
+                [(500, f"{plant_id}:64")],
+            ),
+        )
+
+    async def test_detect_watering_writes_the_care_down_as_the_probe_and_announces_it(self):
+        plant_id = await self.seed_plant(name="Кактус")
+        await self.seed_due_task(plant_id, CareTaskType.WATERING)
+        bot = RecordingBot()
+        await self.run_digest(bot)
+
+        await self.detect_watering(bot, plant_id)
+
+        events = await self.list_care_events(plant_id)
+        self.assertEqual(
+            (
+                [(event.task_type, event.performed_by_display_name) for event in events],
+                [message["text"].splitlines()[0] for message in bot.sent[1:]],
+            ),
+            ([(CareTaskType.WATERING, get_settings().PLANT_SOIL_ACTOR_NAME)], [SOIL_WATERING_DETECTED]),
+        )
+
+    async def test_detect_watering_minutes_after_somebody_recorded_it_leaves_the_card_alone(self):
+        plant_id = await self.seed_plant(name="Кактус")
+        await self.seed_due_task(plant_id, CareTaskType.WATERING)
+        await self.seed_care_event(
+            plant_id, task_type=CareTaskType.WATERING, performed_at=FROZEN_NOW - timedelta(minutes=10)
+        )
+        bot = RecordingBot()
+        await self.run_digest(bot)
+
+        await self.detect_watering(bot, plant_id)
+
+        self.assertEqual((len(bot.sent), bot.edited, bot.deleted), (1, [], []))

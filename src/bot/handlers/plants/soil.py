@@ -9,7 +9,6 @@ from src.bot.handlers.plants.formatting import render_recorded_care
 from src.bot.handlers.plants.keyboards import build_recorded_care_keyboard
 from src.bot.handlers.plants.messages import SOIL_WATERING_DETECTED
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
-from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.common.config import Settings
 from src.common.constants import CareTaskType
 from src.common.exceptions import DomainError, RecentCareExistsError
@@ -27,7 +26,6 @@ def build_watering_recorder(
     care_topic: ForumTopicRegistry,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
-    posted_message_tracker: PostedMessageTracker,
 ):
     """
     Hand the mqtt side one thing it can call, so it never learns what a chat or a card is.
