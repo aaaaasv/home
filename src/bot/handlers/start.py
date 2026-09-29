@@ -13,29 +13,26 @@ from src.infrastructure.db.uow import UnitOfWork
 router = Router(name="start")
 
 
+# the two are the same question — «що тут можна» — and /start used to answer it with all nine modules in any topic
 @router.message(CommandStart())
-async def show_welcome(message: Message) -> None:
+@router.message(Command("help"))
+async def show_help(message: Message, uow_factory: Callable[[], UnitOfWork]) -> None:
+    """Inside a module topic, that topic's commands; in General the full welcome; in a private chat, a pointer."""
     if message.chat.type == ChatType.PRIVATE:
         await message.answer(messages.PRIVATE_WELCOME)
         return
-    await message.answer(messages.WELCOME)
+
+    module_name = await retrieve_topic_module_name(message, uow_factory)
+    await message.answer(messages.TOPIC_HELP.get(module_name, messages.WELCOME))
 
 
-@router.message(Command("help"))
-async def show_help(message: Message, uow_factory: Callable[[], UnitOfWork]) -> None:
-    await message.answer(await _render_help(message, uow_factory))
-
-
-async def _render_help(message: Message, uow_factory: Callable[[], UnitOfWork]) -> str:
-    # inside a module topic, /help lists only that topic's commands; elsewhere it falls back to the full welcome
-    if message.chat.type == ChatType.PRIVATE:
-        return messages.PRIVATE_WELCOME
-    if message.message_thread_id is not None:
-        async with uow_factory() as uow:
-            topic = await uow.forum_topics.retrieve_by_thread_id(message.chat.id, message.message_thread_id)
-        if topic is not None and topic.module_name in messages.TOPIC_HELP:
-            return messages.TOPIC_HELP[topic.module_name]
-    return messages.WELCOME
+async def retrieve_topic_module_name(message: Message, uow_factory: Callable[[], UnitOfWork]) -> str | None:
+    """Which module owns the topic this message was sent in — None in General, where no module does."""
+    if message.message_thread_id is None:
+        return None
+    async with uow_factory() as uow:
+        topic = await uow.forum_topics.retrieve_by_thread_id(message.chat.id, message.message_thread_id)
+    return topic.module_name if topic is not None else None
 
 
 @router.message(Command("chatid"))

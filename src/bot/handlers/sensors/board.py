@@ -6,11 +6,10 @@ from aiogram.types import InlineKeyboardMarkup
 from src.bot.handlers.sensors.contents import ClimateCardContents
 from src.bot.handlers.sensors.formatting import render_climate_card
 from src.bot.handlers.sensors.keyboards import build_climate_card_keyboard
+from src.bot.services.posted_message_tracker import CLIMATE_CARD_KIND
 from src.bot.services.single_message_board import SingleMessageBoard
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
-
-CLIMATE_CARD_KIND = "climate_card"
 
 
 class ThreadTopic:
@@ -47,8 +46,3 @@ class ClimateCardBoard(SingleMessageBoard):
 
     def build_keyboard(self, contents: ClimateCardContents) -> InlineKeyboardMarkup:
         return build_climate_card_keyboard()
-
-    async def refresh_message(self, message_id: int, contents: ClimateCardContents) -> None:
-        """Edit the very card whose button was pressed, so a copy that could not be deleted still stops lying."""
-        if not await self._edit(message_id, contents):
-            await self.repost(contents)

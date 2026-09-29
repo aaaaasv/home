@@ -10,7 +10,7 @@ keeps the name it learned over DHCP even for a client that is currently away, wh
 lookup work for the moment somebody leaves and the moment they come back.
 """
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 
 @dataclass(frozen=True)
@@ -70,3 +70,18 @@ REFUSED_ROUTER_SILENT = "router_silent"
 REFUSED_NEVER_EMPTY = "never_empty"
 # a join that never followed a real absence says nothing about whether its owner is at home
 OUTCOMES_THAT_ARE_NOT_AN_ARRIVAL = (REFUSED_HOP, REFUSED_NO_DEPARTURE)
+
+
+@dataclass(frozen=True)
+class PresenceLogEntry:
+    """
+    One join or departure as the log kept it, with the phone reduced to a number.
+
+    the address is a household identifier and rotates per network, so whoever reads the log is told «phone 2»
+    rather than a hardware address; the number is stable only within one reading of the log.
+    """
+
+    phone_number: int
+    event: str
+    outcome: str | None
+    at: datetime

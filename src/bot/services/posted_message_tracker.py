@@ -19,6 +19,7 @@ CONSERVATION_CARD_KIND = "conservation_card"
 # the standing reserve board — every backup layer on one screen, edited in place and never notifying
 RESERVE_BOARD_KIND = "reserve_board"
 WEATHER_DIGEST_KIND = "weather_digest"
+CLIMATE_CARD_KIND = "climate_card"
 # one standing card per uncomfortable plant, referenced by plant id, deleted the moment the plant is comfortable
 PLANT_DISCOMFORT_KIND = "plant_discomfort"
 # one standing card per chore near its deadline, referenced by chore id, deleted the moment the chore is done

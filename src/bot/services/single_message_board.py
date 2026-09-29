@@ -68,6 +68,11 @@ class SingleMessageBoard:
         if previous_message_id is not None:
             await self._delete(previous_message_id)
 
+    async def refresh_in_place(self, message_id: int, contents) -> None:
+        """Redraw one known message, and repost when it cannot be redrawn — the caller keeps no other state."""
+        if not await self._edit(message_id, contents):
+            await self.repost(contents)
+
     async def _edit(self, message_id: int, contents) -> bool:
         try:
             await self.bot.edit_message_text(

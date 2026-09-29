@@ -15,13 +15,13 @@ class Settings(BaseSettings):
     TELEGRAM_ALLOWED_USER_IDS: str = ""
     TELEGRAM_REMINDER_CHAT_ID: int = 0
     TELEGRAM_PLANTS_TOPIC_ID: int = 0
-    PLANTS_TOPIC_TITLE: str = "plants"
+    PLANTS_TOPIC_TITLE: str = "🪴 рослини"
     TELEGRAM_SHOPPING_TOPIC_ID: int = 0
-    SHOPPING_TOPIC_TITLE: str = "shopping"
+    SHOPPING_TOPIC_TITLE: str = "🛒 шо треба"
     TELEGRAM_PLACES_TOPIC_ID: int = 0
-    PLACES_TOPIC_TITLE: str = "places"
+    PLACES_TOPIC_TITLE: str = "📍 куди сходити"
     TELEGRAM_CHORES_TOPIC_ID: int = 0
-    CHORES_TOPIC_TITLE: str = "chores"
+    CHORES_TOPIC_TITLE: str = "📋 справи"
 
     DATABASE_PATH: str = "home.db"
     PHOTO_STORAGE_PATH: str = "photos"
@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     # the daily weather digest lives in its own topic so its always-on chatter can be muted without silencing plants
     WEATHER_DIGEST_ENABLED: bool = False
     TELEGRAM_WEATHER_TOPIC_ID: int = 0
-    WEATHER_TOPIC_TITLE: str = "climate"
+    WEATHER_TOPIC_TITLE: str = "❄️ клімат"
     # deliberately not 08:00. open-meteo sheds load exactly on the hour, and the digest's own fetch is the one
     # that decides whether the day has weather at all — firing it on the boundary lost the forecast repeatedly
     WEATHER_DIGEST_TIME: str = "08:03"
@@ -121,7 +121,7 @@ class Settings(BaseSettings):
     # the raspberry pi's own vitals, watched from inside the container via sysfs — silent unless something is wrong
     SYSTEM_HEALTH_ENABLED: bool = False
     TELEGRAM_TECH_TOPIC_ID: int = 0
-    TECH_TOPIC_TITLE: str = "service"
+    TECH_TOPIC_TITLE: str = "🩺 сервіс"
     PI_TEMPERATURE_ALERT_CELSIUS: float = 75.0
     # a couple of degrees of hysteresis so a temperature idling near the limit cannot flap the alert
     PI_TEMPERATURE_RECOVERY_CELSIUS: float = 68.0
@@ -184,7 +184,7 @@ class Settings(BaseSettings):
     # ⚡ світло: the EcoFlow Delta 2 over local ble lives in its own topic, so a blackout alert can push while the
     # always-on schedule chatter stays a silent, self-editing card — the shopping-list rule applied to power
     TELEGRAM_POWER_TOPIC_ID: int = 0
-    POWER_TOPIC_TITLE: str = "power"
+    POWER_TOPIC_TITLE: str = "⚡ світло"
     ECOFLOW_ENABLED: bool = False
     # obtained once from an online account login, then the station is read fully offline over ble; not the password
     ECOFLOW_USER_ID: str = ""
@@ -314,7 +314,7 @@ class Settings(BaseSettings):
     # transit: on-demand arrival card for the family stop — the endpoints are raw-ip gov hosts that may move
     TRANSIT_ENABLED: bool = False
     TELEGRAM_TRANSIT_TOPIC_ID: int = 0
-    TRANSIT_TOPIC_TITLE: str = "transit"
+    TRANSIT_TOPIC_TITLE: str = "🚌 транспорт"
     TRANSIT_REALTIME_URL: str = "http://193.23.225.214:732/api/realtime"
     TRANSIT_STATIC_URL: str = "http://193.23.225.211:8002/export-gtfs-static"
     # cached beside the db under ./data (the photos pattern); the static host is slow, so it refreshes only weekly
@@ -347,7 +347,7 @@ class Settings(BaseSettings):
     # the free Gemini tier trains on inputs and humans may read them — keep NO secrets in the knowledge file
     ASSISTANT_ENABLED: bool = False
     TELEGRAM_ASSISTANT_TOPIC_ID: int = 0
-    ASSISTANT_TOPIC_TITLE: str = "ask"
+    ASSISTANT_TOPIC_TITLE: str = "🤖 спитати"
     # the curated facts file that ships with the code (edit it + redeploy); keep NO secrets in it
     ASSISTANT_KNOWLEDGE_PATH: str = "home-knowledge.md"
     GEMINI_API_KEY: str = ""

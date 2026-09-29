@@ -56,4 +56,4 @@ async def refresh_climate_card(
         household_calendar=household_calendar,
     )
 
-    await board.refresh_message(callback.message.message_id, contents)
+    await board.refresh_in_place(callback.message.message_id, contents)
