@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, ForceReply, Message
 
 from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.keyboards import EditPlantCallback, PlantAction, PlantCallback, build_plant_edit_keyboard
@@ -56,7 +56,12 @@ async def ask_new_value(
     await delete_quietly(callback.message)
     await state.set_state(EditPlantStates.field_value)
     await state.update_data(plant_id=callback_data.plant_id, field=callback_data.field)
-    prompt = await callback.message.answer(_prompt_for(callback_data.field, settings))
+    prompt = await callback.message.answer(
+        _prompt_for(callback_data.field, settings),
+        reply_markup=ForceReply(
+            selective=True, input_field_placeholder=messages.EDIT_FIELD_PLACEHOLDERS[callback_data.field]
+        ),
+    )
     await remember_transient_message(state, prompt)
 
 

@@ -35,6 +35,7 @@ from src.modules.plant_care.domain import (
     PlantPhotoReview,
     PlantSummary,
 )
+from src.modules.plant_care.services.plant_air import PlantAir
 
 
 def task_label(task_type: CareTaskType) -> str:
@@ -57,19 +58,36 @@ def render_postponements(consecutive_postponements: int) -> str:
     return POSTPONED_AGAIN.format(ordinal=ordinal)
 
 
-def render_care_card_caption(task: DueCareTask) -> str:
-    header_emoji = OVERDUE_EMOJI if task.overdue_days > 0 else PLANT_EMOJI
-    lines = [f"{header_emoji} <b>{escape(task.plant_name)}</b>"]
-    task_line = f"{task_emoji(task.task_type)} {task_label(task.task_type)}"
-    # both notes share one bracket, so a task that is late *and* deferred does not grow a second one
-    notes = [_overdue_note(task.overdue_days), render_postponements(task.consecutive_postponements)]
-    written = [note for note in notes if note]
-    if written:
-        task_line += f" <i>({', '.join(written)})</i>"
-    lines.append(task_line)
-    if task.instructions:
-        lines.append(f"<blockquote expandable>{escape(task.instructions)}</blockquote>")
+def render_care_card_caption(tasks: list[DueCareTask], probe_air: PlantAir | None = None) -> str:
+    """Every need of one plant, one line each, so the family reads a single card instead of a message per chore."""
+    header_emoji = OVERDUE_EMOJI if any(task.overdue_days > 0 for task in tasks) else PLANT_EMOJI
+    lines = [f"{header_emoji} <b>{escape(tasks[0].plant_name)}</b>"]
+    for task in tasks:
+        line = f"{task_emoji(task.task_type)} {task_label(task.task_type)}"
+        if task.overdue_days > 0:
+            line += f" · {pluralize_days(task.overdue_days)}"
+        postponements = render_postponements(task.consecutive_postponements)
+        if postponements:
+            line += f" · {postponements}"
+        lines.append(line)
+        if task.instructions:
+            lines.append(f"<blockquote expandable>{escape(task.instructions)}</blockquote>")
+    probe_line = _render_probe_line(probe_air)
+    if probe_line:
+        lines.append(probe_line)
     return "\n".join(lines)
+
+
+def _render_probe_line(probe_air: PlantAir | None) -> str:
+    if probe_air is None:
+        return ""
+
+    parts = []
+    if probe_air.temperature_celsius is not None:
+        parts.append(f"{probe_air.temperature_celsius:.0f}°")
+    if probe_air.soil_moisture_percent is not None:
+        parts.append(f"ґрунт {probe_air.soil_moisture_percent:.0f}%")
+    return f"🌡 у горщику {' · '.join(parts)}" if parts else ""
 
 
 def render_plant_discomfort_card(change: PlantComfortChange) -> str:
@@ -200,10 +218,6 @@ def render_care_history(entries: list[CareHistoryEntry], calendar: HouseholdCale
         for entry in entries
     )
     return "\n".join(lines)
-
-
-def _overdue_note(overdue_days: int) -> str:
-    return f"прострочено {pluralize_days(overdue_days)}" if overdue_days > 0 else ""
 
 
 def _render_schedule_line(schedule: CareScheduleDetails) -> str:

@@ -1,15 +1,21 @@
 from collections.abc import Callable
 
-from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from src.bot.formatting import exceeds_caption_limit, format_day
 from src.bot.handlers.plants import messages
+from src.bot.handlers.plants.care_card_reference import build_care_card_reference
+from src.bot.handlers.plants.care_cards import (
+    build_care_cards_for_digest,
+    build_plant_care_card,
+    refresh_care_cards,
+    retarget_care_card,
+)
 from src.bot.handlers.plants.formatting import (
-    render_care_card_caption,
     render_care_history,
+    render_plant_card,
     render_postponements,
     render_recent_care_warning,
     render_recorded_care,
@@ -18,23 +24,26 @@ from src.bot.handlers.plants.keyboards import (
     CareCallback,
     ScheduleAction,
     ScheduleCallback,
-    build_care_card_keyboard,
     build_care_cards,
     build_force_care_keyboard,
+    build_plant_card_keyboard,
     build_recorded_care_keyboard,
+    find_recorded_task_types,
 )
-from src.bot.services.posted_message_tracker import CARE_DIGEST_KIND, PostedMessageTracker, build_care_task_reference
+from src.bot.handlers.plants.plant_list import send_plant_card
+from src.bot.message_cleanup import delete_quietly
 from src.common.config import Settings
-from src.common.constants import CareTaskType
 from src.common.domain import Actor
 from src.common.exceptions import RecentCareExistsError
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.commands import PostponeCareTaskCommand, RecordCareEventCommand, UndoCareEventCommand
+from src.modules.plant_care.domain import CareDigest
 from src.modules.plant_care.use_cases.build_care_digest import BuildCareDigestUseCase
 from src.modules.plant_care.use_cases.list_care_history import ListCareHistoryUseCase
 from src.modules.plant_care.use_cases.postpone_care_task import PostponeCareTaskUseCase
 from src.modules.plant_care.use_cases.record_care_event import RecordCareEventUseCase
+from src.modules.plant_care.use_cases.retrieve_plant_card import RetrievePlantCardUseCase
 from src.modules.plant_care.use_cases.undo_care_event import UndoCareEventUseCase
 
 router = Router(name="care")
@@ -42,14 +51,14 @@ router = Router(name="care")
 
 @router.message(Command("today"))
 async def show_today(
-    message: Message, uow_factory: Callable[[], UnitOfWork], household_calendar: HouseholdCalendar
+    message: Message, uow_factory: Callable[[], UnitOfWork], household_calendar: HouseholdCalendar, settings: Settings
 ) -> None:
     digest = await BuildCareDigestUseCase(uow=uow_factory(), household_calendar=household_calendar)()
     if not digest.tasks:
         await message.answer(messages.NOTHING_DUE)
         return
 
-    for card in build_care_cards(digest):
+    for card in await build_care_cards_for_digest(uow_factory, household_calendar, settings, digest):
         if card.photo_file_id is None or exceeds_caption_limit(card.caption):
             if card.photo_file_id is not None:
                 await message.answer_photo(card.photo_file_id)
@@ -74,11 +83,11 @@ async def show_history(
 async def record_care(
     callback: CallbackQuery,
     callback_data: CareCallback,
+    bot: Bot,
     actor: Actor,
     settings: Settings,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
-    posted_message_tracker: PostedMessageTracker,
 ) -> None:
     use_case = RecordCareEventUseCase(
         uow=uow_factory(),
@@ -106,19 +115,42 @@ async def record_care(
                 performed_by_display_name=recent_care.performed_by_display_name,
                 calendar=household_calendar,
             ),
-            reply_markup=build_force_care_keyboard(callback_data.plant_id, callback_data.task_type),
+            reply_markup=build_force_care_keyboard(
+                callback_data.plant_id, callback_data.task_type, from_plant_card=callback_data.from_plant_card
+            ),
         )
         return
 
     await callback.answer(messages.CARE_RECORDED_TOAST)
-    # the card stays, but as a receipt: no record button to tap twice, and an undo for the tap that was a mistake
-    await _rewrite_card(
-        callback.message,
-        render_recorded_care(record, performed_at, household_calendar),
-        build_recorded_care_keyboard(callback_data.plant_id, callback_data.task_type),
-    )
-    await _drop_digest_card(
-        posted_message_tracker, callback_data.plant_id, callback_data.task_type, callback.message.message_id
+    if callback_data.from_plant_card:
+        await _redraw_plant_card(callback, callback_data, settings, uow_factory, household_calendar)
+        await refresh_care_cards(bot, uow_factory, household_calendar, settings, callback_data.plant_id)
+        return
+
+    # a forced record is confirmed from the warning, so the card the person tapped is not the message under the tap
+    card_is_under_tap = not callback_data.force
+    remaining_card = await build_plant_care_card(uow_factory, household_calendar, settings, callback_data.plant_id)
+    if card_is_under_tap and remaining_card is not None:
+        await _rewrite_card(callback.message, remaining_card.caption, remaining_card.keyboard)
+        await retarget_care_card(uow_factory, callback.message.message_id, remaining_card.reference)
+    else:
+        # nothing else is due, so the card stays as a receipt: no record button to tap twice, and an undo for
+        # the tap that was a mistake
+        await _rewrite_card(
+            callback.message,
+            render_recorded_care(record, performed_at, household_calendar),
+            build_recorded_care_keyboard(callback_data.plant_id, callback_data.task_type),
+        )
+        await retarget_care_card(
+            uow_factory, callback.message.message_id, build_care_card_reference(callback_data.plant_id, ())
+        )
+    await refresh_care_cards(
+        bot,
+        uow_factory,
+        household_calendar,
+        settings,
+        callback_data.plant_id,
+        except_message_id=callback.message.message_id if card_is_under_tap else None,
     )
 
 
@@ -126,6 +158,8 @@ async def record_care(
 async def undo_care(
     callback: CallbackQuery,
     callback_data: ScheduleCallback,
+    bot: Bot,
+    settings: Settings,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
 ) -> None:
@@ -135,16 +169,29 @@ async def undo_care(
 
     await callback.answer(messages.CARE_UNDONE_TOAST)
     # back to a due card, so the task can be done for real without waiting for tomorrow's digest
-    await _rewrite_card(callback.message, render_care_card_caption(task), build_care_card_keyboard(task))
+    card = await build_plant_care_card(uow_factory, household_calendar, settings, callback_data.plant_id)
+    if card is None:
+        card = build_care_cards(CareDigest(today=household_calendar.today(), tasks=[task]))[0]
+    await _rewrite_card(callback.message, card.caption, card.keyboard)
+    await retarget_care_card(uow_factory, callback.message.message_id, card.reference)
+    await refresh_care_cards(
+        bot,
+        uow_factory,
+        household_calendar,
+        settings,
+        callback_data.plant_id,
+        except_message_id=callback.message.message_id,
+    )
 
 
 @router.callback_query(ScheduleCallback.filter(F.action == ScheduleAction.POSTPONE))
 async def postpone_care(
     callback: CallbackQuery,
     callback_data: ScheduleCallback,
+    bot: Bot,
+    settings: Settings,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
-    posted_message_tracker: PostedMessageTracker,
 ) -> None:
     postponed = await PostponeCareTaskUseCase(uow=uow_factory(), household_calendar=household_calendar)(
         PostponeCareTaskCommand(
@@ -157,19 +204,44 @@ async def postpone_care(
     toast = messages.CARE_POSTPONED_TOAST.format(when=format_day(postponed.next_due_on, household_calendar.today()))
     again = render_postponements(postponed.consecutive_postponements)
     await callback.answer(f"{toast} · {again}" if again else toast)
-    await _delete_quietly(callback.message)
-    await _drop_digest_card(posted_message_tracker, callback_data.plant_id, callback_data.task_type)
+    remaining_card = await build_plant_care_card(uow_factory, household_calendar, settings, callback_data.plant_id)
+    if remaining_card is None:
+        await delete_quietly(callback.message)
+    else:
+        await _rewrite_card(callback.message, remaining_card.caption, remaining_card.keyboard)
+        await retarget_care_card(uow_factory, callback.message.message_id, remaining_card.reference)
+    await refresh_care_cards(
+        bot,
+        uow_factory,
+        household_calendar,
+        settings,
+        callback_data.plant_id,
+        except_message_id=callback.message.message_id if remaining_card is not None else None,
+    )
 
 
-async def _drop_digest_card(
-    posted_message_tracker: PostedMessageTracker,
-    plant_id: int,
-    task_type: CareTaskType,
-    keep_message_id: int | None = None,
+async def _redraw_plant_card(
+    callback: CallbackQuery,
+    callback_data: CareCallback,
+    settings: Settings,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
 ) -> None:
-    # the action may have come from the plant card, which leaves the digest card standing on a settled task
-    await posted_message_tracker.clear_one(
-        CARE_DIGEST_KIND, build_care_task_reference(plant_id, task_type), keep_message_id=keep_message_id
+    """The page somebody opened stays a page: the same data, newer, so the next due date and the history are true."""
+    card = await RetrievePlantCardUseCase(
+        uow=uow_factory(), household_calendar=household_calendar, sensor_by_plant=settings.sensor_by_plant
+    )(callback_data.plant_id)
+    if callback_data.force:
+        # the message under the tap is the warning, not the page, so the page goes out again below it
+        await delete_quietly(callback.message)
+        await send_plant_card(callback.message, card, household_calendar)
+        return
+
+    recorded_task_types = find_recorded_task_types(card, callback.message.reply_markup) | {callback_data.task_type}
+    await _rewrite_card(
+        callback.message,
+        render_plant_card(card, household_calendar),
+        build_plant_card_keyboard(card, recorded_task_types),
     )
 
 
@@ -179,10 +251,3 @@ async def _rewrite_card(message: Message, text: str, keyboard: InlineKeyboardMar
         await message.edit_caption(caption=text, reply_markup=keyboard)
     else:
         await message.edit_text(text, reply_markup=keyboard)
-
-
-async def _delete_quietly(message: Message) -> None:
-    try:
-        await message.delete()
-    except TelegramBadRequest:
-        pass

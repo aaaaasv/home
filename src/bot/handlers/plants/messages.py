@@ -73,9 +73,8 @@ ADD_PHOTO_ASK_PHOTO = (
     "Далі можна крупні плани листя, скільки треба.\n\n"
     "/cancel — скасувати"
 )
-CARE_POSTPONE_BUTTON = "⏳ нагадати через {days}"
-# a skippable task (fertilizing, photo) defers a whole cycle, so its button says "skip", not "in N days"
-CARE_SKIP_BUTTON = "⏭ пропустити"
+# one word for every task: a skippable one (fertilizing, photo) defers a whole cycle, and the toast names the day
+CARE_POSTPONE_BUTTON = "Відкласти"
 CARE_POSTPONED_TOAST = "Нагадаю {when}"
 # a deferral that keeps repeating says the interval is wrong, so the card counts it out loud from the second one
 POSTPONED_AGAIN = "відкладено {ordinal}"
@@ -94,7 +93,7 @@ POSTPONED_MANY = "{count}-й раз"
 
 # the card stays after recording instead of vanishing — with the record button gone it no longer invites a
 # second watering, and it is the only place an accidental tap can be taken back the moment it happens
-CARE_UNDO_BUTTON = "↩️ скасувати"
+CARE_UNDO_BUTTON = "Скасувати"
 CARE_RECORDED_CARD = "✅ <b>{plant}</b> — {emoji} {action}\n<i>{who}, {time}</i>"
 # the probe saw the soil go from dry to wet and wrote the care down itself; the card below it carries the
 # usual «скасувати», so a misread costs one tap
@@ -128,8 +127,8 @@ PLANT_FIELD_LABELS: dict[PlantField, str] = {
     PlantField.LOCATION: "Місце",
     PlantField.ROOM: "Кімната",
     PlantField.NOTES: "Нотатка",
-    PlantField.TEMPERATURE_RANGE: "🌡 Температура",
-    PlantField.HUMIDITY_RANGE: "💧 Вологість",
+    PlantField.TEMPERATURE_RANGE: "Температура",
+    PlantField.HUMIDITY_RANGE: "Вологість",
 }
 
 ASK_EDIT_FIELD = "Що змінити?"
@@ -162,10 +161,24 @@ CARE_INSTRUCTIONS_TOO_LONG = f"Задовга інструкція — до {CAR
 ARCHIVE_CONFIRM = "Точно прибрати <b>{plant_name}</b> зі списку? Історія та фото збережуться."
 PLANT_ARCHIVED = "🗑 <b>{plant_name}</b> прибрано зі списку."
 # archiving hides the plant with its schedules, photos and history, and nothing else brings them back
-PLANT_RESTORE_BUTTON = "↩️ повернути"
+PLANT_RESTORE_BUTTON = "Повернути"
 PLANT_RESTORED = "🪴 <b>{plant_name}</b> повернуто до списку."
 
 CARE_RECORDED_TOAST = "Записав ✅"
+
+# the grey hint inside the input field that ForceReply opens, so the person sees what is being asked for
+ADD_PLANT_NAME_PLACEHOLDER = "Назва рослини"
+ADD_PLANT_INTERVAL_PLACEHOLDER = "Число днів"
+EDIT_FIELD_PLACEHOLDERS: dict[PlantField, str] = {
+    PlantField.NAME: "Нова назва",
+    PlantField.SPECIES: "Вид рослини",
+    PlantField.LOCATION: "Де вона стоїть",
+    PlantField.ROOM: "Кімната",
+    PlantField.NOTES: "Нотатка",
+    PlantField.TEMPERATURE_RANGE: "Наприклад: 18-27",
+    PlantField.HUMIDITY_RANGE: "Наприклад: 50-70",
+}
+CARE_INSTRUCTIONS_PLACEHOLDER = "Як саме робити"
 
 # one standing card per uncomfortable plant, so a line names its own plant; fires on a crossing that held for a
 # full day, not on a number — a heated flat is simply dry all winter

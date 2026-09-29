@@ -8,14 +8,11 @@ from aiogram.types import CallbackQuery, InputMediaPhoto, Message
 
 from src.bot.formatting import format_moment
 from src.bot.handlers.plants import messages
+from src.bot.handlers.plants.care_cards import refresh_care_cards
 from src.bot.handlers.plants.formatting import render_plant_photo_review
 from src.bot.handlers.plants.keyboards import PlantAction, PlantCallback
-from src.bot.message_cleanup import (
-    delete_message_quietly,
-    delete_quietly,
-    remember_transient_message,
-    sweep_transient_messages,
-)
+from src.bot.message_cleanup import delete_quietly, remember_transient_message, sweep_transient_messages
+from src.common.config import Settings
 from src.common.constants import PlantPhotoFrame
 from src.common.domain import Actor
 from src.common.household_calendar import HouseholdCalendar
@@ -59,23 +56,12 @@ class AddPhotoStates(StatesGroup):
     photo = State()
 
 
-@router.callback_query(PlantCallback.filter(F.action == PlantAction.ADD_PHOTO))
+# the digest card's button is a separate action only because cards posted before the two flows merged still carry it
+@router.callback_query(PlantCallback.filter(F.action.in_({PlantAction.ADD_PHOTO, PlantAction.ADD_PHOTO_DUE})))
 async def ask_for_photo(callback: CallbackQuery, callback_data: PlantCallback, state: FSMContext) -> None:
-    await _start_upload(callback, callback_data.plant_id, state, due_card_message_id=None)
-
-
-@router.callback_query(PlantCallback.filter(F.action == PlantAction.ADD_PHOTO_DUE))
-async def ask_for_due_photo(callback: CallbackQuery, callback_data: PlantCallback, state: FSMContext) -> None:
-    # remember the digest card so the arriving photo can drop it, the way recording care drops its own card
-    await _start_upload(callback, callback_data.plant_id, state, due_card_message_id=callback.message.message_id)
-
-
-async def _start_upload(
-    callback: CallbackQuery, plant_id: int, state: FSMContext, due_card_message_id: int | None
-) -> None:
     await callback.answer()
     await state.set_state(AddPhotoStates.photo)
-    await state.update_data(plant_id=plant_id, due_card_message_id=due_card_message_id)
+    await state.update_data(plant_id=callback_data.plant_id)
     prompt = await callback.message.answer(messages.ADD_PHOTO_ASK_PHOTO)
     await remember_transient_message(state, prompt)
 
@@ -88,6 +74,7 @@ async def add_photo(
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
     photo_storage: PhotoStorage,
+    settings: Settings,
     photo_analyst: PhotoAnalyst | None,
 ) -> None:
     """
@@ -139,7 +126,7 @@ async def add_photo(
     finally:
         session.frames_arriving -= 1
         if session.frames_arriving == 0:
-            _close_when_quiet(message, state, session, uow_factory, household_calendar, photo_analyst)
+            _close_when_quiet(message, state, session, uow_factory, household_calendar, settings, photo_analyst)
 
 
 def _cancel_closing(session: PhotoSession) -> None:
@@ -156,6 +143,7 @@ def _close_when_quiet(
     session: PhotoSession,
     uow_factory: Callable[[], UnitOfWork],
     household_calendar: HouseholdCalendar,
+    settings: Settings,
     photo_analyst: PhotoAnalyst | None,
 ) -> None:
     # there is no "album finished" update, so the session closes a moment after frames stop arriving; each new
@@ -169,7 +157,8 @@ def _close_when_quiet(
         _open_sessions.pop(key, None)
         await state.clear()
         saved = session_data.get("frames_saved", 1)
-        await _drop_due_card(message, session_data.get("due_card_message_id"))
+        # the photo settles the plant's photo task, so its reminder card loses the line or goes altogether
+        await refresh_care_cards(message.bot, uow_factory, household_calendar, settings, session_data["plant_id"])
         await sweep_transient_messages(message.bot, message.chat.id, session_data)
         await message.answer(messages.PHOTO_ADDED if saved == 1 else messages.PHOTOS_ADDED.format(count=saved))
         await _review_photo(message, session_data["plant_id"], uow_factory, household_calendar, photo_analyst)
@@ -198,14 +187,6 @@ async def _review_photo(
         return
 
     await notice.edit_text(render_plant_photo_review(review))
-
-
-async def _drop_due_card(message: Message, due_card_message_id: int | None) -> None:
-    if due_card_message_id is None:
-        return
-
-    # the card may be older than telegram's edit window, or already gone — the photo is saved either way
-    await delete_message_quietly(message.bot, message.chat.id, due_card_message_id)
 
 
 @router.message(AddPhotoStates.photo)

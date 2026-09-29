@@ -9,8 +9,16 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.formatting import exceeds_caption_limit
+from src.bot.handlers.plants.care_cards import (
+    StandingCareCard,
+    build_care_cards_for_digest,
+    edit_care_card,
+    forget_care_card,
+    list_standing_care_cards,
+    retarget_care_card,
+)
 from src.bot.handlers.plants.formatting import render_plant_comfort_restored, render_plant_discomfort_card
-from src.bot.handlers.plants.keyboards import build_care_cards
+from src.bot.handlers.plants.keyboards import CareCard
 from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import CARE_DIGEST_KIND, PLANT_DISCOMFORT_KIND, PostedMessageTracker
@@ -20,6 +28,7 @@ from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.domain import CareDigest, PlantComfortChange
+from src.modules.plant_care.use_cases.build_care_digest import BuildCareDigestUseCase
 from src.modules.plant_care.use_cases.deliver_daily_care_digest import DeliverDailyCareDigestUseCase
 from src.modules.plant_care.use_cases.evaluate_plant_climate import EvaluatePlantClimateUseCase
 from src.modules.plant_care.use_cases.retrieve_uncomfortable_plants import RetrieveUncomfortablePlantsUseCase
@@ -38,6 +47,10 @@ class DailyCareDigestJob:
 
     if the pi is down at digest time, the first check after it boots delivers the reminder; the sent-date marker
     then keeps it to one digest per day.
+
+    each plant has one standing card that lives until its tasks are done. a need the card never listed posts a
+    new one with a ping and deletes the old; a card whose needs are all still listed is edited where it stands,
+    without a ping, so a task left undone is not a new message every morning.
     """
 
     def __init__(
@@ -66,6 +79,7 @@ class DailyCareDigestJob:
             weekend_digest_time=self.settings.weekend_digest_time,
         )()
         if digest is None:
+            await self._remove_settled_cards()
             return
 
         topic_id = await self.care_topic.resolve()
@@ -83,46 +97,85 @@ class DailyCareDigestJob:
             await uow.care_digest_deliveries.record_sent(digest.today)
         logger.info("Sent the digest for %s with %s tasks", digest.today, len(digest.tasks))
 
+    async def _remove_settled_cards(self) -> None:
+        """The digest is silent on a day with nothing due, which is also the day a leftover card must go."""
+        digest = await BuildCareDigestUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)()
+        due_plant_ids = {task.plant_id for task in digest.tasks}
+        for standing in await list_standing_care_cards(self.uow_factory):
+            reference = standing.reference
+            # a receipt has no needs and is left for the next digest, so its undo button outlives the afternoon
+            if reference is not None and reference.task_types and reference.plant_id not in due_plant_ids:
+                await forget_care_card(self.bot, self.uow_factory, standing.posted)
+
     async def _send_digest(self, digest: CareDigest, topic_id: int | None) -> None:
-        # clear yesterday's leftover cards, then post one per plant so the family sees at a glance which needs what
-        await self.posted_message_tracker.clear(CARE_DIGEST_KIND)
-        # one push per digest, not one per plant — five plants due used to mean five buzzes
-        for position, card in enumerate(build_care_cards(digest)):
-            silent = position > 0
-            if card.photo_file_id is None:
-                sent = await self.bot.send_message(
-                    chat_id=self.chat_id,
-                    message_thread_id=topic_id,
-                    text=card.caption,
-                    reply_markup=card.keyboard,
-                    # the daily "these plants need care today" push — the one message the whole system exists for
-                    disable_notification=silent,
-                )
-            elif exceeds_caption_limit(card.caption):
-                # the photo cannot carry this caption, so it goes bare and the text keeps the buttons
-                await self.bot.send_photo(
-                    chat_id=self.chat_id,
-                    message_thread_id=topic_id,
-                    photo=card.photo_file_id,
-                    disable_notification=True,
-                )
-                sent = await self.bot.send_message(
-                    chat_id=self.chat_id,
-                    message_thread_id=topic_id,
-                    text=card.caption,
-                    reply_markup=card.keyboard,
-                    disable_notification=silent,
-                )
+        cards = await build_care_cards_for_digest(self.uow_factory, self.household_calendar, self.settings, digest)
+        standing_by_plant: dict[int, StandingCareCard] = {}
+        for standing in await list_standing_care_cards(self.uow_factory):
+            if standing.reference is None:
+                # yesterday's one-card-per-task rows, from before a plant had a card of its own
+                await forget_care_card(self.bot, self.uow_factory, standing.posted)
+                continue
+            previous = standing_by_plant.get(standing.reference.plant_id)
+            if previous is not None:
+                await forget_care_card(self.bot, self.uow_factory, previous.posted)
+            standing_by_plant[standing.reference.plant_id] = standing
+
+        due_plant_ids = {card.plant_id for card in cards}
+        for plant_id in standing_by_plant.keys() - due_plant_ids:
+            await forget_care_card(self.bot, self.uow_factory, standing_by_plant[plant_id].posted)
+
+        # one push per digest, not one per plant — five plants with new needs used to mean five buzzes
+        announced = False
+        for card in cards:
+            standing = standing_by_plant.get(card.plant_id)
+            if standing is not None and card.task_types <= standing.reference.task_types:
+                if await edit_care_card(self.bot, standing.posted.chat_id, standing.posted.message_id, card):
+                    await retarget_care_card(self.uow_factory, standing.posted.message_id, card.reference)
+                    continue
+                # the card was deleted by hand: post it again, quietly, since nothing in it is new
+                await forget_care_card(self.bot, self.uow_factory, standing.posted)
+                silent = True
             else:
-                sent = await self.bot.send_photo(
-                    chat_id=self.chat_id,
-                    message_thread_id=topic_id,
-                    photo=card.photo_file_id,
-                    caption=card.caption,
-                    reply_markup=card.keyboard,
-                    disable_notification=silent,
-                )
-            await self.posted_message_tracker.remember(CARE_DIGEST_KIND, sent, reference=card.task_reference)
+                if standing is not None:
+                    await forget_care_card(self.bot, self.uow_factory, standing.posted)
+                # the daily "these plants need care today" push — the one message the whole system exists for
+                silent = announced
+                announced = True
+            sent = await self._post_card(card, topic_id, silent)
+            await self.posted_message_tracker.remember(CARE_DIGEST_KIND, sent, reference=card.reference)
+
+    async def _post_card(self, card: CareCard, topic_id: int | None, silent: bool):
+        if card.photo_file_id is None:
+            return await self.bot.send_message(
+                chat_id=self.chat_id,
+                message_thread_id=topic_id,
+                text=card.caption,
+                reply_markup=card.keyboard,
+                disable_notification=silent,
+            )
+        if exceeds_caption_limit(card.caption):
+            # the photo cannot carry this caption, so it goes bare and the text keeps the buttons
+            await self.bot.send_photo(
+                chat_id=self.chat_id,
+                message_thread_id=topic_id,
+                photo=card.photo_file_id,
+                disable_notification=True,
+            )
+            return await self.bot.send_message(
+                chat_id=self.chat_id,
+                message_thread_id=topic_id,
+                text=card.caption,
+                reply_markup=card.keyboard,
+                disable_notification=silent,
+            )
+        return await self.bot.send_photo(
+            chat_id=self.chat_id,
+            message_thread_id=topic_id,
+            photo=card.photo_file_id,
+            caption=card.caption,
+            reply_markup=card.keyboard,
+            disable_notification=silent,
+        )
 
 
 class RecordRoomClimateJob:
