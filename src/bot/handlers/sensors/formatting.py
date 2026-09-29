@@ -8,8 +8,9 @@ noise, and printing it every morning teaches people to stop reading the line.
 from html import escape
 
 from src.bot.handlers.sensors import messages
+from src.bot.handlers.sensors.contents import ClimateCardContents
 from src.common.household_calendar import HouseholdCalendar
-from src.modules.sensors.domain import ClimateSnapshot, ClimateTrend, SensorNow
+from src.modules.sensors.domain import ClimateSnapshot, ClimateTrend, SensorNow, TemperatureSpan
 
 # below this a difference is the sensor's own noise rather than anything that happened in the flat
 NOTICEABLE_TEMPERATURE_CHANGE = 0.5
@@ -17,12 +18,8 @@ NOTICEABLE_HUMIDITY_CHANGE = 3.0
 LOW_BATTERY_PERCENT = 20.0
 
 
-def render_climate_card(
-    snapshot: ClimateSnapshot,
-    trend: ClimateTrend,
-    pot_labels: dict[str, str],
-    calendar: HouseholdCalendar,
-) -> str:
+def render_climate_card(contents: ClimateCardContents, calendar: HouseholdCalendar) -> str:
+    snapshot = contents.snapshot
     if not snapshot.air and not snapshot.soil:
         return messages.CLIMATE_NOTHING_YET
 
@@ -33,16 +30,23 @@ def render_climate_card(
 
     if snapshot.air:
         lines.append(messages.CLIMATE_ROOMS_TITLE)
-        lines.extend(_render_air(one) for one in snapshot.air)
+        lines.extend(_render_air(one, contents.temperature_spans.get(one.sensor)) for one in snapshot.air)
 
     if snapshot.soil:
-        lines.extend(["", messages.CLIMATE_POTS_TITLE])
-        lines.extend(_render_soil(one, pot_labels.get(one.sensor, one.sensor)) for one in snapshot.soil)
+        lines.extend(["", messages.CLIMATE_POTS_TITLE.format(probes=len(snapshot.soil), plants=contents.plant_count)])
+        lines.extend(_render_soil(one, contents.pot_labels.get(one.sensor, one.sensor)) for one in snapshot.soil)
 
-    for line in _render_trend(trend):
+    for line in _render_trend(contents.trend):
         lines.extend(["", line])
 
-    lines.extend(["", f"<i>станом на {calendar.local_time(snapshot.taken_at):%H:%M}</i>"])
+    lines.extend(
+        [
+            "",
+            messages.CLIMATE_AS_OF.format(
+                unix=int(snapshot.taken_at.timestamp()), time=f"{calendar.local_time(snapshot.taken_at):%H:%M}"
+            ),
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -76,12 +80,22 @@ def _render_average(snapshot: ClimateSnapshot) -> str:
     return f"загалом {' · '.join(parts)}"
 
 
-def _render_air(one: SensorNow) -> str:
+def _render_air(one: SensorNow, span: TemperatureSpan | None) -> str:
     name = escape(one.room or one.sensor)
     values = _air_values(one)
     if one.is_stale:
         return f"· {name} — <s>{values}</s> <i>{messages.CLIMATE_STALE_NOTE}</i>"
-    return f"· {name} — {values}{_battery(one)}"
+    return f"· {name} — {values}{_render_span(span)}{_battery(one)}"
+
+
+def _render_span(span: TemperatureSpan | None) -> str:
+    """The day's low and high, left out when they round to the same number and so say nothing."""
+    if span is None:
+        return ""
+    minimum, maximum = f"{span.minimum_celsius:.0f}", f"{span.maximum_celsius:.0f}"
+    if minimum == maximum:
+        return ""
+    return f" {messages.CLIMATE_SPAN_NOTE.format(minimum=minimum, maximum=maximum)}"
 
 
 def _render_soil(one: SensorNow, label: str) -> str:

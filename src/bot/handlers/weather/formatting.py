@@ -19,20 +19,21 @@ from src.bot.handlers.weather.messages import (
     WEATHER_DIGEST_AS_OF,
     WEATHER_DIGEST_TITLE,
     WEATHER_EVENING_SUFFIX,
-    WEATHER_FROST_LINE,
+    WEATHER_FROST_WARNING,
     WEATHER_INDOOR_LINE,
     WEATHER_OUTDOOR_LINE,
     WEATHER_OUTDOOR_LINE_WITH_FEELS_LIKE,
-    WEATHER_POLLEN_LINE,
-    WEATHER_RAIN_LINE,
-    WEATHER_RAIN_LINE_WITH_WINDOW,
+    WEATHER_POLLEN_WARNING,
+    WEATHER_RAIN_WARNING,
+    WEATHER_RAIN_WARNING_WITH_WINDOW,
     WEATHER_RAIN_WINDOW_RANGE,
     WEATHER_RAIN_WINDOW_SINGLE_HOUR,
-    WEATHER_THUNDERSTORM_LINE,
+    WEATHER_THUNDERSTORM_WARNING,
     WEATHER_UNAVAILABLE,
-    WEATHER_UV_LINE,
+    WEATHER_UV_WARNING,
     WEATHER_VENTILATION_LINES,
-    WEATHER_WIND_LINE,
+    WEATHER_WARNINGS_LINE,
+    WEATHER_WARNINGS_SEPARATOR,
     WIND_BANDS,
     WIND_NOTABLE_THRESHOLD_METERS_PER_SECOND,
     WIND_STRONGEST_LABEL,
@@ -61,33 +62,24 @@ def render_climate_digest(
 
     if outdoor is not None:
         lines.append(_render_outdoor(outdoor))
+        warnings = _collect_warnings(outdoor)
+        if warnings:
+            lines.append(WEATHER_WARNINGS_LINE.format(warnings=WEATHER_WARNINGS_SEPARATOR.join(warnings)))
+        # a fact and a measurement rather than something to watch for, so neither is folded into the warnings
         if ventilation is not None:
             lines.append(WEATHER_VENTILATION_LINES[ventilation])
-        rain_line = _render_rain(outdoor)
-        if rain_line:
-            lines.append(rain_line)
-        if outdoor.is_thunderstorm_expected:
-            lines.append(WEATHER_THUNDERSTORM_LINE)
-        wind_line = _render_wind(outdoor)
-        if wind_line:
-            lines.append(wind_line)
-        if outdoor.temperature_min_celsius <= FROST_THRESHOLD_CELSIUS:
-            lines.append(WEATHER_FROST_LINE.format(temperature=f"{outdoor.temperature_min_celsius:.0f}"))
-        if outdoor.uv_index_max is not None and outdoor.uv_index_max >= UV_INDEX_NOTABLE_THRESHOLD:
-            lines.append(WEATHER_UV_LINE)
         air_quality_line = _render_air_quality(outdoor, local_air)
         if air_quality_line:
             lines.append(air_quality_line)
-        pollen_line = _render_pollen(outdoor.pollen)
-        if pollen_line:
-            lines.append(pollen_line)
     else:
         # say it out loud — an indoor-only digest looks complete, so a silent fetch failure reads as a feature
         lines.append(WEATHER_UNAVAILABLE)
 
     if generated_at is not None:
         lines.append("")
-        lines.append(WEATHER_DIGEST_AS_OF.format(time=generated_at.strftime("%H:%M")))
+        lines.append(
+            WEATHER_DIGEST_AS_OF.format(unix=int(generated_at.timestamp()), time=generated_at.strftime("%H:%M"))
+        )
 
     return "\n".join(lines)
 
@@ -108,6 +100,21 @@ def _render_outdoor(outdoor: WeatherReport) -> str:
     return line
 
 
+def _collect_warnings(outdoor: WeatherReport) -> list[str]:
+    """What is worth knowing about today; each phrase appears only once its own threshold is crossed."""
+    warnings = [_render_rain(outdoor)]
+    if outdoor.is_thunderstorm_expected:
+        warnings.append(WEATHER_THUNDERSTORM_WARNING)
+    warnings.append(_render_wind(outdoor))
+    if outdoor.uv_index_max is not None and outdoor.uv_index_max >= UV_INDEX_NOTABLE_THRESHOLD:
+        warnings.append(WEATHER_UV_WARNING)
+    warnings.append(_render_pollen(outdoor.pollen))
+    # last, because it is the only phrase that ends in advice
+    if outdoor.temperature_min_celsius <= FROST_THRESHOLD_CELSIUS:
+        warnings.append(WEATHER_FROST_WARNING.format(temperature=f"{outdoor.temperature_min_celsius:.0f}"))
+    return [warning for warning in warnings if warning]
+
+
 def _render_wind(outdoor: WeatherReport) -> str | None:
     speed = outdoor.wind_speed_meters_per_second
     if speed is None or speed < WIND_NOTABLE_THRESHOLD_METERS_PER_SECOND:
@@ -118,7 +125,7 @@ def _render_wind(outdoor: WeatherReport) -> str | None:
         if speed <= upper_bound:
             label = band_label
             break
-    return WEATHER_WIND_LINE.format(label=label)
+    return label
 
 
 def _render_rain(outdoor: WeatherReport) -> str | None:
@@ -128,13 +135,13 @@ def _render_rain(outdoor: WeatherReport) -> str | None:
 
     window = outdoor.rain_window
     if window is None:
-        return WEATHER_RAIN_LINE.format(probability=probability)
+        return WEATHER_RAIN_WARNING.format(probability=probability)
 
     if window.start_hour == window.end_hour:
         rendered_window = WEATHER_RAIN_WINDOW_SINGLE_HOUR.format(start=window.start_hour)
     else:
         rendered_window = WEATHER_RAIN_WINDOW_RANGE.format(start=window.start_hour, end=window.end_hour)
-    return WEATHER_RAIN_LINE_WITH_WINDOW.format(probability=probability, window=rendered_window)
+    return WEATHER_RAIN_WARNING_WITH_WINDOW.format(probability=probability, window=rendered_window)
 
 
 def _render_air_quality(outdoor: WeatherReport, local: LocalAirQuality | None) -> str | None:
@@ -176,4 +183,4 @@ def _render_pollen(readings: list[PollenReading]) -> str | None:
 
     if not notable:
         return None
-    return WEATHER_POLLEN_LINE.format(details=", ".join(notable))
+    return WEATHER_POLLEN_WARNING.format(details=", ".join(notable))

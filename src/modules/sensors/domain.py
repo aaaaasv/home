@@ -82,3 +82,11 @@ def average_of(values) -> float | None:
     """The mean of whatever is actually there — a sensor with nothing to say must not drag the answer down."""
     present = [value for value in values if value is not None]
     return fmean(present) if present else None
+
+
+class TemperatureSpan(DomainModel):
+    """How far one sensor's temperature travelled over the last twenty-four hours."""
+
+    sensor: str
+    minimum_celsius: float
+    maximum_celsius: float
