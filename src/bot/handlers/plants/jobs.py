@@ -103,8 +103,13 @@ class DailyCareDigestJob:
         due_plant_ids = {task.plant_id for task in digest.tasks}
         for standing in await list_standing_care_cards(self.uow_factory):
             reference = standing.reference
+            if reference is None:
+                # a card an older format posted: its buttons carry a payload this version cannot unpack, so a
+                # tap does nothing at all — it cannot be left standing until the next digest
+                await forget_care_card(self.bot, self.uow_factory, standing.posted)
+                continue
             # a receipt has no needs and is left for the next digest, so its undo button outlives the afternoon
-            if reference is not None and reference.task_types and reference.plant_id not in due_plant_ids:
+            if reference.task_types and reference.plant_id not in due_plant_ids:
                 await forget_care_card(self.bot, self.uow_factory, standing.posted)
 
     async def _send_digest(self, digest: CareDigest, topic_id: int | None) -> None:
