@@ -413,6 +413,9 @@ class AirAlertEvent(Base):
     reason = Column(String(160), nullable=True)
     # what the watcher did about it, or nothing when the level changed without calling for an action
     outcome = Column(String(24), nullable=True)
+    # which feed answered — the socket or the poll behind it; the two disagreeing is this module's one
+    # real failure mode, and it cannot be told apart afterwards unless it is written down here
+    source = Column(String(12), nullable=True)
     at = Column(UtcDateTime, nullable=False)
 
 

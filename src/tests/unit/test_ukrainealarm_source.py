@@ -1,7 +1,7 @@
 import unittest
 
-from src.infrastructure.adapters.ukrainealarm_source import read_region_alert
-from src.modules.air_alert.domain import AlertLevel
+from src.infrastructure.adapters.ukrainealarm_source import UkraineAlarmSource, read_region_alert
+from src.modules.air_alert.domain import AirAlert, AlertLevel
 
 # exactly as the feed answered on 25.09.2026 during a real alert, kept whole so a changed shape fails here
 KYIV_YELLOW = {
@@ -124,3 +124,65 @@ class SeverityTestCase(unittest.TestCase):
         alert = read_region_alert([self.build_kyiv("Yellow")], "м. Київ")
 
         self.assertEqual(alert.level, AlertLevel.YELLOW)
+
+
+class ChoosingBetweenSocketAndPollTestCase(unittest.IsolatedAsyncioTestCase):
+    """
+    Which of the two feeds answers, which is the question behind this module's one real failure.
+
+    the rule used to be «trust the socket if it spoke in the last two minutes», which sounds careful and is
+    wrong: the channel publishes only on change, so silence is the normal state of a quiet night. A long
+    alert therefore read from the poll instead, and two services answering by turns is a machine for
+    producing flips — on 29.09 the light came up a second time on a level nobody on the ground had seen.
+    """
+
+    def build_source(self) -> UkraineAlarmSource:
+        source = UkraineAlarmSource(region_name="м. Київ")
+        source._poll = self.refuse_to_poll
+        return source
+
+    async def refuse_to_poll(self):
+        self.polled = True
+        return AirAlert(level=AlertLevel.NONE, source="poll")
+
+    def setUp(self):
+        self.polled = False
+
+    async def test_read_current_trusts_an_open_socket_however_long_it_has_been_quiet(self):
+        source = self.build_source()
+        source._connected = True
+        source._alert = AirAlert(level=AlertLevel.RED)
+
+        alert = await source.read_current()
+
+        self.assertEqual(alert.level, AlertLevel.RED)
+        self.assertFalse(self.polled)
+
+    async def test_read_current_marks_the_socket_as_the_source(self):
+        source = self.build_source()
+        source._connected = True
+        source._alert = AirAlert(level=AlertLevel.RED)
+
+        alert = await source.read_current()
+
+        self.assertEqual(alert.source, "socket")
+
+    async def test_read_current_polls_when_the_socket_is_shut(self):
+        source = self.build_source()
+        source._connected = False
+        source._alert = AirAlert(level=AlertLevel.RED)
+
+        alert = await source.read_current()
+
+        self.assertTrue(self.polled)
+        self.assertEqual(alert.source, "poll")
+
+    async def test_read_current_polls_when_the_socket_has_never_said_a_level(self):
+        """A fresh connection carries no baseline of its own — it only publishes what changes next."""
+        source = self.build_source()
+        source._connected = True
+        source._alert = None
+
+        await source.read_current()
+
+        self.assertTrue(self.polled)
