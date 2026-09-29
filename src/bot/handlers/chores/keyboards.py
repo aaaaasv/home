@@ -11,8 +11,10 @@ from src.bot.handlers.chores.messages import (
     CHORES_ASSIGN_NOBODY,
     CHORES_DEADLINE_BUTTON,
     CHORES_DONE_BUTTON,
+    CHORES_REMOVE_BUTTON,
+    CHORES_RENAME_BUTTON,
 )
-from src.bot.messages import BACK_BUTTON, REMOVE_BUTTON, RENAME_BUTTON
+from src.bot.messages import BACK_BUTTON
 from src.modules.chores.domain import ChoreDetails, ChoresList
 from src.modules.family.domain import FamilyMember
 
@@ -48,15 +50,23 @@ def build_chores_list_keyboard(chores: ChoresList) -> InlineKeyboardMarkup:
 
 def build_chore_item_keyboard(chore: ChoreDetails) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text=CHORES_DONE_BUTTON, callback_data=ChoreCallback(action=ChoreAction.DONE, chore_id=chore.id))
+    builder.button(
+        text=CHORES_DONE_BUTTON,
+        callback_data=ChoreCallback(action=ChoreAction.DONE, chore_id=chore.id),
+        style="success",
+    )
     builder.button(
         text=CHORES_DEADLINE_BUTTON, callback_data=ChoreCallback(action=ChoreAction.DEADLINE, chore_id=chore.id)
     )
     builder.button(
         text=CHORES_ASSIGN_BUTTON, callback_data=ChoreCallback(action=ChoreAction.ASSIGN_MENU, chore_id=chore.id)
     )
-    builder.button(text=RENAME_BUTTON, callback_data=ChoreCallback(action=ChoreAction.RENAME, chore_id=chore.id))
-    builder.button(text=REMOVE_BUTTON, callback_data=ChoreCallback(action=ChoreAction.REMOVE, chore_id=chore.id))
+    builder.button(text=CHORES_RENAME_BUTTON, callback_data=ChoreCallback(action=ChoreAction.RENAME, chore_id=chore.id))
+    builder.button(
+        text=CHORES_REMOVE_BUTTON,
+        callback_data=ChoreCallback(action=ChoreAction.REMOVE, chore_id=chore.id),
+        style="danger",
+    )
     builder.button(text=BACK_BUTTON, callback_data=ChoreCallback(action=ChoreAction.DISMISS).pack())
     builder.adjust(2)
     return builder.as_markup()

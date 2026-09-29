@@ -17,6 +17,7 @@ from src.bot.message_cleanup import (
     remember_transient_message,
     sweep_transient_messages,
 )
+from src.bot.prompts import ask_for_text
 from src.common.domain import Actor
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
@@ -145,8 +146,11 @@ async def rename_place(
     await callback.answer()
     place = await _find_place(callback_data.place_id, uow_factory)
     await delete_quietly(callback.message)
-    prompt = await callback.message.answer(
-        messages.PLACES_ASK_NEW_NAME.format(name=place.name if place else ""), disable_notification=True
+    prompt = await ask_for_text(
+        callback.message,
+        callback.from_user,
+        messages.PLACES_ASK_NEW_NAME.format(name=place.name if place else ""),
+        messages.PLACES_NEW_NAME_PLACEHOLDER,
     )
     await state.set_state(PlaceStates.new_name)
     await state.update_data(place_id=callback_data.place_id)

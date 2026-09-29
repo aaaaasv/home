@@ -31,33 +31,23 @@ AIR_CONDITIONER_MODE_LABELS: dict[AirConditionerMode, str] = {
     AirConditionerMode.FAN: "вентиляція",
     AirConditionerMode.HEAT: "тепло",
 }
-# the icons the family already reads off the physical remote; the active mode swaps its icon for a tick,
-# because a middle dot is not visibly "selected" at button size on a phone
-AIR_CONDITIONER_MODE_ICONS: dict[AirConditionerMode, str] = {
-    AirConditionerMode.COOL: "❄️",
-    AirConditionerMode.DRY: "💧",
-    AirConditionerMode.FAN: "💨",
-}
+# the active mode or toggle carries a tick in front of its label
 AIR_CONDITIONER_ACTIVE_MODE_MARKER = "✓"
 AIR_CONDITIONER_BUTTON_TURN_ON = "Увімкнути"
 AIR_CONDITIONER_BUTTON_TURN_OFF = "Вимкнути"
 AIR_CONDITIONER_BUTTON_WARMER = "+1°"
 AIR_CONDITIONER_BUTTON_COOLER = "−1°"
-AIR_CONDITIONER_BUTTON_REFRESH = "↻"
+AIR_CONDITIONER_BUTTON_TEMPERATURE = "{temperature}° ↻"
 AIR_CONDITIONER_FAN_SPEED_LABELS: dict[AirConditionerFanSpeed, str] = {
     AirConditionerFanSpeed.AUTO: "авто",
     AirConditionerFanSpeed.LOW: "низька",
     AirConditionerFanSpeed.MEDIUM: "середня",
     AirConditionerFanSpeed.HIGH: "висока",
 }
-AIR_CONDITIONER_BUTTON_FAN = "🌀 обдув: {speed}"
-# each toggle shows its own icon when off and the shared tick when on, so "on" reads the same as a picked mode
+AIR_CONDITIONER_BUTTON_FAN = "обдув: {speed}"
 AIR_CONDITIONER_BUTTON_TURBO = "турбо"
-AIR_CONDITIONER_BUTTON_TURBO_ICON = "🚀"
 AIR_CONDITIONER_BUTTON_QUIET = "тихо"
-AIR_CONDITIONER_BUTTON_QUIET_ICON = "🔇"
 AIR_CONDITIONER_BUTTON_XFAN = "просушка"
-AIR_CONDITIONER_BUTTON_XFAN_ICON = "💧"
 # surfaced in the card text only while active, because each of these visibly changes how the unit behaves
 AIR_CONDITIONER_BADGE_TURBO = "🚀 турбо"
 AIR_CONDITIONER_BADGE_QUIET = "🔇 тихо"

@@ -3,6 +3,7 @@ import logging
 from collections.abc import Callable
 
 from aiogram import Bot
+from aiogram.types import LinkPreviewOptions
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -51,6 +52,8 @@ class PriceWatchJob:
                     chat_id=self.chat_id,
                     message_thread_id=topic_id,
                     text=render_price_drop_alert(drop),
+                    # the link is only there to be tapped, and its preview would double the height of a three-line alert
+                    link_preview_options=LinkPreviewOptions(is_disabled=True),
                     # the tracked item hit a new low — the event someone asked to be told about
                     disable_notification=False,
                 )

@@ -97,7 +97,8 @@ class BaseBehaviourTestCase(BaseIntegrationTestCase):
         self.dispatcher, self.bot = shared_dispatcher()
         self.session: RecordingSession = self.bot.session
         self.session.calls.clear()
-        await self.dispatcher.storage.close()
+        # close() is a no-op on MemoryStorage, so a flow left half-done by one test would still be waiting in the next
+        self.dispatcher.storage.storage.clear()
         self.photo_storage = RecordingPhotoStorage(local_path="photos/unique-abc.jpg")
         self.shopping_list_board = NullBoard()
 

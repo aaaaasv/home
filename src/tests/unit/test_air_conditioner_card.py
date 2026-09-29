@@ -62,10 +62,10 @@ class BuildAirConditionerKeyboardTestCase(unittest.TestCase):
         texts = self.button_texts(build_state(mode=AirConditionerMode.DRY))
 
         self.assertIn("✓ осушення", texts)
-        self.assertIn("❄️ холод", texts)
+        self.assertIn("холод", texts)
 
-    def test_build_air_conditioner_keyboard_shows_the_target_between_the_steps(self):
-        self.assertEqual(self.button_texts(build_state())[1:4], ["−1°", "24°", "+1°"])
+    def test_build_air_conditioner_keyboard_shows_the_target_between_the_steps_marked_as_refreshing(self):
+        self.assertEqual(self.button_texts(build_state())[1:4], ["−1°", "24° ↻", "+1°"])
 
     def test_build_air_conditioner_keyboard_never_offers_heating(self):
         self.assertNotIn("тепло", self.button_texts(build_state()))
@@ -109,27 +109,27 @@ class AirConditionerAirflowControlsTestCase(unittest.TestCase):
     def test_airflow_buttons_appear_while_the_unit_runs(self):
         texts = self.button_texts(build_state(is_on=True))
 
-        self.assertIn("🌀 обдув: авто", texts)
-        self.assertIn("🚀 турбо", texts)
-        self.assertIn("🔇 тихо", texts)
-        self.assertIn("💧 просушка", texts)
+        self.assertIn("обдув: авто", texts)
+        self.assertIn("турбо", texts)
+        self.assertIn("тихо", texts)
+        self.assertIn("просушка", texts)
 
     def test_airflow_buttons_are_hidden_when_the_unit_is_off(self):
         texts = self.button_texts(build_state(is_on=False))
 
-        self.assertNotIn("🌀 обдув: авто", texts)
-        self.assertNotIn("🚀 турбо", texts)
+        self.assertNotIn("обдув: авто", texts)
+        self.assertNotIn("турбо", texts)
 
     def test_fan_button_names_the_current_speed(self):
         texts = self.button_texts(build_state(fan_speed=AirConditionerFanSpeed.HIGH))
 
-        self.assertIn("🌀 обдув: висока", texts)
+        self.assertIn("обдув: висока", texts)
 
-    def test_active_toggle_swaps_its_icon_for_a_tick(self):
+    def test_active_toggle_carries_a_tick(self):
         texts = self.button_texts(build_state(turbo=True))
 
         self.assertIn("✓ турбо", texts)
-        self.assertNotIn("🚀 турбо", texts)
+        self.assertNotIn("турбо", texts)
 
     def test_fan_button_steps_to_the_next_speed(self):
         fan = next(

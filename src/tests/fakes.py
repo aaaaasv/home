@@ -71,7 +71,13 @@ class RecordingBot:
         self.deleted: list[int] = []
 
     async def send_message(
-        self, chat_id, message_thread_id=None, text=None, reply_markup=None, disable_notification=False
+        self,
+        chat_id,
+        message_thread_id=None,
+        text=None,
+        reply_markup=None,
+        disable_notification=False,
+        link_preview_options=None,
     ):
         message_id = self.next_message_id
         self.next_message_id += 1
@@ -82,6 +88,7 @@ class RecordingBot:
                 "message_thread_id": message_thread_id,
                 "text": text,
                 "silent": disable_notification,
+                "link_preview_options": link_preview_options,
             }
         )
         return SimpleNamespace(message_id=message_id, chat=SimpleNamespace(id=chat_id))

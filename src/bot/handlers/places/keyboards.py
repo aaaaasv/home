@@ -6,8 +6,8 @@ from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from src.bot.formatting import shorten_for_button
-from src.bot.handlers.places.messages import PLACES_VISIT_BUTTON
-from src.bot.messages import BACK_BUTTON, REMOVE_BUTTON, RENAME_BUTTON
+from src.bot.handlers.places.messages import PLACES_REMOVE_BUTTON, PLACES_RENAME_BUTTON, PLACES_VISIT_BUTTON
+from src.bot.messages import BACK_BUTTON
 from src.modules.places.domain import PlaceDetails, PlacesList
 
 
@@ -24,9 +24,17 @@ def build_places_list_keyboard(places: PlacesList) -> InlineKeyboardMarkup:
 
 def build_place_item_keyboard(place: PlaceDetails) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text=PLACES_VISIT_BUTTON, callback_data=PlaceCallback(action=PlaceAction.VISIT, place_id=place.id))
-    builder.button(text=RENAME_BUTTON, callback_data=PlaceCallback(action=PlaceAction.RENAME, place_id=place.id))
-    builder.button(text=REMOVE_BUTTON, callback_data=PlaceCallback(action=PlaceAction.REMOVE, place_id=place.id))
+    builder.button(
+        text=PLACES_VISIT_BUTTON,
+        callback_data=PlaceCallback(action=PlaceAction.VISIT, place_id=place.id),
+        style="success",
+    )
+    builder.button(text=PLACES_RENAME_BUTTON, callback_data=PlaceCallback(action=PlaceAction.RENAME, place_id=place.id))
+    builder.button(
+        text=PLACES_REMOVE_BUTTON,
+        callback_data=PlaceCallback(action=PlaceAction.REMOVE, place_id=place.id),
+        style="danger",
+    )
     builder.button(text=BACK_BUTTON, callback_data=PlaceCallback(action=PlaceAction.DISMISS).pack())
     builder.adjust(2)
     return builder.as_markup()

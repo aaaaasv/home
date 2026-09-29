@@ -1,14 +1,18 @@
 from datetime import timedelta
 
+from aiogram.types import LinkPreviewOptions
+
+from src.bot.handlers.shopping.jobs import PriceWatchJob
 from src.common.domain import Actor
 from src.common.exceptions import DoesNotExistError, ValidationError
+from src.infrastructure.db.uow import UnitOfWork
 from src.modules.shopping.commands import TrackExistingItemCommand, TrackShoppingItemCommand
 from src.modules.shopping.constants import PriceTrend, ShoppingHorizon
 from src.modules.shopping.services.shopping_list_reader import load_priced_shopping_list
 from src.modules.shopping.use_cases.check_tracked_prices import CheckTrackedPricesUseCase
 from src.modules.shopping.use_cases.track_existing_item import TrackExistingItemUseCase
 from src.modules.shopping.use_cases.track_shopping_item import TrackShoppingItemUseCase
-from src.tests.fakes import ScriptedPriceSource
+from src.tests.fakes import RecordingBot, ScriptedPriceSource, StubForumTopic
 from src.tests.integration.base import FROZEN_NOW, BaseIntegrationTestCase
 
 BOHDAN = Actor(telegram_user_id=2, display_name="Богдан")
@@ -219,3 +223,26 @@ class CheckTrackedPricesTestCase(BaseIntegrationTestCase):
         self.assertEqual(item.current_price, 19500)
         self.assertEqual(item.initial_price, 21999)
         self.assertEqual(item.price_trend, PriceTrend.DOWN)
+
+
+class PriceWatchJobTestCase(BaseIntegrationTestCase):
+    async def test_call_announces_a_drop_without_expanding_the_shop_link_into_a_preview(self):
+        source = ScriptedPriceSource({PRODUCT_URL: [21999]}, name="Пилосос Dyson")
+        await TrackShoppingItemUseCase(uow=self.uow, actor=BOHDAN, price_source=source, checked_at=FROZEN_NOW)(
+            TrackShoppingItemCommand(hotline_url=PRODUCT_URL)
+        )
+        bot = RecordingBot()
+        price_watch_job = PriceWatchJob(
+            bot=bot,
+            chat_id=-1002000000000,
+            shopping_topic=StubForumTopic(thread_id=8),
+            uow_factory=lambda: UnitOfWork(session_factory=self.session_factory),
+            price_source=ScriptedPriceSource({PRODUCT_URL: [19500]}),
+        )
+
+        await price_watch_job()
+
+        self.assertEqual([message["silent"] for message in bot.sent], [False])
+        self.assertEqual(
+            [message["link_preview_options"] for message in bot.sent], [LinkPreviewOptions(is_disabled=True)]
+        )

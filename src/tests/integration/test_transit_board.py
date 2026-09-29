@@ -167,7 +167,7 @@ class TransitBoardTestCase(BaseIntegrationTestCase):
         frozen_body, frozen_footer = self.bot.edited[-1]["text"].split("\n\n")
         self.assertEqual(frozen_body, CARD_BODY)
         self.assertTrue(frozen_footer.startswith("<i>станом на "))
-        self.assertTrue(frozen_footer.endswith(" · 🔄 щоб оновити</i>"))
+        self.assertTrue(frozen_footer.endswith(" · натисни «Оновити»</i>"))
 
     async def test_resume_restarts_the_refresh_window_on_a_frozen_card(self):
         board = self.build_board()

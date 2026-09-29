@@ -88,7 +88,7 @@ def photo_update(unique_id: str, update_id: int = 1, topic: int = PLANTS_TOPIC) 
     return Update(update_id=update_id, message=message.model_copy(update={"text": None, "photo": [photo]}))
 
 
-def callback_update(data: str, update_id: int = 1, message_id: int = 1) -> Update:
+def callback_update(data: str, update_id: int = 1, message_id: int = 1, topic: int = PLANTS_TOPIC) -> Update:
     return Update(
         update_id=update_id,
         callback_query=CallbackQuery(
@@ -96,6 +96,6 @@ def callback_update(data: str, update_id: int = 1, message_id: int = 1) -> Updat
             from_user=User(id=ACTOR_ID, is_bot=False, first_name=ACTOR_NAME),
             chat_instance="test",
             data=data,
-            message=build_message("", message_id=message_id, from_bot=True),
+            message=build_message("", message_id=message_id, from_bot=True, topic=topic),
         ),
     )
