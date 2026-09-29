@@ -19,6 +19,8 @@ ASSISTANT_TOPIC = 12
 CLIMATE_TOPIC = 13
 ACTOR_ID = 900000001
 ACTOR_NAME = "Тест"
+# a selective force reply reaches the asker only through the invisible mention ask_for_text puts in front
+ASKER_MENTION = f'<a href="tg://user?id={ACTOR_ID}">\u200b</a>'
 
 
 class RecordingSession(BaseSession):

@@ -8,7 +8,7 @@ from src.bot.handlers.plants.care_card_reference import build_care_card_referenc
 from src.bot.services.posted_message_tracker import CARE_DIGEST_KIND
 from src.common.constants import CareTaskType
 from src.tests.behaviour.base import BaseBehaviourTestCase
-from src.tests.telegram import ACTOR_ID, CHAT_ID, callback_update, message_update, photo_update
+from src.tests.telegram import ACTOR_ID, ASKER_MENTION, CHAT_ID, callback_update, message_update, photo_update
 
 STANDING_CARD_MESSAGE_ID = 77
 
@@ -225,13 +225,16 @@ class PlantCareCardsFlowTestCase(BaseBehaviourTestCase):
             ("🪴 <b>Містер Біг</b>\n💧 полив", [["Полито", "Відкласти"]]),
         )
 
-    async def test_add_plant_asks_for_the_name_in_a_field_that_opens_itself(self):
+    async def test_add_plant_asks_for_the_name_in_a_field_that_opens_itself_for_the_asker_only(self):
         await self.feed(message_update("/add"))
 
         prompt = self.session.calls_named("SendMessage")[-1]
         self.assertEqual(
             (prompt.text, prompt.reply_markup),
-            (messages.ADD_PLANT_ASK_NAME, ForceReply(selective=True, input_field_placeholder="Назва рослини")),
+            (
+                ASKER_MENTION + messages.ADD_PLANT_ASK_NAME,
+                ForceReply(selective=True, input_field_placeholder="Назва рослини"),
+            ),
         )
 
     async def test_edit_plant_asks_for_the_new_value_in_a_field_that_opens_itself(self):

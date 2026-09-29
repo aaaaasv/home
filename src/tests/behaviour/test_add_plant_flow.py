@@ -1,6 +1,6 @@
 from src.bot.handlers.plants import messages
 from src.tests.behaviour.base import BaseBehaviourTestCase
-from src.tests.telegram import callback_update, message_update
+from src.tests.telegram import ASKER_MENTION, callback_update, message_update
 
 
 class AddPlantFlowTestCase(BaseBehaviourTestCase):
@@ -14,7 +14,7 @@ class AddPlantFlowTestCase(BaseBehaviourTestCase):
     async def test_add_plant_asks_for_a_name_first(self):
         await self.feed(message_update("/add"))
 
-        self.assertEqual(self.session.sent_texts(), [messages.ADD_PLANT_ASK_NAME])
+        self.assertEqual(self.session.sent_texts(), [ASKER_MENTION + messages.ADD_PLANT_ASK_NAME])
 
     async def test_add_plant_asks_for_a_photo_once_it_has_a_name(self):
         await self.feed(message_update("/add", update_id=1))

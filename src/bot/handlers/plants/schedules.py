@@ -3,7 +3,7 @@ from collections.abc import Callable
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, ForceReply, Message
+from aiogram.types import CallbackQuery, Message
 
 from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.formatting import render_schedule_remove_confirm
@@ -17,6 +17,7 @@ from src.bot.handlers.plants.keyboards import (
 )
 from src.bot.handlers.plants.plant_list import send_plant_card
 from src.bot.message_cleanup import delete_quietly, remember_transient_message, sweep_transient_messages
+from src.bot.prompts import ask_for_text
 from src.common.config import Settings
 from src.common.constants import CARE_INSTRUCTIONS_MAX_LENGTH, CareTaskType
 from src.common.household_calendar import HouseholdCalendar
@@ -80,9 +81,11 @@ async def set_schedule(
         await delete_quietly(callback.message)
         await state.set_state(SetCareScheduleStates.custom_interval)
         await state.update_data(plant_id=callback_data.plant_id, task_type=callback_data.task_type)
-        prompt = await callback.message.answer(
+        prompt = await ask_for_text(
+            callback.message,
+            callback.from_user,
             messages.ASK_CUSTOM_TASK_INTERVAL,
-            reply_markup=ForceReply(selective=True, input_field_placeholder=messages.ADD_PLANT_INTERVAL_PLACEHOLDER),
+            messages.ADD_PLANT_INTERVAL_PLACEHOLDER,
         )
         await remember_transient_message(state, prompt)
         return
@@ -133,9 +136,8 @@ async def edit_instructions(callback: CallbackQuery, callback_data: ScheduleCall
     await delete_quietly(callback.message)
     await state.set_state(SetCareScheduleStates.instructions)
     await state.update_data(plant_id=callback_data.plant_id, task_type=callback_data.task_type)
-    prompt = await callback.message.answer(
-        messages.ASK_CARE_INSTRUCTIONS,
-        reply_markup=ForceReply(selective=True, input_field_placeholder=messages.CARE_INSTRUCTIONS_PLACEHOLDER),
+    prompt = await ask_for_text(
+        callback.message, callback.from_user, messages.ASK_CARE_INSTRUCTIONS, messages.CARE_INSTRUCTIONS_PLACEHOLDER
     )
     await remember_transient_message(state, prompt)
 

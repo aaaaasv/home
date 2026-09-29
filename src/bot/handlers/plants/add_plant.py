@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, ForceReply, Message
+from aiogram.types import CallbackQuery, Message
 
 from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.keyboards import (
@@ -20,6 +20,7 @@ from src.bot.message_cleanup import (
     replace_prompt,
     sweep_transient_messages,
 )
+from src.bot.prompts import ask_for_text
 from src.common.constants import PLANT_NAME_MAX_LENGTH, CareTaskType
 from src.common.domain import Actor
 from src.common.household_calendar import HouseholdCalendar
@@ -219,8 +220,10 @@ async def _create_plant(
 
 async def _ask(message: Message, state: FSMContext, text: str, placeholder: str | None = None) -> None:
     """Posts the wizard's next question; a placeholder opens the input field on it for a text answer."""
-    reply_markup = ForceReply(selective=True, input_field_placeholder=placeholder) if placeholder else None
-    prompt = await message.answer(text, reply_markup=reply_markup)
+    if placeholder is None:
+        prompt = await message.answer(text)
+    else:
+        prompt = await ask_for_text(message, message.from_user, text, placeholder)
     await replace_prompt(state, prompt)
 
 
