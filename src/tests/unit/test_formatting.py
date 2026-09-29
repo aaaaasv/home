@@ -235,7 +235,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         self.assertIn("🏠 вдома: 28° · 33%", rendered)
         self.assertIn("🌍 надворі: 28°, удень до 31°", rendered)
-        self.assertIn("☔ дощ: 45%", rendered)
+        self.assertIn("⚠️ дощ 45%", rendered)
         self.assertIn("🌫 повітря: добре (AQI 39)", rendered)
 
     def test_render_climate_digest_names_the_evening_temperature_when_it_is_still_ahead(self):
@@ -248,7 +248,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         rendered = render_climate_digest(None, self.build_report(), generated_at=moment)
 
-        self.assertTrue(rendered.endswith("\n\n<i>станом на 14:35</i>"))
+        self.assertTrue(rendered.endswith('\n\n<i><tg-time unix="1785162900" format="r">станом на 14:35</tg-time></i>'))
 
     def test_render_climate_digest_omits_the_as_of_time_by_default(self):
         rendered = render_climate_digest(None, self.build_report())
@@ -258,12 +258,12 @@ class RenderClimateDigestTestCase(unittest.TestCase):
     def test_render_climate_digest_warns_about_a_thunderstorm(self):
         rendered = render_climate_digest(None, self.build_report(is_thunderstorm_expected=True))
 
-        self.assertIn("⛈️ можлива гроза", rendered)
+        self.assertIn("⚠️ можлива гроза", rendered)
 
     def test_render_climate_digest_warns_about_frost_ahead(self):
         rendered = render_climate_digest(None, self.build_report(temperature_min_celsius=-2.0))
 
-        self.assertIn("❄️ вночі до -2° — заносьте рослини з балкона", rendered)
+        self.assertIn("⚠️ вночі до -2°, заносьте рослини з балкона", rendered)
 
     def test_render_climate_digest_stays_silent_about_frost_above_the_threshold(self):
         rendered = render_climate_digest(None, self.build_report(temperature_min_celsius=1.6))
@@ -273,7 +273,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
     def test_render_climate_digest_warns_about_high_uv(self):
         rendered = render_climate_digest(None, self.build_report(uv_index_max=6.35))
 
-        self.assertIn("☀️ УФ високий — крем і кепка", rendered)
+        self.assertIn("⚠️ УФ високий, потрібні крем і кепка", rendered)
 
     def test_render_climate_digest_stays_silent_about_low_uv(self):
         rendered = render_climate_digest(None, self.build_report(uv_index_max=5.9))
@@ -293,7 +293,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
     def test_render_climate_digest_on_a_calm_day_has_no_wind_line(self):
         rendered = render_climate_digest(None, self.build_report(wind_speed_meters_per_second=7.9))
 
-        self.assertNotIn("💨", rendered)
+        self.assertNotIn("⚠️", rendered)
 
     def test_render_climate_digest_grades_the_wind_by_band(self):
         bands = {
@@ -309,12 +309,12 @@ class RenderClimateDigestTestCase(unittest.TestCase):
         }
 
         for speed, label in bands.items():
-            self.assertIn(f"💨 {label}", rendered[speed])
+            self.assertIn(f"⚠️ {label}", rendered[speed])
 
     def test_render_climate_digest_without_a_wind_reading_has_no_wind_line(self):
         rendered = render_climate_digest(None, self.build_report(wind_speed_meters_per_second=None))
 
-        self.assertNotIn("💨", rendered)
+        self.assertNotIn("⚠️", rendered)
 
     def test_render_climate_digest_shows_the_feels_like_when_it_differs_enough(self):
         report = self.build_report(temperature_celsius=8.0, apparent_temperature_celsius=3.0)
@@ -345,7 +345,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         rendered = render_climate_digest(None, report)
 
-        self.assertIn("☔ дощ: 63% — найімовірніше 08:00–09:00", rendered)
+        self.assertIn("⚠️ дощ 63%, найімовірніше 08:00–09:00", rendered)
 
     def test_render_climate_digest_with_a_single_hour_rain_window_names_that_hour(self):
         report = self.build_report(
@@ -354,18 +354,18 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         rendered = render_climate_digest(None, report)
 
-        self.assertIn("☔ дощ: 80% — найімовірніше о 17:00", rendered)
+        self.assertIn("⚠️ дощ 80%, найімовірніше о 17:00", rendered)
 
     def test_render_climate_digest_without_a_rain_window_shows_the_bare_probability(self):
         rendered = render_climate_digest(None, self.build_report(precipitation_probability_percent=45))
 
-        self.assertIn("☔ дощ: 45%", rendered)
+        self.assertIn("⚠️ дощ 45%", rendered)
         self.assertNotIn("найімовірніше", rendered)
 
     def test_render_climate_digest_stays_silent_about_an_unlikely_rain(self):
         rendered = render_climate_digest(None, self.build_report(precipitation_probability_percent=5))
 
-        self.assertNotIn("☔", rendered)
+        self.assertNotIn("дощ", rendered)
 
     def test_render_climate_digest_lists_pollen_above_the_threshold_with_levels(self):
         report = self.build_report(
@@ -377,7 +377,7 @@ class RenderClimateDigestTestCase(unittest.TestCase):
 
         rendered = render_climate_digest(None, report)
 
-        self.assertIn("🌾 пилок: амброзія помірно, трава високо", rendered)
+        self.assertIn("⚠️ пилок: амброзія помірно, трава високо", rendered)
 
     def test_render_climate_digest_hides_pollen_below_the_threshold(self):
         report = self.build_report(pollen=[PollenReading(species=PollenSpecies.GRASS, grains_per_cubic_meter=5.0)])
@@ -385,6 +385,46 @@ class RenderClimateDigestTestCase(unittest.TestCase):
         rendered = render_climate_digest(None, report)
 
         self.assertNotIn("пилок", rendered)
+
+    def test_render_climate_digest_with_many_thresholds_crossed_joins_them_into_one_warning_line(self):
+        indoor = RoomClimate(temperature_celsius=24.0, relative_humidity_percent=45.0)
+        report = self.build_report(
+            precipitation_probability_percent=70,
+            rain_window=RainWindow(start_hour=13, end_hour=15),
+            is_thunderstorm_expected=True,
+            wind_speed_meters_per_second=9.0,
+            uv_index_max=7.0,
+            temperature_min_celsius=-2.0,
+            pollen=[PollenReading(species=PollenSpecies.GRASS, grains_per_cubic_meter=80.0)],
+        )
+
+        rendered = render_climate_digest(indoor, report)
+
+        self.assertEqual(
+            rendered,
+            "🌤 <b>Погода</b>\n\n"
+            "🏠 вдома: 24° · 45%\n"
+            "🌍 надворі: 28°, удень до 31°\n"
+            "⚠️ дощ 70%, найімовірніше 13:00–15:00 · можлива гроза · вітряно · УФ високий, потрібні крем і кепка"
+            " · пилок: трава високо · вночі до -2°, заносьте рослини з балкона\n"
+            "🌫 повітря: добре (AQI 39)",
+        )
+
+    def test_render_climate_digest_on_a_quiet_day_has_no_warning_line(self):
+        rendered = render_climate_digest(None, self.build_report())
+
+        self.assertNotIn("⚠️", rendered)
+
+    def test_render_climate_digest_keeps_the_ventilation_fact_out_of_the_warnings(self):
+        report = self.build_report(precipitation_probability_percent=45)
+
+        rendered = render_climate_digest(None, report, VentilationEffect.WETTER)
+
+        self.assertEqual(
+            rendered,
+            "🌤 <b>Погода</b>\n\n🌍 надворі: 28°, удень до 31°\n⚠️ дощ 45%\n🪟 надворі вологіше\n"
+            "🌫 повітря: добре (AQI 39)",
+        )
 
     def test_render_climate_digest_without_outdoor_says_the_forecast_is_unavailable(self):
         indoor = RoomClimate(temperature_celsius=28.5, relative_humidity_percent=33.0)
