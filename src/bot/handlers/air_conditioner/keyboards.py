@@ -10,16 +10,13 @@ from src.bot.handlers.air_conditioner.messages import (
     AIR_CONDITIONER_BUTTON_COOLER,
     AIR_CONDITIONER_BUTTON_FAN,
     AIR_CONDITIONER_BUTTON_QUIET,
-    AIR_CONDITIONER_BUTTON_QUIET_ICON,
+    AIR_CONDITIONER_BUTTON_TEMPERATURE,
     AIR_CONDITIONER_BUTTON_TURBO,
-    AIR_CONDITIONER_BUTTON_TURBO_ICON,
     AIR_CONDITIONER_BUTTON_TURN_OFF,
     AIR_CONDITIONER_BUTTON_TURN_ON,
     AIR_CONDITIONER_BUTTON_WARMER,
     AIR_CONDITIONER_BUTTON_XFAN,
-    AIR_CONDITIONER_BUTTON_XFAN_ICON,
     AIR_CONDITIONER_FAN_SPEED_LABELS,
-    AIR_CONDITIONER_MODE_ICONS,
     AIR_CONDITIONER_MODE_LABELS,
 )
 from src.modules.air_conditioner.domain import AirConditionerFanSpeed, AirConditionerMode, AirConditionerState
@@ -75,13 +72,14 @@ def build_air_conditioner_keyboard(state: AirConditionerState) -> InlineKeyboard
     builder.button(
         text=AIR_CONDITIONER_BUTTON_TURN_OFF if state.is_on else AIR_CONDITIONER_BUTTON_TURN_ON,
         callback_data=AirConditionerCallback(action=AirConditionerAction.SET_POWER, turn_on=not state.is_on),
+        style="danger" if state.is_on else None,
     )
     builder.button(
         text=AIR_CONDITIONER_BUTTON_COOLER,
         callback_data=AirConditionerCallback(action=AirConditionerAction.COOLER),
     )
     builder.button(
-        text=f"{state.target_temperature_celsius}°",
+        text=AIR_CONDITIONER_BUTTON_TEMPERATURE.format(temperature=state.target_temperature_celsius),
         callback_data=AirConditionerCallback(action=AirConditionerAction.REFRESH),
     )
     builder.button(
@@ -89,9 +87,9 @@ def build_air_conditioner_keyboard(state: AirConditionerState) -> InlineKeyboard
         callback_data=AirConditionerCallback(action=AirConditionerAction.WARMER),
     )
     for mode in AIR_CONDITIONER_OFFERED_MODES:
-        prefix = AIR_CONDITIONER_ACTIVE_MODE_MARKER if mode == state.mode else AIR_CONDITIONER_MODE_ICONS[mode]
+        marker = f"{AIR_CONDITIONER_ACTIVE_MODE_MARKER} " if mode == state.mode else ""
         builder.button(
-            text=f"{prefix} {AIR_CONDITIONER_MODE_LABELS[mode]}",
+            text=f"{marker}{AIR_CONDITIONER_MODE_LABELS[mode]}",
             callback_data=AirConditionerCallback(action=AirConditionerAction.SET_MODE, mode=mode),
         )
 
@@ -112,24 +110,14 @@ def _add_air_conditioner_airflow_buttons(builder: InlineKeyboardBuilder, state: 
             action=AirConditionerAction.SET_FAN, fan_speed=next_fan_speed(state.fan_speed)
         ),
     )
-    for is_on, action, label, icon in (
-        (
-            state.turbo,
-            AirConditionerAction.TOGGLE_TURBO,
-            AIR_CONDITIONER_BUTTON_TURBO,
-            AIR_CONDITIONER_BUTTON_TURBO_ICON,
-        ),
-        (
-            state.quiet,
-            AirConditionerAction.TOGGLE_QUIET,
-            AIR_CONDITIONER_BUTTON_QUIET,
-            AIR_CONDITIONER_BUTTON_QUIET_ICON,
-        ),
-        (state.xfan, AirConditionerAction.TOGGLE_XFAN, AIR_CONDITIONER_BUTTON_XFAN, AIR_CONDITIONER_BUTTON_XFAN_ICON),
+    for is_on, action, label in (
+        (state.turbo, AirConditionerAction.TOGGLE_TURBO, AIR_CONDITIONER_BUTTON_TURBO),
+        (state.quiet, AirConditionerAction.TOGGLE_QUIET, AIR_CONDITIONER_BUTTON_QUIET),
+        (state.xfan, AirConditionerAction.TOGGLE_XFAN, AIR_CONDITIONER_BUTTON_XFAN),
     ):
-        prefix = AIR_CONDITIONER_ACTIVE_MODE_MARKER if is_on else icon
+        marker = f"{AIR_CONDITIONER_ACTIVE_MODE_MARKER} " if is_on else ""
         builder.button(
-            text=f"{prefix} {label}",
+            text=f"{marker}{label}",
             callback_data=AirConditionerCallback(action=action, turn_on=not is_on),
         )
 
@@ -139,5 +127,6 @@ def build_air_conditioner_stop_keyboard() -> InlineKeyboardMarkup:
     builder.button(
         text=AIR_CONDITIONER_BUTTON_TURN_OFF,
         callback_data=AirConditionerCallback(action=AirConditionerAction.STOP_AND_DISMISS, turn_on=False),
+        style="danger",
     )
     return builder.as_markup()

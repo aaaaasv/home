@@ -17,6 +17,7 @@ from src.bot.message_cleanup import (
     remember_transient_message,
     sweep_transient_messages,
 )
+from src.bot.prompts import ask_for_text
 from src.common.domain import Actor
 from src.common.exceptions import ValidationError
 from src.common.time import current_time
@@ -49,6 +50,8 @@ router = Router(name="shopping_items")
 
 
 class ShoppingItemStates(StatesGroup):
+    new_item = State()
+    new_tracked_link = State()
     link = State()
     new_name = State()
     note = State()
@@ -70,12 +73,13 @@ async def show_list(
 async def add_needed_now_by_command(
     message: Message,
     command: CommandObject,
+    state: FSMContext,
     actor: Actor,
     uow_factory: Callable[[], UnitOfWork],
     shopping_list_board: ShoppingListBoard,
 ) -> None:
     if not command.args:
-        await message.answer(messages.SHOPPING_ADD_NEEDS_TEXT)
+        await _ask_for_new_item(message, state, ShoppingHorizon.NOW)
         return
 
     await _add_item(command.args, ShoppingHorizon.NOW, message, actor, uow_factory, shopping_list_board)
@@ -85,51 +89,76 @@ async def add_needed_now_by_command(
 async def track_item(
     message: Message,
     command: CommandObject,
+    state: FSMContext,
     actor: Actor,
     uow_factory: Callable[[], UnitOfWork],
     shopping_list_board: ShoppingListBoard,
     price_source: PriceSource,
 ) -> None:
-    args = command.args
     # the command itself is transient noise once read, so drop it and let the board be the only trace
     await delete_quietly(message)
-    if not args:
-        await message.answer(messages.TRACK_NEEDS_LINK)
+    if not command.args:
+        prompt = await ask_for_text(
+            message, message.from_user, messages.TRACK_ASK_LINK, messages.TRACK_LINK_PLACEHOLDER
+        )
+        await state.set_state(ShoppingItemStates.new_tracked_link)
+        await remember_transient_message(state, prompt)
         return
 
-    url = args.strip()
-    if not is_hotline_url(url):
-        await message.answer(messages.TRACK_NOT_HOTLINE)
-        return
-
-    # the fetch hits hotline (~1-2s) with the command already deleted, so leave a status banner in its place
-    checking = await message.answer(messages.TRACK_CHECKING)
-    try:
-        shopping_list = await TrackShoppingItemUseCase(
-            uow=uow_factory(), actor=actor, price_source=price_source, checked_at=current_time()
-        )(TrackShoppingItemCommand(hotline_url=url))
-    except ValidationError:
-        # the link is a hotline one but the page did not yield a price — a dead product, or a changed layout
-        await checking.edit_text(messages.TRACK_UNREADABLE)
-        return
-
-    await delete_quietly(checking)
-    await shopping_list_board.refresh(shopping_list)
+    await _track_new_item(command.args.strip(), message, actor, uow_factory, shopping_list_board, price_source)
 
 
 @router.message(Command("later"))
 async def add_wanted_later(
     message: Message,
     command: CommandObject,
+    state: FSMContext,
     actor: Actor,
     uow_factory: Callable[[], UnitOfWork],
     shopping_list_board: ShoppingListBoard,
 ) -> None:
     if not command.args:
-        await message.answer(messages.SHOPPING_LATER_NEEDS_TEXT)
+        await _ask_for_new_item(message, state, ShoppingHorizon.LATER)
         return
 
     await _add_item(command.args, ShoppingHorizon.LATER, message, actor, uow_factory, shopping_list_board)
+
+
+# registered before the plain-text catch-all: after a bare /add or /later, text is the item on that horizon
+@router.message(ShoppingItemStates.new_item, F.text, ~F.text.startswith("/"))
+async def receive_new_item(
+    message: Message,
+    state: FSMContext,
+    actor: Actor,
+    uow_factory: Callable[[], UnitOfWork],
+    shopping_list_board: ShoppingListBoard,
+) -> None:
+    collected_data = await state.get_data()
+    horizon = ShoppingHorizon(collected_data["horizon"])
+    if not await _add_item(message.text, horizon, message, actor, uow_factory, shopping_list_board):
+        return
+
+    await state.clear()
+    await sweep_transient_messages(message.bot, message.chat.id, collected_data)
+
+
+# after a bare /track the next line is the link of a new item, unlike `link` below, which belongs to an existing one
+@router.message(ShoppingItemStates.new_tracked_link, F.text, ~F.text.startswith("/"))
+async def receive_new_tracked_link(
+    message: Message,
+    state: FSMContext,
+    actor: Actor,
+    uow_factory: Callable[[], UnitOfWork],
+    shopping_list_board: ShoppingListBoard,
+    price_source: PriceSource,
+) -> None:
+    collected_data = await state.get_data()
+    await delete_quietly(message)
+    if not await _track_new_item(message.text.strip(), message, actor, uow_factory, shopping_list_board, price_source):
+        return
+
+    await state.clear()
+    await sweep_transient_messages(message.bot, message.chat.id, collected_data)
 
 
 # registered before the plain-text catch-all: while waiting for a tracking link, text is the link, not a new item
@@ -283,8 +312,11 @@ async def edit_item_note(
     await callback.answer()
     item = await _find_item(callback_data.item_id, uow_factory)
     await delete_quietly(callback.message)
-    prompt = await callback.message.answer(
-        messages.SHOPPING_ASK_NOTE.format(name=item.name if item else ""), disable_notification=True
+    prompt = await ask_for_text(
+        callback.message,
+        callback.from_user,
+        messages.SHOPPING_ASK_NOTE.format(name=item.name if item else ""),
+        messages.SHOPPING_NOTE_PLACEHOLDER,
     )
     await state.set_state(ShoppingItemStates.note)
     await state.update_data(item_id=callback_data.item_id)
@@ -371,8 +403,11 @@ async def track_item_from_menu(
     await callback.answer()
     item = await _find_item(callback_data.item_id, uow_factory)
     await delete_quietly(callback.message)
-    prompt = await callback.message.answer(
-        messages.SHOPPING_TRACK_ASK_LINK.format(name=item.name if item else ""), disable_notification=True
+    prompt = await ask_for_text(
+        callback.message,
+        callback.from_user,
+        messages.SHOPPING_TRACK_ASK_LINK.format(name=item.name if item else ""),
+        messages.TRACK_LINK_PLACEHOLDER,
     )
     await state.set_state(ShoppingItemStates.link)
     await state.update_data(item_id=callback_data.item_id)
@@ -407,8 +442,11 @@ async def rename_item(
     await callback.answer()
     item = await _find_item(callback_data.item_id, uow_factory)
     await delete_quietly(callback.message)
-    prompt = await callback.message.answer(
-        messages.SHOPPING_ASK_NEW_NAME.format(name=item.name if item else ""), disable_notification=True
+    prompt = await ask_for_text(
+        callback.message,
+        callback.from_user,
+        messages.SHOPPING_ASK_NEW_NAME.format(name=item.name if item else ""),
+        messages.SHOPPING_NEW_NAME_PLACEHOLDER,
     )
     await state.set_state(ShoppingItemStates.new_name)
     await state.update_data(item_id=callback_data.item_id)
@@ -426,6 +464,48 @@ async def _find_item(item_id: int, uow_factory: Callable[[], UnitOfWork]):
     return next((item for item in shopping_list.needed_now + shopping_list.wanted_later if item.id == item_id), None)
 
 
+async def _ask_for_new_item(message: Message, state: FSMContext, horizon: ShoppingHorizon) -> None:
+    # the bare command is spent once read, so drop it and let the prompt be the only thing left to answer
+    await delete_quietly(message)
+    if horizon == ShoppingHorizon.NOW:
+        text, placeholder = messages.SHOPPING_ASK_NEW_ITEM, messages.SHOPPING_NEW_ITEM_PLACEHOLDER
+    else:
+        text, placeholder = messages.SHOPPING_ASK_LATER_ITEM, messages.SHOPPING_LATER_ITEM_PLACEHOLDER
+    prompt = await ask_for_text(message, message.from_user, text, placeholder)
+    await state.set_state(ShoppingItemStates.new_item)
+    await state.update_data(horizon=horizon.value)
+    await remember_transient_message(state, prompt)
+
+
+async def _track_new_item(
+    url: str,
+    message: Message,
+    actor: Actor,
+    uow_factory: Callable[[], UnitOfWork],
+    shopping_list_board: ShoppingListBoard,
+    price_source: PriceSource,
+) -> bool:
+    """Start watching a hotline link as a new item; False means the link was refused and nothing was added."""
+    if not is_hotline_url(url):
+        await message.answer(messages.TRACK_NOT_HOTLINE)
+        return False
+
+    # the fetch hits hotline (~1-2s) with the request already deleted, so leave a status banner in its place
+    checking = await message.answer(messages.TRACK_CHECKING)
+    try:
+        shopping_list = await TrackShoppingItemUseCase(
+            uow=uow_factory(), actor=actor, price_source=price_source, checked_at=current_time()
+        )(TrackShoppingItemCommand(hotline_url=url))
+    except ValidationError:
+        # the link is a hotline one but the page did not yield a price — a dead product, or a changed layout
+        await checking.edit_text(messages.TRACK_UNREADABLE)
+        return False
+
+    await delete_quietly(checking)
+    await shopping_list_board.refresh(shopping_list)
+    return True
+
+
 async def _add_item(
     text: str,
     horizon: ShoppingHorizon,
@@ -434,14 +514,15 @@ async def _add_item(
     uow_factory: Callable[[], UnitOfWork],
     shopping_list_board: ShoppingListBoard,
     photo_telegram_file_id: str | None = None,
-) -> None:
+) -> bool:
     name = text.strip()
     if len(name) > SHOPPING_ITEM_NAME_MAX_LENGTH:
         await message.answer(messages.SHOPPING_NAME_TOO_LONG)
-        return
+        return False
 
     shopping_list = await AddShoppingItemUseCase(uow=uow_factory(), actor=actor)(
         AddShoppingItemCommand(name=name, horizon=horizon, photo_telegram_file_id=photo_telegram_file_id)
     )
     await confirm_captured(message)
     await shopping_list_board.refresh(shopping_list)
+    return True

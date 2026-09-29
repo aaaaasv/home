@@ -902,7 +902,7 @@ class RenderTransitCardTestCase(unittest.TestCase):
         self.assertEqual(
             card,
             "найближчий: 🚎 3 за ~4 хв (~1.1 км) · 🚌 69 ~9 хв · 🚎 9К поки не видно\n\n"
-            "<i>станом на 09:00 · 🔄 щоб оновити</i>",
+            "<i>станом на 09:00 · натисни «Оновити»</i>",
         )
 
 

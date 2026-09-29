@@ -1,4 +1,5 @@
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import LinkPreviewOptions
 
 from src.bot.services.single_message_board import SingleMessageBoard
 from src.infrastructure.db.uow import UnitOfWork
@@ -20,18 +21,21 @@ class RecordingBoardBot:
         self.edit_error = edit_error
         self.sent: list[str] = []
         self.edited: list[int] = []
+        self.link_preview_options: list[LinkPreviewOptions] = []
         self.deleted: list[int] = []
 
-    async def send_message(self, chat_id, message_thread_id, text, reply_markup):
+    async def send_message(self, chat_id, message_thread_id, text, reply_markup, link_preview_options):
         self.sent.append(text)
+        self.link_preview_options.append(link_preview_options)
 
         class Sent:
             message_id = 500 + len(self.sent)
 
         return Sent()
 
-    async def edit_message_text(self, chat_id, message_id, text, reply_markup):
+    async def edit_message_text(self, chat_id, message_id, text, reply_markup, link_preview_options):
         self.edited.append(message_id)
+        self.link_preview_options.append(link_preview_options)
         if self.edit_error is not None:
             raise TelegramBadRequest(method=FakeRequest("editMessageText"), message=self.edit_error)
 
@@ -69,6 +73,15 @@ class SingleMessageBoardTestCase(BaseIntegrationTestCase):
         self.assertEqual(bot.sent, ["список"])
         self.assertEqual(bot.edited, [])
         self.assertEqual(await self.remembered_message_id(), 501)
+
+    async def test_refresh_switches_link_previews_off_for_the_post_and_for_the_edit(self):
+        bot = RecordingBoardBot()
+        board = self.build_board(bot)
+        await board.refresh("перший")
+
+        await board.refresh("другий")
+
+        self.assertEqual(bot.link_preview_options, [LinkPreviewOptions(is_disabled=True)] * 2)
 
     async def test_refresh_edits_the_remembered_message_in_place(self):
         bot = RecordingBoardBot()

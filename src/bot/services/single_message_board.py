@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, LinkPreviewOptions
 
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.infrastructure.db.uow import UnitOfWork
@@ -26,6 +26,8 @@ class SingleMessageBoard:
     """
 
     kind: str
+    # telegram pins the preview of the first link under the whole message, which under a list is a random picture
+    link_preview_options = LinkPreviewOptions(is_disabled=True)
 
     def render(self, contents) -> str:
         raise NotImplementedError
@@ -62,6 +64,7 @@ class SingleMessageBoard:
             message_thread_id=self.forum_topic.topic_id,
             text=self.render(contents),
             reply_markup=self.build_keyboard(contents),
+            link_preview_options=self.link_preview_options,
         )
         await self._remember_message_id(message.message_id)
 
@@ -80,6 +83,7 @@ class SingleMessageBoard:
                 message_id=message_id,
                 text=self.render(contents),
                 reply_markup=self.build_keyboard(contents),
+                link_preview_options=self.link_preview_options,
             )
         except TelegramBadRequest as error:
             reason = error.message.lower()
