@@ -375,3 +375,44 @@ class SoilWateringOnTheStandingCardTestCase(DailyCareDigestCardsTestCase):
         await self.detect_watering(bot, plant_id)
 
         self.assertEqual((len(bot.sent), bot.edited, bot.deleted), (1, [], []))
+
+
+class QuietDayCareCardsTestCase(DailyCareDigestCardsTestCase):
+    """
+    What the job does on a check that posts nothing — the path that runs every half hour between digests.
+
+    a card left over from a format this version no longer understands cannot wait for the next digest: its
+    buttons carry a payload that no longer unpacks, so until it goes a tap on it does nothing at all.
+    """
+
+    async def run_quiet_check(self, bot: RecordingBot) -> None:
+        async with self.uow as uow:
+            await uow.care_digest_deliveries.record_sent(self.today)
+        await self.run_digest(bot)
+
+    async def track_card(self, message_id: int, reference: str) -> None:
+        async with self.uow as uow:
+            await uow.posted_messages.create(
+                {"kind": CARE_DIGEST_KIND, "chat_id": CHAT_ID, "message_id": message_id, "reference": reference}
+            )
+
+    async def test_run_a_quiet_check_with_a_card_from_the_one_card_per_task_format_takes_it_away(self):
+        await self.track_card(message_id=400, reference="watering:5")
+        bot = RecordingBot()
+
+        await self.run_quiet_check(bot)
+
+        async with self.uow as uow:
+            standing = await uow.posted_messages.list_by_kind(CARE_DIGEST_KIND)
+        self.assertEqual((bot.sent, bot.deleted, standing), ([], [400], []))
+
+    async def test_run_a_quiet_check_with_a_settled_cards_receipt_leaves_it_for_its_owner(self):
+        plant_id = await self.seed_plant(name="Кактус")
+        await self.track_card(message_id=400, reference=f"{plant_id}:0")
+        bot = RecordingBot()
+
+        await self.run_quiet_check(bot)
+
+        async with self.uow as uow:
+            standing = await uow.posted_messages.list_by_kind(CARE_DIGEST_KIND)
+        self.assertEqual((bot.deleted, [posted.message_id for posted in standing]), ([], [400]))
