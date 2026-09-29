@@ -24,6 +24,9 @@ class AirAlert(DomainModel):
     level: AlertLevel
     reason: str | None = None
     since: datetime | None = None
+    # which feed answered — the socket or the poll behind it; kept because the two disagreeing is the one
+    # failure this module has actually had, and telling them apart afterwards needs it written down
+    source: str | None = None
 
 
 class AlertTransition(StrEnum):

@@ -12,9 +12,19 @@ evening each:
 * **`updateMap` publishes the whole country every time, not a delta.** Which is convenient — every frame is
   self-sufficient, so a dropped connection cannot mean a missed change.
 
-The fallback matters more here than anywhere else in this project. A socket that is connected, subscribed and
-**silent** looks exactly like calm; that happened on 25.09 and only a second, independent source revealed it.
-So `read_current` prefers the socket while it is demonstrably fresh and falls back to polling when it is not.
+The fallback matters more here than anywhere else in this project. A socket that is **shut** looks exactly
+like calm, and that happened on 25.09 — only a second, independent source revealed it. So `read_current`
+prefers the socket **while the connection is open** and polls when it is not.
+
+Trusting silence took one correction to get right. The first rule treated «nothing heard for two minutes» as
+stale, which sounds careful and is wrong: the channel publishes only on change, so silence is the normal
+state of a quiet night, and the rule made a long alert read from the poll instead — two different services
+answering by turns, which is a machine for producing flips. On the night of 29.09 the light came up a second
+time at 02:12 and nobody could say which of the two had spoken.
+
+What makes silence trustworthy is not its length but the socket being **open**: `heartbeat=25` has aiohttp
+ping the peer and shut the connection when pongs stop, so a dead one stops being open. Silence on an open
+socket means «nothing changed»; that is exactly what it is for.
 
 Measured 26.09.2026: the channel sends **no heartbeat of any kind** — ninety seconds of a calm evening
 produced not one frame. Which is survivable only because of what it implies: the channel publishes on change,
@@ -25,7 +35,7 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import aiohttp
 
@@ -41,10 +51,11 @@ CHANNEL = "updateMap"
 CONNECT_METHOD = 0
 SUBSCRIBE_METHOD = 1
 REQUEST_TIMEOUT_SECONDS = 15
-# beyond this the socket's own answer is not evidence of anything, and the poll takes over
-FRESHNESS_SECONDS = 120
 RECONNECT_DELAY_SECONDS = 5
 AIR_ALERT_TYPE = "AIR"
+# which of the two answered, kept with every reading so «why did it flip» is a query rather than a guess
+SOCKET_SOURCE = "socket"
+POLL_SOURCE = "poll"
 LEVELS = {"red": AlertLevel.RED, "yellow": AlertLevel.YELLOW}
 # a region may carry several levels at once, and which one arrives first is not a fact about the sky
 SEVERITY = {AlertLevel.NONE: 0, AlertLevel.YELLOW: 1, AlertLevel.RED: 2}
@@ -63,16 +74,14 @@ class UkraineAlarmSource:
         self.session_factory = session_factory
         self._alert: AirAlert | None = None
         self._heard_at: datetime | None = None
+        self._connected = False
 
     async def read_current(self) -> AirAlert | None:
-        if self._is_fresh():
-            return self._alert
+        # an open socket that has already told us a level is the better answer; it only goes quiet because
+        # nothing changed, and mixing it with the poll by turns is what made the level flip
+        if self._connected and self._alert is not None:
+            return self._alert.model_copy(update={"source": SOCKET_SOURCE})
         return await self._poll()
-
-    def _is_fresh(self) -> bool:
-        if self._alert is None or self._heard_at is None:
-            return False
-        return datetime.now(timezone.utc) - self._heard_at < timedelta(seconds=FRESHNESS_SECONDS)
 
     async def run(self, on_change=None) -> None:
         """Holds the socket open forever, reconnecting on its own — started once by the composition root."""
@@ -83,6 +92,9 @@ class UkraineAlarmSource:
                 raise
             except Exception as error:
                 logger.warning("Alert socket dropped: %s: %s", type(error).__name__, error)
+            finally:
+                # whatever ended it, the poll owns the answer again until a new connection says otherwise
+                self._connected = False
             await asyncio.sleep(RECONNECT_DELAY_SECONDS)
 
     async def _serve_one_connection(self, on_change) -> None:
@@ -94,6 +106,7 @@ class UkraineAlarmSource:
                 )
                 await socket.send_str(json.dumps({"id": 2, "method": SUBSCRIBE_METHOD, "params": {"channel": CHANNEL}}))
                 logger.info("Alert socket connected")
+                self._connected = True
                 async for message in socket:
                     if message.type is not aiohttp.WSMsgType.TEXT:
                         logger.info("Alert socket closed: %s", message.type)
@@ -144,7 +157,7 @@ class UkraineAlarmSource:
 
         if not isinstance(regions, list):
             return None
-        return read_region_alert(regions, self.region_name)
+        return read_region_alert(regions, self.region_name).model_copy(update={"source": POLL_SOURCE})
 
 
 def read_region_alert(regions: list, region_name: str) -> AirAlert:
