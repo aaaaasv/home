@@ -1,4 +1,8 @@
-"""Raising the strip when a red alert starts, and putting it back when it ends.
+"""Raising the strip when a red alert starts, and putting it back after a fixed while.
+
+**The light goes out on a clock, not on the all-clear.** It exists for the few minutes of putting shoes on and
+getting out; after that it is just a light burning through an alert that may run for hours. Waiting for the
+all-clear also tied it to the feed being right twice instead of once.
 
 The rule that matters most here is the one about not touching a light somebody is already using. At three in
 the morning the person may have switched it on themselves, or left it at a level they chose; overriding that
@@ -6,6 +10,7 @@ because a feed changed state is the behaviour that gets an automation disabled f
 """
 import logging
 from collections.abc import Callable
+from datetime import timedelta
 
 from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
@@ -39,9 +44,9 @@ class AlertLightWatcher:
         self.panel_light = panel_light
         self.settings = settings
         self.household_calendar = household_calendar
-        # whether the light standing at the alert level is our doing; an alert that began before the bot
-        # started is deliberately not claimed, so we never put out something we did not turn on
-        self._raised_it = False
+        # when we raised it, or None when the light standing there is not our doing; an alert that began
+        # before the bot started is deliberately not claimed, so we never put out something we did not turn on
+        self._raised_at = None
 
     async def __call__(self) -> None:
         transition, alert = await FollowAirAlertUseCase(
@@ -50,8 +55,7 @@ class AlertLightWatcher:
 
         if transition == AlertTransition.RAISED:
             await self._raise(alert)
-        elif transition == AlertTransition.CLEARED:
-            await self._lower()
+        await self._sweep()
 
     async def _raise(self, alert) -> None:
         standing = await self.panel_light.read()
@@ -64,25 +68,27 @@ class AlertLightWatcher:
             return
 
         await self.panel_light.set_brightness(self.settings.ALERT_LIGHT_PERCENT)
-        self._raised_it = True
+        self._raised_at = self.household_calendar.now()
         logger.info(
             "Red alert (%s): light raised to %.0f%%",
             alert.reason if alert else "без причини",
             self.settings.ALERT_LIGHT_PERCENT,
         )
 
-    async def _lower(self) -> None:
-        if not self._raised_it:
-            logger.info("All clear, but the light was not ours to put out")
+    async def _sweep(self) -> None:
+        """Put it out once the minutes it was raised for have passed, whatever the alert is doing by then."""
+        if self._raised_at is None:
+            return
+        if self.household_calendar.now() - self._raised_at < timedelta(minutes=self.settings.ALERT_LIGHT_MINUTES):
             return
 
         standing = await self.panel_light.read()
         if standing is not None and abs(standing.brightness_percent - self.settings.ALERT_LIGHT_PERCENT) > 1:
             # it moved since we set it, so a hand has been on it — leave it where that hand put it
-            logger.info("All clear, but the light was changed by hand; leaving it")
-            self._raised_it = False
+            logger.info("The alert light was changed by hand; leaving it")
+            self._raised_at = None
             return
 
         await self.panel_light.set_brightness(0)
-        self._raised_it = False
-        logger.info("All clear: light back out")
+        self._raised_at = None
+        logger.info("Alert light back out after %d minutes", self.settings.ALERT_LIGHT_MINUTES)

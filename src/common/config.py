@@ -263,6 +263,9 @@ class Settings(BaseSettings):
     ALERT_LIGHT_PERCENT: float = 20.0
     # сокет дає секунди, але мовчить, коли в країні нічого не змінюється — і тоді тиша не відрізняється
     # від обриву. ця перевірка ходить резервним опитуванням і задає найгіршу можливу затримку
+    # the light goes out on a clock rather than on the all-clear: it is there for putting shoes on and
+    # getting out, and an alert can run for hours after that is done
+    ALERT_LIGHT_MINUTES: int = 15
     ALERT_LIGHT_CHECK_SECONDS: int = 30
     PANEL_LIGHT_ENABLED: bool = False
     PANEL_LIGHT_STATE_PATH: str = "/run/panel-light/state.json"

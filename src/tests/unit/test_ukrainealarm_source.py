@@ -84,3 +84,43 @@ class ReadRegionAlertTestCase(unittest.TestCase):
         }
 
         self.assertEqual(read_region_alert([purple], "м. Київ").level, AlertLevel.NONE)
+
+
+class SeverityTestCase(unittest.TestCase):
+    """
+    A region can carry several levels at once, and the order they arrive in is not a fact about the sky.
+
+    reading the first entry made the level flip with the ordering: on the night of 29.09 the welcome light
+    came up a second time at 02:12 on a «new» red that nobody on the ground had seen.
+    """
+
+    def build_kyiv(self, *levels) -> dict:
+        return {
+            "regionName": "м. Київ",
+            "activeAlerts": [
+                {
+                    "type": "AIR",
+                    "activeAlertLevels": [{"alertLevel": level, "reason": f"{level} рівень"} for level in levels],
+                }
+            ],
+        }
+
+    def test_read_region_alert_takes_red_when_it_is_listed_after_yellow(self):
+        alert = read_region_alert([self.build_kyiv("Yellow", "Red")], "м. Київ")
+
+        self.assertEqual(alert.level, AlertLevel.RED)
+
+    def test_read_region_alert_takes_red_when_it_is_listed_before_yellow(self):
+        alert = read_region_alert([self.build_kyiv("Red", "Yellow")], "м. Київ")
+
+        self.assertEqual(alert.level, AlertLevel.RED)
+
+    def test_read_region_alert_carries_the_reason_of_the_level_it_chose(self):
+        alert = read_region_alert([self.build_kyiv("Yellow", "Red")], "м. Київ")
+
+        self.assertEqual(alert.reason, "Red рівень")
+
+    def test_read_region_alert_with_only_yellow_stays_yellow(self):
+        alert = read_region_alert([self.build_kyiv("Yellow")], "м. Київ")
+
+        self.assertEqual(alert.level, AlertLevel.YELLOW)

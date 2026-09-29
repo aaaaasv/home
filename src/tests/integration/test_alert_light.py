@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from src.bot.handlers.air_alert.light import AlertLightWatcher
 from src.common.config import Settings
 from src.modules.air_alert.domain import AirAlert, AlertLevel
@@ -5,6 +7,8 @@ from src.modules.lighting.domain import PanelLightState
 from src.tests.integration.base import BaseIntegrationTestCase
 
 ALERT_PERCENT = 20.0
+ALERT_MINUTES = 15
+FAR_PAST = datetime(2000, 1, 1, tzinfo=timezone.utc)
 
 
 class ScriptedAlertSource:
@@ -45,7 +49,9 @@ class AlertLightTestCase(BaseIntegrationTestCase):
             uow_factory=lambda: self.uow,
             source=source,
             panel_light=light,
-            settings=Settings(TELEGRAM_BOT_TOKEN="123:abc", ALERT_LIGHT_PERCENT=ALERT_PERCENT),
+            settings=Settings(
+                TELEGRAM_BOT_TOKEN="123:abc", ALERT_LIGHT_PERCENT=ALERT_PERCENT, ALERT_LIGHT_MINUTES=ALERT_MINUTES
+            ),
             household_calendar=self.household_calendar,
         )
 
@@ -80,14 +86,37 @@ class AlertLightTestCase(BaseIntegrationTestCase):
         self.assertEqual(light.asked_for, [])
         self.assertEqual(light.state.brightness_percent, 55.0)
 
-    async def test_the_all_clear_puts_out_a_light_we_raised(self):
+    async def test_the_light_stays_up_while_the_minutes_it_was_raised_for_run(self):
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(ScriptedAlertSource(AlertLevel.RED, AlertLevel.RED), light)
+        await watcher()
+
+        self.household_calendar.frozen_now += timedelta(minutes=ALERT_MINUTES - 1)
+        await watcher()
+
+        self.assertEqual(light.asked_for, [ALERT_PERCENT])
+
+    async def test_the_light_goes_out_on_the_clock_even_with_the_alert_still_running(self):
+        """It is there for putting shoes on and getting out; an alert can run for hours after that is done."""
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(ScriptedAlertSource(AlertLevel.RED, AlertLevel.RED), light)
+        await watcher()
+
+        self.household_calendar.frozen_now += timedelta(minutes=ALERT_MINUTES + 1)
+        await watcher()
+
+        self.assertEqual(light.asked_for, [ALERT_PERCENT, 0])
+
+    async def test_the_all_clear_alone_does_not_put_the_light_out(self):
+        """The clock owns the lowering now, so an all-clear a minute in leaves the light where it is."""
         light = RecordingPanelLight()
         watcher = self.build_watcher(ScriptedAlertSource(AlertLevel.RED, AlertLevel.NONE), light)
         await watcher()
 
+        self.household_calendar.frozen_now += timedelta(minutes=1)
         await watcher()
 
-        self.assertEqual(light.asked_for, [ALERT_PERCENT, 0])
+        self.assertEqual(light.asked_for, [ALERT_PERCENT])
 
     async def test_the_all_clear_leaves_a_light_somebody_else_moved(self):
         light = RecordingPanelLight()
@@ -125,6 +154,30 @@ class AlertLightTestCase(BaseIntegrationTestCase):
         await self.build_watcher(ScriptedAlertSource(AlertLevel.RED), light)()
 
         self.assertEqual(light.asked_for, [])
+
+    async def test_a_second_red_while_the_light_is_up_does_not_touch_it(self):
+        """The night of 29.09: a «new» red arrived mid-alert and the light came up again at two in the morning."""
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(ScriptedAlertSource(AlertLevel.RED, AlertLevel.YELLOW, AlertLevel.RED), light)
+        await watcher()
+        await watcher()
+
+        await watcher()
+
+        self.assertEqual(light.asked_for, [ALERT_PERCENT])
+
+    async def test_every_change_of_level_is_written_to_the_journal(self):
+        light = RecordingPanelLight()
+        watcher = self.build_watcher(
+            ScriptedAlertSource(AlertLevel.RED, AlertLevel.RED, AlertLevel.YELLOW, AlertLevel.NONE), light
+        )
+        for _ in range(4):
+            await watcher()
+
+        async with self.uow as uow:
+            journal = await uow.air_alert_events.list_since(FAR_PAST)
+        self.assertEqual([event.level for event in journal], ["red", "yellow", "none"])
+        self.assertEqual([event.outcome for event in journal], ["raised", "cleared", "unchanged"])
 
 
 async def _none():
