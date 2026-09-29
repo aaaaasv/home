@@ -46,6 +46,8 @@ FRESHNESS_SECONDS = 120
 RECONNECT_DELAY_SECONDS = 5
 AIR_ALERT_TYPE = "AIR"
 LEVELS = {"red": AlertLevel.RED, "yellow": AlertLevel.YELLOW}
+# a region may carry several levels at once, and which one arrives first is not a fact about the sky
+SEVERITY = {AlertLevel.NONE: 0, AlertLevel.YELLOW: 1, AlertLevel.RED: 2}
 
 
 class UkraineAlarmSource:
@@ -149,7 +151,13 @@ def read_region_alert(regions: list, region_name: str) -> AirAlert:
     """
     What the feed says about one region. Absence from the list is the all-clear — both endpoints list only
     what is currently alerting.
+
+    **The most severe level wins, not the first one listed.** A region can carry several at once — a drone
+    warning and a missile threat are separate entries — and the order they arrive in is the feed's business,
+    not a fact about the sky. Reading the first entry made the level flip with the ordering: on the night of
+    29.09 the light came up a second time at 02:12 on a «new» red that nobody on the ground had seen.
     """
+    worst = AirAlert(level=AlertLevel.NONE)
     for region in regions:
         if not isinstance(region, dict) or region.get("regionName") != region_name:
             continue
@@ -158,9 +166,9 @@ def read_region_alert(regions: list, region_name: str) -> AirAlert:
                 continue
             for entry in active.get("activeAlertLevels") or []:
                 level = LEVELS.get(str(entry.get("alertLevel", "")).lower())
-                if level is not None:
-                    return AirAlert(level=level, reason=entry.get("reason") or None, since=_read_moment(entry))
-    return AirAlert(level=AlertLevel.NONE)
+                if level is not None and SEVERITY[level] > SEVERITY[worst.level]:
+                    worst = AirAlert(level=level, reason=entry.get("reason") or None, since=_read_moment(entry))
+    return worst
 
 
 def _read_moment(entry: dict) -> datetime | None:

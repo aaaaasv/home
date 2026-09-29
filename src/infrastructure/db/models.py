@@ -396,6 +396,26 @@ class SensorDay(Base):
     minimum_battery_percent = Column(Float, nullable=True)
 
 
+class AirAlertEvent(Base):
+    """
+    Every level the alert feed reported, kept so a night can be reconstructed from data rather than from logs.
+
+    the night of 29.09 is why this exists: the light came up a second time at 02:12 and nobody could say
+    afterwards whether the feed had really flipped, because only the current level was stored. logs age out
+    and do not survive a container being recreated; this does.
+    """
+
+    __tablename__ = "air_alert_events"
+    __table_args__ = (Index("ix_air_alert_events_at", "at"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    level = Column(String(8), nullable=False)
+    reason = Column(String(160), nullable=True)
+    # what the watcher did about it, or nothing when the level changed without calling for an action
+    outcome = Column(String(24), nullable=True)
+    at = Column(UtcDateTime, nullable=False)
+
+
 class AirThreatNotice(Base):
     """
     One row per tracked object the household was told about, so a restart cannot announce the same drone twice.

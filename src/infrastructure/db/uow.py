@@ -3,7 +3,7 @@ from collections.abc import Callable
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.db.main import get_session_maker
-from src.infrastructure.repositories.air_alert_state import AirAlertStateRepository
+from src.infrastructure.repositories.air_alert_state import AirAlertEventRepository, AirAlertStateRepository
 from src.infrastructure.repositories.air_conditioner_run import AirConditionerRunRepository
 from src.infrastructure.repositories.air_threat_notice import AirThreatNoticeRepository
 from src.infrastructure.repositories.care_digest_delivery import CareDigestDeliveryRepository
@@ -57,6 +57,7 @@ class UnitOfWork:
         self.sensor_days: SensorDayRepository | None = None
         self.air_threat_notices: AirThreatNoticeRepository | None = None
         self.air_alert_state: AirAlertStateRepository | None = None
+        self.air_alert_events: AirAlertEventRepository | None = None
         self.presence_events: PresenceEventRepository | None = None
 
     async def __aenter__(self):
@@ -84,6 +85,7 @@ class UnitOfWork:
         self.sensor_days = SensorDayRepository(session=self.session)
         self.air_threat_notices = AirThreatNoticeRepository(session=self.session)
         self.air_alert_state = AirAlertStateRepository(session=self.session)
+        self.air_alert_events = AirAlertEventRepository(session=self.session)
         self.presence_events = PresenceEventRepository(session=self.session)
         return self
 
