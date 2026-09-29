@@ -81,16 +81,18 @@ class RecordingBot:
     ):
         message_id = self.next_message_id
         self.next_message_id += 1
-        self.sent.append(
-            {
-                "message_id": message_id,
-                "chat_id": chat_id,
-                "message_thread_id": message_thread_id,
-                "text": text,
-                "silent": disable_notification,
-                "link_preview_options": link_preview_options,
-            }
-        )
+        call = {
+            "message_id": message_id,
+            "chat_id": chat_id,
+            "message_thread_id": message_thread_id,
+            "text": text,
+            "silent": disable_notification,
+        }
+        # recorded only when it was actually asked for, so a test that asserts the whole call does not
+        # have to name every option the bot has ever grown
+        if link_preview_options is not None:
+            call["link_preview_options"] = link_preview_options
+        self.sent.append(call)
         return SimpleNamespace(message_id=message_id, chat=SimpleNamespace(id=chat_id))
 
     async def edit_message_text(self, chat_id, message_id, text, reply_markup=None):

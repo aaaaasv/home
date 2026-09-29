@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import patch
 
 from src.bot.handlers.plants import messages, photos
@@ -27,16 +26,18 @@ class PlantPhotoAlbumTestCase(BaseBehaviourTestCase):
         self.session.calls.clear()
 
     async def feed_album(self, *unique_ids: str) -> None:
-        """Every frame at once, the way telegram delivers an album, then wait for the session to close itself."""
-        # long enough that the quiet interval cannot expire between two frames of the same album, which in
-        # life it never does — telegram sends them milliseconds apart — and short enough not to slow the suite
-        with patch.object(photos, "ALBUM_SETTLE_SECONDS", 0.05):
-            await asyncio.gather(
-                *(
-                    self.feed(photo_update(unique_id, update_id=index + 10))
-                    for index, unique_id in enumerate(unique_ids)
-                )
-            )
+        """
+        One frame after another, then wait for the session to close itself.
+
+        telegram sends an album's frames milliseconds apart, but it sends them as separate updates and the
+        dispatcher takes them one at a time — so feeding them concurrently was not faithful, and it raced:
+        four frames gathered at once arrived in whatever order the loop happened to schedule, and the test
+        failed roughly once in three runs on the order alone.
+        """
+        # long enough that the quiet interval cannot expire between two frames, short enough not to slow the suite
+        with patch.object(photos, "ALBUM_SETTLE_SECONDS", 0.5):
+            for index, unique_id in enumerate(unique_ids):
+                await self.feed(photo_update(unique_id, update_id=index + 10))
             await photos._open_sessions[(CHAT_ID, ACTOR_ID)].closing
 
     async def test_add_photo_with_an_album_of_four_frames_saves_every_frame(self):

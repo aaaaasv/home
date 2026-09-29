@@ -44,8 +44,10 @@ def build_shopping_list_keyboard(shopping_list: ShoppingList) -> InlineKeyboardM
     # one button per item; tapping it opens that item's menu (buy, rename, remove, …), so nothing is ambiguous
     builder = InlineKeyboardBuilder()
     for item in shopping_list.needed_now + shopping_list.wanted_later:
+        # these two are not decoration: nothing else on the list says an item carries a photo or a price watch
+        marker = f"{'🔖' if item.is_tracked else ''}{'📷' if item.has_photo else ''}"
         builder.button(
-            text=shorten_for_button(item.name),
+            text=f"{marker + ' ' if marker else ''}{shorten_for_button(item.name)}",
             callback_data=ShoppingCallback(action=ShoppingAction.OPEN, item_id=item.id),
         )
     builder.adjust(2)

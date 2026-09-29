@@ -87,8 +87,6 @@ STALE_BUTTON = "Ця кнопка вже застара 🙃 Напиши /help 
 PRIVATE_WELCOME = "🏠 <b>Домашній бот</b>\n\nЯ працюю в сімейній групі — кожен розділ у своєму топіку. Пиши команди там."
 
 # item and place menus share the same edit/remove/back verbs
-RENAME_BUTTON = "✏️ Перейменувати"
-REMOVE_BUTTON = "✖️ Прибрати"
 BACK_BUTTON = "← Назад"
 
 # the error router is the last-resort net under every module, so its wording must fit any of them: it once said
