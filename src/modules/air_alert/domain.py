@@ -33,3 +33,13 @@ class AlertTransition(StrEnum):
     RAISED = "raised"
     CLEARED = "cleared"
     UNCHANGED = "unchanged"
+
+
+class AlertJournalEntry(DomainModel):
+    """One change of level as the journal kept it: what it became, why, what was done, and which feed said so."""
+
+    level: AlertLevel
+    reason: str | None
+    transition: AlertTransition
+    source: str | None
+    at: datetime

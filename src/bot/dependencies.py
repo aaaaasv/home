@@ -4,6 +4,7 @@ from typing import Any
 
 from aiogram import Bot
 
+from src.bot.handlers.air_alert import facts as air_alert_facts
 from src.bot.handlers.chores import facts as chores_facts
 from src.bot.handlers.chores.board import ChoresBoard
 from src.bot.handlers.newspaper.gemini_word_source import GeminiWordSource
@@ -15,6 +16,7 @@ from src.bot.handlers.plants.gemini_plant_identifier import GeminiPlantIdentifie
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.handlers.power.reserve_board import ReserveBoard
+from src.bot.handlers.presence import facts as presence_facts
 from src.bot.handlers.shopping import facts as shopping_facts
 from src.bot.handlers.shopping.board import ShoppingListBoard
 from src.bot.handlers.transit.board import TransitBoard
@@ -77,7 +79,13 @@ from src.modules.weather.services.weather_provider import NullWeatherProvider, W
 
 # every module that keeps a record the family may ask about, collected here because only the composition root
 # may know them all. src/tests/unit/test_architecture.py fails if a module publishes facts nobody collects
-FACT_GATHERERS = (plant_facts.gather_facts, chores_facts.gather_facts, shopping_facts.gather_facts)
+FACT_GATHERERS = (
+    plant_facts.gather_facts,
+    chores_facts.gather_facts,
+    shopping_facts.gather_facts,
+    presence_facts.gather_facts,
+    air_alert_facts.gather_facts,
+)
 
 
 def build_photo_storage(bot: Bot, settings: Settings) -> PhotoStorage:

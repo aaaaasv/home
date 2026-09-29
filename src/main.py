@@ -66,8 +66,8 @@ logger = logging.getLogger(__name__)
 # telegram scopes the command menu per chat at best — never per topic — so the group menu is one flat list
 # and the wording of a shared command has to hold in every topic
 GROUP_COMMANDS = [
-    BotCommand(command="list", description="показати список цього топіка"),
-    BotCommand(command="add", description="додати запис у цей топік"),
+    BotCommand(command="list", description="список: рослини, покупки, місця чи справи — залежно від топіка"),
+    BotCommand(command="add", description="додати рослину чи покупку (у справах і місцях просто напиши текстом)"),
     BotCommand(command="today", description="🪴 що треба зробити сьогодні"),
     BotCommand(command="history", description="🪴 останні дії"),
     BotCommand(command="later", description="🛒 покупка на колись"),
@@ -78,8 +78,8 @@ GROUP_COMMANDS = [
     BotCommand(command="reserve", description="⚡ резерв живлення"),
     BotCommand(command="conserve", description="⚡ зберігання EcoFlow"),
     BotCommand(command="pi", description="🩺 стан Raspberry Pi"),
-    BotCommand(command="bus", description="🚌 коли транспорт із зупинки"),
-    BotCommand(command="help", description="що в якому топіку"),
+    BotCommand(command="bus", description="🚌 коли транспорт із зупинки (можна й /транспорт)"),
+    BotCommand(command="help", description="що вміє цей топік (у загальній — усе)"),
     BotCommand(command="cancel", description="скасувати поточну дію"),
 ]
 

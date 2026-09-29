@@ -12,11 +12,14 @@ from src.bot.handlers.system.messages import (
     PI_STATUS_POWER_OK,
     PI_STATUS_TEMPERATURE,
     PI_STATUS_TITLE,
+    SENSOR_BATTERY_LOW_POT,
+    SENSOR_BATTERY_LOW_ROOM,
     SYSTEM_HEALTH_ALERT_TITLE,
     SYSTEM_HEALTH_DISK,
     SYSTEM_HEALTH_TEMPERATURE,
     SYSTEM_HEALTH_UNDERVOLTAGE,
 )
+from src.modules.sensors.domain import SensorNow
 from src.modules.system_health.domain import (
     DiskFault,
     DiskIssue,
@@ -64,3 +67,11 @@ def render_media_server_disk_alert(issues: list[DiskIssue]) -> str:
     lines = [MEDIA_SERVER_DISK_TITLE]
     lines.extend(DISK_FAULT_LINES[issue.fault].format(model=issue.model, value=issue.value) for issue in issues)
     return "\n".join(lines)
+
+
+def render_sensor_battery_card(reading: SensorNow, plant_name: str | None) -> str:
+    """Names the sensor by the room it watches or the plant it stands in, since its own identifier means nothing."""
+    percent = f"{reading.battery_percent:.0f}"
+    if plant_name is not None:
+        return SENSOR_BATTERY_LOW_POT.format(place=plant_name, percent=percent)
+    return SENSOR_BATTERY_LOW_ROOM.format(place=reading.room or reading.sensor, percent=percent)
