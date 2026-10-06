@@ -47,7 +47,7 @@ from src.bot.handlers.shopping.board import SHOPPING_MODULE_NAME, ShoppingListBo
 from src.bot.handlers.system import SYSTEM_MODULE_NAME
 from src.bot.handlers.transit.board import TRANSIT_MODULE_NAME, TransitBoard
 from src.bot.handlers.weather.board import WEATHER_MODULE_NAME, WeatherDigestBoard
-from src.bot.preflight import verify_reminder_chat
+from src.bot.preflight import verify_reminder_chat, verify_sensored_rooms
 from src.bot.reminders import build_scheduler
 from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
@@ -111,6 +111,7 @@ async def run() -> None:
     bot = build_bot(settings)
     # crash loudly rather than poll a chat the bot cannot serve: that silence cost the family several days of digests
     await verify_reminder_chat(bot, settings.TELEGRAM_REMINDER_CHAT_ID)
+    verify_sensored_rooms(settings)
 
     care_topic = build_forum_topic(
         bot, settings, PLANTS_MODULE_NAME, settings.PLANTS_TOPIC_TITLE, settings.plants_topic_id
