@@ -69,11 +69,16 @@ class BaseIntegrationTestCase(unittest.IsolatedAsyncioTestCase):
             await uow.session.flush()
             return photo.id
 
-    async def seed_climate_day(self, day, temperature: float, humidity: float) -> None:
+    async def seed_climate_day(
+        self, day, temperature: float, humidity: float, room: str = "кухня-вітальня", sensor: str = "temp-room"
+    ) -> None:
         async with self.uow as uow:
-            await uow.room_climate_days.save_day(
+            await uow.sensor_days.save_day(
+                sensor,
                 day,
                 {
+                    "room": room,
+                    "reading_count": 24,
                     "minimum_temperature_celsius": temperature,
                     "maximum_temperature_celsius": temperature,
                     "average_temperature_celsius": temperature,

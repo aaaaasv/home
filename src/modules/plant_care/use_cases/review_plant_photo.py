@@ -1,10 +1,12 @@
+from collections import defaultdict
+from datetime import date
 from statistics import mean
 
 from src.common.constants import CareTaskType, PlantPhotoFrame
 from src.common.exceptions import DoesNotExistError
 from src.common.household_calendar import HouseholdCalendar
 from src.common.use_case import BaseUseCase
-from src.infrastructure.db.models import CareSchedule, Plant, PlantPhoto, RoomClimateDay, RoomClimateReading
+from src.infrastructure.db.models import CareSchedule, Plant, PlantPhoto, SensorDay
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.domain import (
     ClimateInterval,
@@ -13,6 +15,8 @@ from src.modules.plant_care.domain import (
     PlantPhotoReviewContext,
 )
 from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
+from src.modules.room_climate.domain import RoomClimate
+from src.modules.room_climate.use_cases.retrieve_room_climate import RetrieveRoomClimateUseCase
 
 
 class ReviewPlantPhotoUseCase(BaseUseCase):
@@ -29,14 +33,20 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
 
             photos = await uow.plant_photos.list_by_plant_id(plant_id)
             schedules = await uow.care_schedules.list_by_plant_id(plant_id)
-            room_climate = await uow.room_climate_readings.retrieve_latest()
             current, previous = self._comparable_pair(photos)
             climate_days = []
-            if current is not None and previous is not None:
-                climate_days = await uow.room_climate_days.list_between(
+            if current is not None and previous is not None and plant.room:
+                climate_days = await uow.sensor_days.list_room_between(
+                    plant.room,
                     self.household_calendar.local_date(previous.taken_at),
                     self.household_calendar.local_date(current.taken_at),
                 )
+
+        # the plant's own room, never the wired sensor: that one has measured the server shelf since the pi
+        # moved there, and an analyst told the wrong air answers about the wrong plant
+        room_climate = await RetrieveRoomClimateUseCase(uow=self.uow, household_calendar=self.household_calendar)(
+            plant.room
+        )
 
         context = self._build_context(plant, photos, schedules, room_climate, climate_days)
         if context is None:
@@ -49,8 +59,8 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
         plant: Plant,
         photos: list[PlantPhoto],
         schedules: list[CareSchedule],
-        room_climate: RoomClimateReading | None,
-        climate_days: list[RoomClimateDay],
+        room_climate: RoomClimate | None,
+        climate_days: list[SensorDay],
     ) -> PlantPhotoReviewContext | None:
         current, previous = self._comparable_pair(photos)
         if current is None:
@@ -95,23 +105,57 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
         return current, previous
 
     def _summarise_climate(
-        self, climate_days: list[RoomClimateDay], ideal_humidity_min_percent: float | None
+        self, climate_days: list[SensorDay], ideal_humidity_min_percent: float | None
     ) -> ClimateInterval | None:
-        """The span and the middle of the air between two photos, plus how much of it the plant disliked."""
-        if not climate_days:
+        """
+        The span and the middle of the air between two photos, plus how much of it the plant disliked.
+
+        a room may be covered by more than one sensor, so the rows are folded per day before anything is
+        counted — otherwise two sensors would read as twice as many days of history as the room actually has.
+        """
+        by_day: dict[date, list[SensorDay]] = defaultdict(list)
+        for day in climate_days:
+            by_day[day.day].append(day)
+
+        minimum_temperatures, maximum_temperatures, average_temperatures = [], [], []
+        minimum_humidities, maximum_humidities, average_humidities = [], [], []
+        for rows in by_day.values():
+            if not self._complete(rows):
+                continue
+            minimum_temperatures.append(min(row.minimum_temperature_celsius for row in rows))
+            maximum_temperatures.append(max(row.maximum_temperature_celsius for row in rows))
+            average_temperatures.append(mean(row.average_temperature_celsius for row in rows))
+            minimum_humidities.append(min(row.minimum_humidity_percent for row in rows))
+            maximum_humidities.append(max(row.maximum_humidity_percent for row in rows))
+            average_humidities.append(mean(row.average_humidity_percent for row in rows))
+
+        if not average_temperatures:
             return None
+
         below = None
         if ideal_humidity_min_percent is not None:
-            below = sum(1 for day in climate_days if day.average_humidity_percent < ideal_humidity_min_percent)
+            below = sum(1 for humidity in average_humidities if humidity < ideal_humidity_min_percent)
         return ClimateInterval(
-            days_recorded=len(climate_days),
-            minimum_temperature_celsius=min(day.minimum_temperature_celsius for day in climate_days),
-            maximum_temperature_celsius=max(day.maximum_temperature_celsius for day in climate_days),
-            average_temperature_celsius=mean(day.average_temperature_celsius for day in climate_days),
-            minimum_humidity_percent=min(day.minimum_humidity_percent for day in climate_days),
-            maximum_humidity_percent=max(day.maximum_humidity_percent for day in climate_days),
-            average_humidity_percent=mean(day.average_humidity_percent for day in climate_days),
+            days_recorded=len(average_temperatures),
+            minimum_temperature_celsius=min(minimum_temperatures),
+            maximum_temperature_celsius=max(maximum_temperatures),
+            average_temperature_celsius=mean(average_temperatures),
+            minimum_humidity_percent=min(minimum_humidities),
+            maximum_humidity_percent=max(maximum_humidities),
+            average_humidity_percent=mean(average_humidities),
             days_below_ideal_humidity=below,
+        )
+
+    def _complete(self, rows: list[SensorDay]) -> bool:
+        """A soil probe folds into the same table with no air in it, so a day without air is skipped whole."""
+        return all(
+            row.minimum_temperature_celsius is not None
+            and row.maximum_temperature_celsius is not None
+            and row.average_temperature_celsius is not None
+            and row.minimum_humidity_percent is not None
+            and row.maximum_humidity_percent is not None
+            and row.average_humidity_percent is not None
+            for row in rows
         )
 
     def _describe_schedule(self, schedule: CareSchedule, current: PlantPhoto) -> PhotoReviewSchedule:
