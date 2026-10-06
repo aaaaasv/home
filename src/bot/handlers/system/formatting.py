@@ -14,6 +14,9 @@ from src.bot.handlers.system.messages import (
     PI_STATUS_TITLE,
     SENSOR_BATTERY_LOW_POT,
     SENSOR_BATTERY_LOW_ROOM,
+    SHELF_HOT,
+    SHELF_RECOVERED,
+    SHELF_WARM,
     SYSTEM_HEALTH_ALERT_TITLE,
     SYSTEM_HEALTH_DISK,
     SYSTEM_HEALTH_TEMPERATURE,
@@ -27,6 +30,7 @@ from src.modules.system_health.domain import (
     SystemHealthDimension,
     SystemHealthIssue,
 )
+from src.modules.system_health.shelf_heat_monitor import HOT
 
 
 def render_system_health_alert(issues: list[SystemHealthIssue]) -> str:
@@ -75,3 +79,12 @@ def render_sensor_battery_card(reading: SensorNow, plant_name: str | None) -> st
     if plant_name is not None:
         return SENSOR_BATTERY_LOW_POT.format(place=plant_name, percent=percent)
     return SENSOR_BATTERY_LOW_ROOM.format(place=reading.room or reading.sensor, percent=percent)
+
+
+def render_shelf_heat_card(level: str, temperature_celsius: float) -> str:
+    template = SHELF_HOT if level == HOT else SHELF_WARM
+    return template.format(temperature=round(temperature_celsius))
+
+
+def render_shelf_recovered(temperature_celsius: float) -> str:
+    return SHELF_RECOVERED.format(temperature=round(temperature_celsius))

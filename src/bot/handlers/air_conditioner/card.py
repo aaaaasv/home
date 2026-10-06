@@ -23,6 +23,7 @@ from src.bot.handlers.air_conditioner.messages import (
 )
 from src.bot.services.posted_message_tracker import AIR_CONDITIONER_CARD_KIND, PostedMessageTracker
 from src.common.config import Settings
+from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.air_conditioner.domain import AirConditionerState
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
@@ -51,7 +52,7 @@ async def show_air_conditioner(
         await message.answer(AIR_CONDITIONER_UNREACHABLE)
         return
 
-    indoor, ventilation = await _read_room(weather_provider, uow_factory, live=True)
+    indoor, ventilation = await _read_room(weather_provider, uow_factory, settings, live=True)
     # drop any earlier control panel so only the newest one is live
     await posted_message_tracker.clear(AIR_CONDITIONER_CARD_KIND)
     sent = await message.answer(
@@ -180,7 +181,7 @@ async def _show(
             pass
         return
 
-    indoor, ventilation = await _read_room(weather_provider, uow_factory)
+    indoor, ventilation = await _read_room(weather_provider, uow_factory, settings)
     try:
         await callback.message.edit_text(
             render_air_conditioner(
@@ -196,9 +197,14 @@ async def _show(
 
 
 async def _read_room(
-    weather_provider: WeatherProvider, uow_factory: Callable[[], UnitOfWork], live: bool = False
+    weather_provider: WeatherProvider,
+    uow_factory: Callable[[], UnitOfWork],
+    settings: Settings,
+    live: bool = False,
 ) -> tuple[RoomClimate | None, VentilationEffect | None]:
-    indoor = await RetrieveRoomClimateUseCase(uow=uow_factory())()
+    indoor = await RetrieveRoomClimateUseCase(
+        uow=uow_factory(), household_calendar=HouseholdCalendar(timezone=settings.timezone)
+    )(settings.AIR_CONDITIONER_ROOM)
     if indoor is None:
         return None, None
 
