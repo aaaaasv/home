@@ -41,6 +41,10 @@ class FoldSensorDaysJob:
         logger.info("Folded %s sensor-day summaries", folded)
 
 
+# spread across a quarter of an hour, so the fold never starts in the same second as the rest
+FOLD_JITTER_SECONDS = 900
+
+
 def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
     """Nothing to fold until a sensor is mapped to a room or a pot, so an unmapped house schedules nothing."""
     settings = context.settings
@@ -52,9 +56,11 @@ def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> Non
         household_calendar=context.household_calendar,
         raw_retention_days=settings.SENSOR_HISTORY_RAW_DAYS,
     )
+    # every interval job is seeded at boot, so they all land on the same second forever. the fold is the
+    # heaviest writer of them and lost the lock on every one of those pile-ups, so it runs on its own minute
     scheduler.add_job(
         fold_job.__call__,
-        trigger=IntervalTrigger(minutes=settings.SENSOR_FOLD_INTERVAL_MINUTES),
+        trigger=IntervalTrigger(minutes=settings.SENSOR_FOLD_INTERVAL_MINUTES, jitter=FOLD_JITTER_SECONDS),
         id="fold_sensor_days",
         replace_existing=True,
     )

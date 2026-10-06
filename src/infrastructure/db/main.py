@@ -15,7 +15,9 @@ def apply_sqlite_pragmas(engine: AsyncEngine) -> None:
         # blocks a writer, and with the default zero busy timeout the loser raises immediately instead
         # of waiting — which the family sees as «Щось пішло не так» for no reason they can perceive
         cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA busy_timeout=5000")
+        # five seconds was not enough for the hourly fold, which rewrites a day of readings while a dozen
+        # other jobs are mid-write; it lost the lock on every pile-up until the fold was moved off it
+        cursor.execute("PRAGMA busy_timeout=15000")
         cursor.close()
 
 
