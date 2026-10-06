@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     CHORE_REMINDER_START_HOUR: int = 9
     CHORE_REMINDER_END_HOUR: int = 21
 
+    # the shelf warms over tens of minutes, not seconds, so a quarter-hour look is plenty
+    SHELF_HEAT_CHECK_MINUTES: int = 15
     CLIMATE_SENSOR_ENABLED: bool = False
     CLIMATE_SENSOR_I2C_BUS: int = 1
     CLIMATE_SENSOR_I2C_ADDRESS: int = 0x44

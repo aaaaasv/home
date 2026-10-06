@@ -28,3 +28,15 @@ SENSOR_BATTERY_LOW_ROOM = "🔋 <b>Датчик «{place}»</b> — лишило
 SENSOR_BATTERY_LOW_POT = (
     "🔋 <b>Датчик у горщику «{place}»</b> — лишилось {percent}% батареї. Час поміняти елемент живлення."
 )
+
+# one card for the server shelf, posted when it gets hot and taken down when it cools; the shelf carries the pi,
+# the router, the media laptop and the ups cells, so these two numbers are about hardware, not comfort
+SHELF_WARM = (
+    "🌡 <b>Серверна полиця {temperature}°</b> — ноутбуку й акумуляторам вже некомфортно. "
+    "Варто прибрати, що гріє поруч, або дати більше повітря."
+)
+SHELF_HOT = (
+    "🔥 <b>Серверна полиця {temperature}°</b> — заряджати літій за такої температури шкідливо. "
+    "Варто розвантажити полицю зараз."
+)
+SHELF_RECOVERED = "🌡 Серверна полиця охолола — {temperature}°"

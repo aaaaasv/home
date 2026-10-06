@@ -102,6 +102,15 @@ class SensorDayRepository(SQLAlchemyRepository[SensorDay]):
         for field, value in summary.items():
             setattr(existing, field, value)
 
+    async def list_room_between(self, room: str, first_day: date, last_day: date) -> list[SensorDay]:
+        """Every day every sensor of one room folded — two sensors in a room describe one air, as elsewhere."""
+        result = await self.session.execute(
+            select(SensorDay)
+            .where(SensorDay.room == room, SensorDay.day >= first_day, SensorDay.day <= last_day)
+            .order_by(SensorDay.day)
+        )
+        return list(result.scalars().all())
+
     async def list_between(self, sensor: str, first_day: date, last_day: date) -> list[SensorDay]:
         result = await self.session.execute(
             select(SensorDay)

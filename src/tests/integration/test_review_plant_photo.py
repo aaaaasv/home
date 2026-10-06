@@ -22,6 +22,7 @@ class ReviewPlantPhotoTestCase(BaseIntegrationTestCase):
             name="Пеперомія",
             species="Peperomia obtusifolia",
             location="кухня",
+            room="кухня-вітальня",
             ideal_temperature_min_celsius=18.0,
             ideal_temperature_max_celsius=26.0,
             ideal_humidity_min_percent=40.0,
@@ -144,7 +145,8 @@ class ReviewPlantPhotoTestCase(BaseIntegrationTestCase):
         self.assertIsNone(self.photo_analyst.reviewed_contexts[0].climate_between_photos)
 
     async def test_review_plant_photo_passes_the_plant_profile_and_the_room_climate(self):
-        await self.seed_room_climate_readings(
+        await self.seed_sensor_readings(
+            room="кухня-вітальня",
             humidity_percent=31.0,
             temperature_celsius=27.0,
             since=FROZEN_NOW - timedelta(hours=1),
@@ -224,3 +226,19 @@ class ReviewPlantPhotoTestCase(BaseIntegrationTestCase):
 
         self.assertIsNone(review)
         self.assertEqual(self.photo_analyst.reviewed_contexts, [])
+
+    async def test_review_plant_photo_for_a_plant_in_another_room_says_nothing_about_the_air(self):
+        """A room with no sensor of its own is a room we know nothing about, and the analyst is told so."""
+        await self.seed_sensor_readings(
+            room="спальня",
+            humidity_percent=31.0,
+            temperature_celsius=27.0,
+            since=FROZEN_NOW - timedelta(hours=1),
+            until=FROZEN_NOW,
+        )
+        await self.seed_plant_photo(plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW)
+
+        await self.build_use_case()(self.plant_id)
+
+        context = self.photo_analyst.reviewed_contexts[0]
+        self.assertEqual((context.room_temperature_celsius, context.room_humidity_percent), (None, None))
