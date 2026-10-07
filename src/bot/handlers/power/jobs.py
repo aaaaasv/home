@@ -236,9 +236,9 @@ class YasnoScheduleJob:
             return
 
         today = outlook.today
-        # keep the board current: edit the day's message in place, or post the first one when an outage appears
-        if not await self.outage_schedule_board.refresh(today) and today.has_outages:
-            await self.outage_schedule_board.post(today)
+        # keep the board current: edit it in place, or post the first one once something is planned and still ahead
+        if not await self.outage_schedule_board.refresh(outlook):
+            await self.outage_schedule_board.post(outlook)
 
         if today.status == OutageScheduleStatus.EMERGENCY_SHUTDOWNS:
             await self._push_emergency(today)

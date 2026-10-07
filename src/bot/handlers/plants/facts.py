@@ -50,6 +50,12 @@ def _describe(sheet: PlantSheet, calendar: HouseholdCalendar) -> str:
     if sheet.ideal_temperature_min_celsius is not None:
         lines.append(f"  бажано: {sheet.ideal_temperature_min_celsius:.0f}–{sheet.ideal_temperature_max_celsius:.0f}°C")
 
+    # a typed question only gets the photos of a plant it names, so every other plant must at least say that
+    # photos of it exist and how fresh they are — the model used to answer as if it had seen them
+    if sheet.photos:
+        taken_on = calendar.local_date(sheet.photos[-1].taken_at).isoformat()
+        lines.append(f"  фото: {len(sheet.photos)}, останнє {taken_on}")
+
     for schedule in sheet.schedules:
         label = CARE_TASK_LABELS[schedule.task_type]
         done = calendar.local_date(schedule.last_performed_at).isoformat() if schedule.last_performed_at else "ніколи"
