@@ -1,6 +1,7 @@
 """How the EcoFlow card, the reserve board, the outage schedule and the conservation card render."""
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
+from src.bot.formatting import GENITIVE_MONTH_NAMES
 from src.bot.handlers.power.messages import (
     POWER_CONSERVATION_CYCLE_DUE,
     POWER_CONSERVATION_CYCLE_SOON,
@@ -43,14 +44,21 @@ from src.bot.handlers.power.messages import (
     POWER_RESERVE_TITLE_UNKNOWN,
     POWER_RESERVE_UNREACHABLE,
     POWER_SCHEDULE_AS_OF,
+    POWER_SCHEDULE_DAY_DATE,
+    POWER_SCHEDULE_DAY_TODAY,
+    POWER_SCHEDULE_DAY_TOMORROW,
     POWER_SCHEDULE_EMERGENCY_NOTE,
     POWER_SCHEDULE_INTERVAL,
+    POWER_SCHEDULE_INTERVAL_NOW,
+    POWER_SCHEDULE_INTERVAL_PASSED,
     POWER_SCHEDULE_TITLE,
 )
 from src.modules.power.domain import (
     EcoFlowState,
     GridState,
     OutageForecast,
+    OutageInterval,
+    OutageOutlook,
     OutageSchedule,
     OutageScheduleStatus,
     Reserve,
@@ -175,14 +183,51 @@ def render_outage_forecast(forecast: OutageForecast) -> str:
     )
 
 
-def render_outage_schedule(schedule: OutageSchedule, generated_at: datetime) -> str:
+def render_outage_outlook(outlook: OutageOutlook, generated_at: datetime) -> str:
+    """
+    Both published days on one board, each interval marked for where the clock already is.
+
+    an hour that has already passed must not read like a forecast — on 7 october yasno published the day's
+    intervals at 21:10 and the board announced two outages that were over, which is worse than saying nothing
+    """
     lines = [POWER_SCHEDULE_TITLE]
-    if schedule.status == OutageScheduleStatus.EMERGENCY_SHUTDOWNS:
-        lines.append(POWER_SCHEDULE_EMERGENCY_NOTE)
-    for interval in schedule.off_intervals:
-        lines.append(POWER_SCHEDULE_INTERVAL.format(start=f"{interval.start:%H:%M}", end=f"{interval.end:%H:%M}"))
+    for schedule in (outlook.today, outlook.tomorrow):
+        if schedule is None or not schedule.has_outages:
+            continue
+        lines.append("")
+        lines.extend(_render_day_section(schedule, generated_at))
     lines.extend(["", POWER_SCHEDULE_AS_OF.format(time=f"{generated_at:%H:%M}")])
     return "\n".join(lines)
+
+
+def _render_day_section(schedule: OutageSchedule, generated_at: datetime) -> list[str]:
+    lines = [_render_day_heading(schedule.day, generated_at.date())]
+    if schedule.status == OutageScheduleStatus.EMERGENCY_SHUTDOWNS:
+        lines.append(POWER_SCHEDULE_EMERGENCY_NOTE)
+    # only the day the clock is actually in can have an interval behind or around it
+    minute_of_day = generated_at.hour * 60 + generated_at.minute if schedule.day == generated_at.date() else None
+    for interval in schedule.off_intervals:
+        lines.append(_render_interval(interval, minute_of_day))
+    return lines
+
+
+def _render_day_heading(day: date, today: date) -> str:
+    if day == today:
+        return POWER_SCHEDULE_DAY_TODAY
+    if day == today + timedelta(days=1):
+        return POWER_SCHEDULE_DAY_TOMORROW
+    return POWER_SCHEDULE_DAY_DATE.format(day=f"{day.day} {GENITIVE_MONTH_NAMES[day.month - 1]}")
+
+
+def _render_interval(interval: OutageInterval, minute_of_day: int | None) -> str:
+    hours = {"start": f"{interval.start:%H:%M}", "end": f"{interval.end:%H:%M}"}
+    if minute_of_day is None:
+        return POWER_SCHEDULE_INTERVAL.format(**hours)
+    if interval.has_ended_by(minute_of_day):
+        return POWER_SCHEDULE_INTERVAL_PASSED.format(**hours)
+    if interval.contains_minute(minute_of_day):
+        return POWER_SCHEDULE_INTERVAL_NOW.format(**hours)
+    return POWER_SCHEDULE_INTERVAL.format(**hours)
 
 
 def render_conservation_card(advisory: ConservationAdvisory) -> str:

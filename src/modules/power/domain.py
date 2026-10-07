@@ -158,6 +158,9 @@ class OutageInterval:
     def contains_minute(self, minute_of_day: int) -> bool:
         return self.start_minute <= minute_of_day < self.end_minute
 
+    def has_ended_by(self, minute_of_day: int) -> bool:
+        return self.end_minute <= minute_of_day
+
 
 @dataclass(frozen=True)
 class OutageSchedule:
@@ -199,6 +202,24 @@ class OutageOutlook:
 
     today: OutageSchedule
     tomorrow: OutageSchedule | None
+
+    @property
+    def has_outages(self) -> bool:
+        return self.today.has_outages or (self.tomorrow is not None and self.tomorrow.has_outages)
+
+    def has_anything_ahead(self, moment: datetime) -> bool:
+        """
+        Whether a board put up now would still tell the family something that has not happened yet.
+
+        yasno publishes a day's intervals whenever it likes — on 7 october it published them at 21:10, and the
+        board went up naming two outages that were over or ending. tomorrow is the answer the family wants by
+        then, so a day with nothing left in it no longer earns a board of its own
+        """
+        if self.tomorrow is not None and self.tomorrow.has_outages:
+            return True
+        if self.today.day != moment.date():
+            return False
+        return any(not interval.has_ended_by(_minute_of_day(moment)) for interval in self.today.off_intervals)
 
 
 def _minutes_to_time(minutes: int) -> time:

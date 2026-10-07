@@ -1,4 +1,5 @@
 import unittest
+from copy import deepcopy
 from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo
 
@@ -127,6 +128,49 @@ class ParseOutageOutlookTestCase(unittest.TestCase):
 
     def test_parse_outlook_for_unknown_group_returns_none(self):
         self.assertIsNone(parse_outage_outlook(SAMPLE, "99.9"))
+
+
+class OutageIntervalEndTestCase(unittest.TestCase):
+    def setUp(self):
+        self.interval = OutageInterval(480, 630)
+
+    def test_has_ended_by_a_minute_before_the_end_is_false(self):
+        self.assertFalse(self.interval.has_ended_by(629))
+
+    def test_has_ended_by_the_exclusive_end_is_true(self):
+        self.assertTrue(self.interval.has_ended_by(630))
+
+    def test_has_ended_by_a_minute_before_the_start_is_false(self):
+        self.assertFalse(self.interval.has_ended_by(479))
+
+
+class OutlookAheadTestCase(unittest.TestCase):
+    """Whether a board put up at this moment would still be telling the family something unspent."""
+
+    def setUp(self):
+        self.outlook = parse_outage_outlook(SAMPLE, "2.1")
+
+    def test_has_anything_ahead_before_the_first_outage_is_true(self):
+        self.assertTrue(self.outlook.has_anything_ahead(datetime(2026, 8, 11, 7, 0, tzinfo=KYIV)))
+
+    def test_has_anything_ahead_inside_the_last_outage_is_true(self):
+        self.assertTrue(self.outlook.has_anything_ahead(datetime(2026, 8, 11, 18, 0, tzinfo=KYIV)))
+
+    def test_has_anything_ahead_after_the_last_outage_with_an_empty_tomorrow_is_false(self):
+        self.assertFalse(self.outlook.has_anything_ahead(datetime(2026, 8, 11, 20, 0, tzinfo=KYIV)))
+
+    def test_has_anything_ahead_after_the_last_outage_with_a_planned_tomorrow_is_true(self):
+        payload = deepcopy(SAMPLE)
+        payload["2.1"]["tomorrow"]["slots"] = [{"start": 900, "end": 1110, "type": "Definite"}]
+        outlook = parse_outage_outlook(payload, "2.1")
+
+        self.assertTrue(outlook.has_anything_ahead(datetime(2026, 8, 11, 20, 0, tzinfo=KYIV)))
+
+    def test_has_anything_ahead_on_a_day_the_clock_has_left_behind_is_false(self):
+        self.assertFalse(self.outlook.has_anything_ahead(datetime(2026, 8, 12, 7, 0, tzinfo=KYIV)))
+
+    def test_has_outages_with_a_clear_group_is_false(self):
+        self.assertFalse(parse_outage_outlook(SAMPLE, "1.1").has_outages)
 
 
 if __name__ == "__main__":

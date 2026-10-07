@@ -54,8 +54,13 @@ POWER_CONSERVATION_IN_USE_TOAST = "▶️ Delta 2 у користуванні"
 
 # ⚡ Світло — Yasno outage schedule. the daily digest is self-editing and silent (a glance, never a ping) like the
 # weather digest; the pushes below (pre-outage, emergency) are the only notifications, and carry facts, not advice
-POWER_SCHEDULE_TITLE = "🗓 <b>Графік відключень</b> — сьогодні"
+POWER_SCHEDULE_TITLE = "🗓 <b>Графік відключень</b>"
+POWER_SCHEDULE_DAY_TODAY = "<b>Сьогодні</b>"
+POWER_SCHEDULE_DAY_TOMORROW = "<b>Завтра</b>"
+POWER_SCHEDULE_DAY_DATE = "<b>{day}</b>"
 POWER_SCHEDULE_INTERVAL = "🕯 {start}–{end}"
+POWER_SCHEDULE_INTERVAL_NOW = "🕯 {start}–{end} — зараз"
+POWER_SCHEDULE_INTERVAL_PASSED = "🕯 <s>{start}–{end}</s>"
 POWER_SCHEDULE_EMERGENCY_NOTE = "⚠️ аварійні відключення"
 POWER_SCHEDULE_AS_OF = "<i>станом на {time}</i>"
 POWER_SCHEDULE_BUTTON_REFRESH = "Оновити"
