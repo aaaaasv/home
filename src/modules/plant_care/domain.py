@@ -87,6 +87,14 @@ class PlantPhotoDetails(DomainModel):
         )
 
 
+class QuestionPhoto(DomainModel):
+    """A stored photo picked out to answer a question, with enough about it to be labelled in the request."""
+
+    plant_name: str
+    taken_at: datetime
+    local_path: str
+
+
 def find_cover_photo(photos: list[PlantPhotoDetails]) -> PlantPhotoDetails | None:
     """
     The newest general frame, which stands for the plant on its card and its sheet.

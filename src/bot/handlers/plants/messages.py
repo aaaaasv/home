@@ -112,6 +112,9 @@ PHOTO_ADDED = "📸 Фото додано."
 PHOTOS_ADDED = "📸 Додано {count} кадри. Перший — для порівняння, решта в зібранні."
 
 PHOTO_REVIEW_IN_PROGRESS = "🔎 Дивлюсь, що змінилось…"
+# a typed question carries no image of its own, so the attached frames are named in the order they are sent
+PLANT_QUESTION_PHOTO_NOTE = "До питання додано фото з колекції, у цьому порядку:"
+PLANT_QUESTION_PHOTO_LINE = "— {plant}, {day}"
 PHOTO_REVIEW_CHANGE_LABEL = "Зміни"
 PHOTO_REVIEW_ACTION_LABEL = "Що зробити"
 
