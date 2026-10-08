@@ -140,5 +140,8 @@ board pattern.
 
 ## The rule that keeps this from happening again
 
-**Feature freeze on new bot modules until Phase 0 passes its test.** Every hour spent on the media language
-ladder or the places module was a fine hour. The *next* such hour is not.
+**Phase 0 outranks new modules — it does not forbid them.** Written as a freeze once, and read back later as
+a ban on having ideas, which was never the point. The point is the ordering: when survivability and a new
+module compete for the same evening, survivability wins, because the system that cannot send «світло зникло»
+is the one that most needs to. A module that costs an afternoon and touches nothing at layer 0 is not what
+this rule is about.
