@@ -347,8 +347,15 @@ class Settings(BaseSettings):
     # names an unfamiliar plant from the photo sent while adding it, so the species and the watering rhythm
     # are confirmed rather than typed. shares the gemini key and its free-tier quota with the review above
     PLANT_IDENTIFICATION_ENABLED: bool = False
-    ANTHROPIC_API_KEY: str = ""
-    PLANT_PHOTO_REVIEW_MODEL: str = "claude-opus-4-8"
+    CLAUDE_API_SECRET_KEY: str = ""
+    # the assistant and anything else that only needs words; the photo review buys the dearer model below
+    CLAUDE_MODEL: str = "claude-sonnet-5-5"
+    PLANT_PHOTO_REVIEW_MODEL: str = "claude-opus-5-5"
+    # ceilings on what the paid models may cost, in dollars. the day is the one that matters: a job that wakes
+    # every minute and asks the same question forever is how the credit would actually be lost, and the free
+    # tier used to stop that by accident. the month is the rolling thirty days, not a calendar one
+    CLAUDE_DAILY_BUDGET_USD: float = 3.0
+    CLAUDE_MONTHLY_BUDGET_USD: float = 60.0
 
     # the assistant: a grounded home helper in its own topic, answering only from the curated knowledge file via a
     # swappable LanguageModel (default: Google's free-tier Gemini). off until a free api key is set
