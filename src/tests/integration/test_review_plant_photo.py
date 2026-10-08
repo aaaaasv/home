@@ -184,6 +184,30 @@ class ReviewPlantPhotoTestCase(BaseIntegrationTestCase):
         self.assertEqual(context.schedules[0].interval_days, 3)
         self.assertEqual(context.schedules[0].days_since_last_performed, 2)
 
+    async def test_review_plant_photo_passes_the_written_protocol_of_each_task(self):
+        """Without the dose a review could only point at «графік», which a care line may never do."""
+        await self.seed_care_schedule(
+            plant_id=self.plant_id,
+            task_type=CareTaskType.FERTILIZING,
+            interval_days=30,
+            instructions="0.5 мл STIMUL на 1 л води, по вологому ґрунту",
+        )
+        await self.seed_plant_photo(plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW)
+
+        await self.build_use_case()(self.plant_id)
+
+        context = self.photo_analyst.reviewed_contexts[0]
+        self.assertEqual(context.schedules[0].instructions, "0.5 мл STIMUL на 1 л води, по вологому ґрунту")
+
+    async def test_review_plant_photo_for_a_task_with_no_protocol_passes_none(self):
+        await self.seed_care_schedule(plant_id=self.plant_id, task_type=CareTaskType.WATERING, interval_days=3)
+        await self.seed_plant_photo(plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW)
+
+        await self.build_use_case()(self.plant_id)
+
+        context = self.photo_analyst.reviewed_contexts[0]
+        self.assertIsNone(context.schedules[0].instructions)
+
     async def test_review_plant_photo_with_the_only_photo_has_nothing_to_compare_with(self):
         await self.seed_plant_photo(plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW)
 

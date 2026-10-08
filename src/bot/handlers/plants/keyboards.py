@@ -19,6 +19,7 @@ from src.bot.handlers.plants.messages import (
     CARE_POSTPONE_BUTTON,
     CARE_TASK_LABELS,
     CARE_UNDO_BUTTON,
+    PHOTO_REVIEW_RETRY_BUTTON,
     PLANT_FIELD_LABELS,
     PLANT_RESTORE_BUTTON,
     SCHEDULE_REMOVE_BUTTON,
@@ -40,6 +41,7 @@ class PlantAction(StrEnum):
     OPEN = "open"
     PHOTOS = "photos"
     ADD_PHOTO = "add_photo"
+    REVIEW_PHOTO = "review_photo"
     # same upload flow as ADD_PHOTO, but entered from a digest card the bot must delete afterwards
     ADD_PHOTO_DUE = "photo_due"
     EDIT = "edit"
@@ -155,6 +157,15 @@ def build_archived_plant_keyboard(plant_id: int) -> InlineKeyboardMarkup:
         text=PLANT_RESTORE_BUTTON,
         callback_data=PlantCallback(action=PlantAction.RESTORE, plant_id=plant_id),
         style=SUCCESS_STYLE,
+    )
+    return builder.as_markup()
+
+
+def build_photo_review_retry_keyboard(plant_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=PHOTO_REVIEW_RETRY_BUTTON,
+        callback_data=PlantCallback(action=PlantAction.REVIEW_PHOTO, plant_id=plant_id),
     )
     return builder.as_markup()
 

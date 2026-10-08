@@ -14,8 +14,8 @@ from src.bot.formatting import format_moment
 from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.care_cards import refresh_care_cards
 from src.bot.handlers.plants.formatting import render_plant_photo_review
-from src.bot.handlers.plants.keyboards import PlantAction, PlantCallback
-from src.bot.message_cleanup import delete_quietly, remember_transient_message, sweep_transient_messages
+from src.bot.handlers.plants.keyboards import PlantAction, PlantCallback, build_photo_review_retry_keyboard
+from src.bot.message_cleanup import remember_transient_message, sweep_transient_messages
 from src.common.config import Settings
 from src.common.constants import PlantPhotoFrame
 from src.common.domain import Actor
@@ -225,15 +225,49 @@ async def _review_photo(
 
     # the model takes a while to answer, so say it is looking rather than leave the upload hanging in silence
     notice = await message.answer(messages.PHOTO_REVIEW_IN_PROGRESS)
+    await _write_review_into(notice, plant_id, uow_factory, household_calendar, photo_analyst)
+
+
+async def _write_review_into(
+    notice: Message,
+    plant_id: int,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_analyst: PhotoAnalyst,
+) -> None:
+    """
+    Turns the «дивлюсь» placeholder into the review, or into saying the look did not happen.
+
+    it used to delete the placeholder on failure, which left «фото додано» followed by nothing — identical to
+    the bot having ignored the upload. three photos in a row looked that way the evening gemini spent twelve
+    minutes refusing every request, and from the group there was no telling it from a bug
+    """
     use_case = ReviewPlantPhotoUseCase(
         uow=uow_factory(), household_calendar=household_calendar, photo_analyst=photo_analyst
     )
     review = await use_case(plant_id)
     if review is None:
-        await delete_quietly(notice)
+        await notice.edit_text(messages.PHOTO_REVIEW_FAILED, reply_markup=build_photo_review_retry_keyboard(plant_id))
         return
 
     await notice.edit_text(render_plant_photo_review(review))
+
+
+@router.callback_query(PlantCallback.filter(F.action == PlantAction.REVIEW_PHOTO))
+async def retry_photo_review(
+    callback: CallbackQuery,
+    callback_data: PlantCallback,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_analyst: PhotoAnalyst | None = None,
+) -> None:
+    """Looking again, on the same card — the family decides when to spend the next request, not a timer."""
+    await callback.answer()
+    if photo_analyst is None:
+        return
+
+    await callback.message.edit_text(messages.PHOTO_REVIEW_IN_PROGRESS)
+    await _write_review_into(callback.message, callback_data.plant_id, uow_factory, household_calendar, photo_analyst)
 
 
 @router.message(AddPhotoStates.photo)
