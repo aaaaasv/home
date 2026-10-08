@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
+from src.bot.handlers.plants.keyboards import PhotoHistoryCallback, build_photo_history_keyboard
 from src.bot.handlers.plants.photos import build_photo_history, render_history_caption
 from src.common.constants import PlantPhotoFrame
 from src.modules.plant_care.domain import PlantPhotoDetails
@@ -53,24 +54,51 @@ class BuildPhotoHistoryTestCase(unittest.TestCase):
 
 
 class RenderHistoryCaptionTestCase(unittest.TestCase):
+    """Every frame stands alone: the card scrolls away from the one it was opened from."""
+
     def setUp(self):
         self.calendar = FrozenHouseholdCalendar(KYIV, FROZEN_NOW)
         self.photo = build_photo(1, 1, PlantPhotoFrame.OVERVIEW)
 
-    def test_render_history_caption_for_the_first_frame_names_the_plant(self):
-        caption = render_history_caption("Містер Біг", self.photo, 0, self.calendar)
+    def test_render_history_caption_names_the_plant_the_moment_and_the_place_in_the_run(self):
+        caption = render_history_caption("Містер Біг", self.photo, 0, 3, self.calendar)
 
-        self.assertEqual(caption, "<b>Містер Біг</b> · 1 липня, 13:00")
+        self.assertEqual(caption, "<b>Містер Біг</b> · 1 липня, 13:00 · 1/3")
 
-    def test_render_history_caption_for_a_later_frame_is_the_moment_alone(self):
-        caption = render_history_caption("Містер Біг", self.photo, 1, self.calendar)
+    def test_render_history_caption_for_a_later_frame_counts_from_the_newest(self):
+        caption = render_history_caption("Містер Біг", self.photo, 2, 3, self.calendar)
 
-        self.assertEqual(caption, "1 липня, 13:00")
+        self.assertEqual(caption, "<b>Містер Біг</b> · 1 липня, 13:00 · 3/3")
 
     def test_render_history_caption_escapes_a_name_with_markup_in_it(self):
-        caption = render_history_caption("Фікус <b>", self.photo, 0, self.calendar)
+        caption = render_history_caption("Фікус <b>", self.photo, 0, 1, self.calendar)
 
-        self.assertEqual(caption, "<b>Фікус &lt;b&gt;</b> · 1 липня, 13:00")
+        self.assertEqual(caption, "<b>Фікус &lt;b&gt;</b> · 1 липня, 13:00 · 1/1")
+
+
+class BuildPhotoHistoryKeyboardTestCase(unittest.TestCase):
+    def labels(self, index: int, total: int) -> list[str]:
+        keyboard = build_photo_history_keyboard(plant_id=7, index=index, total=total)
+        if keyboard is None:
+            return []
+        return [button.text for row in keyboard.inline_keyboard for button in row]
+
+    def test_the_newest_frame_can_only_step_back_in_time(self):
+        self.assertEqual(self.labels(index=0, total=3), ["старіше →"])
+
+    def test_a_middle_frame_steps_both_ways(self):
+        self.assertEqual(self.labels(index=1, total=3), ["← новіше", "старіше →"])
+
+    def test_the_oldest_frame_can_only_step_forward(self):
+        self.assertEqual(self.labels(index=2, total=3), ["← новіше"])
+
+    def test_a_single_sitting_carries_no_buttons_at_all(self):
+        self.assertIsNone(build_photo_history_keyboard(plant_id=7, index=0, total=1))
+
+    def test_a_step_payload_stays_well_under_the_telegram_limit(self):
+        packed = PhotoHistoryCallback(plant_id=999999, index=9).pack()
+
+        self.assertLessEqual(len(packed.encode()), 64)
 
 
 if __name__ == "__main__":
