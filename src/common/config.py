@@ -350,9 +350,10 @@ class Settings(BaseSettings):
     CLAUDE_API_SECRET_KEY: str = ""
     # the assistant and anything else that only needs words; the photo review buys the dearer model below
     CLAUDE_MODEL: str = "claude-sonnet-5-5"
-    # how hard the model thinks before answering: low | medium | high | xhigh | max. low for anything a person
-    # is sitting and waiting for — the assistant, naming a plant from a photo — because the wait is the cost
-    CLAUDE_EFFORT: str = "low"
+    # how hard the model thinks before answering: low | medium | high | xhigh | max. at this house's volumes
+    # the money is not the trade-off — a better answer costs fractions of a cent — so the only thing low ever
+    # buys is a shorter wait for whoever is watching the chat. drop it if the pause starts to annoy
+    CLAUDE_EFFORT: str = "medium"
     PLANT_PHOTO_REVIEW_MODEL: str = "claude-opus-5-5"
     # the review is the one answer the family acts on, it happens twice a day, and comparing two photos taken
     # weeks apart is the one job here that is actually reasoning. it gets the dear model and real effort
