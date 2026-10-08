@@ -317,6 +317,7 @@ async def run() -> None:
             price_source=build_price_source(settings),
             weather_topic=weather_topic,
             weather_digest_board=weather_digest_board,
+            weather_provider=weather_provider,
             air_conditioner=air_conditioner,
             tech_topic=tech_topic,
             pi_health_sensor=build_pi_health_sensor(settings),

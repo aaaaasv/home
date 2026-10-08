@@ -501,3 +501,46 @@ class ModelUsage(Base):
     # millionths of a dollar: an integer, because money must not drift through floats
     cost_micro_usd = Column(Integer, nullable=False)
     at = Column(UtcDateTime, nullable=False)
+
+
+class OutdoorWeatherDay(Base):
+    """
+    One row per household day for the air outside, folded from hourly samples.
+
+    indoor has been kept per room per day since `sensor_days`; outdoor was fetched for every digest and
+    thrown away. without the pair nothing about this flat is computable — how fast each room loses heat,
+    when the heating actually came on, what a four-hour January outage will do to the bedroom. one row a
+    day costs nothing and cannot be recovered later, which is why it is written before anything reads it.
+    """
+
+    __tablename__ = "outdoor_weather_days"
+
+    day = Column(Date, primary_key=True, autoincrement=False)
+    reading_count = Column(Integer, nullable=False)
+    minimum_temperature_celsius = Column(Float, nullable=True)
+    maximum_temperature_celsius = Column(Float, nullable=True)
+    average_temperature_celsius = Column(Float, nullable=True)
+    minimum_humidity_percent = Column(Float, nullable=True)
+    maximum_humidity_percent = Column(Float, nullable=True)
+    average_humidity_percent = Column(Float, nullable=True)
+
+
+class GridEvent(Base):
+    """
+    Every time the city grid went or came back, as the bot decided it.
+
+    the monitor held this in memory and re-seeded from the first reading after a restart, so «скільки годин
+    ми були без світла в жовтні» had no answer at all — in the one layer the whole system is built around.
+    `AirAlertEvent` was written for exactly this reason in September and the lesson was never carried over.
+
+    a transition, not a state: the length of an outage is the gap between two rows, and storing it would
+    mean rewriting a row when the light came back.
+    """
+
+    __tablename__ = "grid_events"
+    __table_args__ = (Index("ix_grid_events_at", "at"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # "on_grid" or "on_battery", in the GridState the monitor announced
+    state = Column(String(16), nullable=False)
+    at = Column(UtcDateTime, nullable=False)

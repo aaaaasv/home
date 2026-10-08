@@ -81,12 +81,16 @@ class MainsWatchJob:
         ecoflow_station: EcoFlowStation,
         pi_ups: PiUps,
         settings: Settings,
+        uow_factory: Callable[[], UnitOfWork],
+        household_calendar: HouseholdCalendar,
     ):
         self.bot = bot
         self.chat_id = chat_id
         self.power_topic = power_topic
         self.ecoflow_station = ecoflow_station
         self.pi_ups = pi_ups
+        self.uow_factory = uow_factory
+        self.household_calendar = household_calendar
         self.monitor = MainsMonitor(
             confirmations=settings.ECOFLOW_MAINS_CONFIRMATIONS,
             station_feeds_the_pi=settings.PI_UPS_FED_BY_STATION,
@@ -98,6 +102,10 @@ class MainsWatchJob:
         grid = self.monitor.update(ups, station)
         if grid is None:
             return
+
+        # written before the message is sent: a telegram outage must not cost the record of what happened
+        async with self.uow_factory() as uow:
+            await uow.grid_events.create({"state": grid.value, "at": self.household_calendar.now()})
 
         await self.bot.send_message(
             chat_id=self.chat_id,
@@ -342,6 +350,8 @@ def _register_mains_watch(scheduler: AsyncIOScheduler, context: SchedulerContext
         ecoflow_station=context.ecoflow_station or NullEcoFlowStation(),
         pi_ups=context.pi_ups or NullPiUps(),
         settings=settings,
+        uow_factory=context.uow_factory,
+        household_calendar=context.household_calendar,
     )
     scheduler.add_job(
         mains_watch_job.__call__,
