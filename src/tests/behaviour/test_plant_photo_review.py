@@ -96,3 +96,68 @@ class PhotoReviewFailureTestCase(BaseBehaviourTestCase):
         await self.feed(callback_update(PlantCallback(action=PlantAction.REVIEW_PHOTO, plant_id=self.plant_id).pack()))
 
         self.assertEqual(self.session.calls_named("EditMessageText"), [])
+
+
+class ReviewFromTheCardTestCase(BaseBehaviourTestCase):
+    """Asking for a review from the plant's card, long after the photo that would have triggered one."""
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.plant_id = await self.seed_plant(name="Марті")
+        await self.seed_plant_photo(plant_id=self.plant_id, local_path="/photos/one.jpg")
+
+    async def tap_review(self, analyst):
+        return await self.feed(
+            callback_update(PlantCallback(action=PlantAction.REVIEW_NOW, plant_id=self.plant_id).pack()),
+            photo_analyst=analyst,
+        )
+
+    async def test_tapping_review_answers_beneath_the_card_rather_than_over_it(self):
+        await self.tap_review(RecordingPhotoAnalyst(review=REVIEW))
+
+        # a fresh message under the card, not a rewrite of it — the card is where the other buttons live
+        self.assertEqual(
+            [call.text for call in self.session.calls_named("SendMessage")], [messages.PHOTO_REVIEW_IN_PROGRESS]
+        )
+        self.assertEqual([call.text for call in self.session.calls_named("EditMessageText")], ["✅ Виглядає здоровою."])
+
+    async def test_tapping_review_when_the_model_cannot_answer_offers_to_try_again(self):
+        await self.tap_review(RecordingPhotoAnalyst(review=None))
+
+        edited = self.session.calls_named("EditMessageText")[-1]
+        self.assertEqual(edited.text, messages.PHOTO_REVIEW_FAILED)
+        self.assertEqual(
+            [button.text for row in edited.reply_markup.inline_keyboard for button in row],
+            [messages.PHOTO_REVIEW_RETRY_BUTTON],
+        )
+
+    async def test_tapping_review_with_no_model_configured_says_nothing(self):
+        await self.feed(callback_update(PlantCallback(action=PlantAction.REVIEW_NOW, plant_id=self.plant_id).pack()))
+
+        self.assertEqual(self.session.calls_named("SendMessage"), [])
+
+    async def test_the_card_offers_the_review_button_once_the_plant_has_a_photo(self):
+        await self.feed(callback_update(PlantCallback(action=PlantAction.OPEN, plant_id=self.plant_id).pack()))
+
+        buttons = [
+            button.text
+            for call in self.session.calls
+            if getattr(call, "reply_markup", None) is not None
+            for row in call.reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertIn(messages.PHOTO_REVIEW_NOW_BUTTON, buttons)
+
+    async def test_a_plant_with_no_photos_is_not_offered_a_review_it_cannot_make(self):
+        bare_plant_id = await self.seed_plant(name="Кроко")
+
+        await self.feed(callback_update(PlantCallback(action=PlantAction.OPEN, plant_id=bare_plant_id).pack()))
+
+        buttons = [
+            button.text
+            for call in self.session.calls
+            if getattr(call, "reply_markup", None) is not None
+            for row in call.reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertNotIn(messages.PHOTO_REVIEW_NOW_BUTTON, buttons)

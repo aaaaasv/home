@@ -279,7 +279,7 @@ class PhotoHistoryCarouselTestCase(BaseBehaviourTestCase):
         self.assertEqual(self.session.calls_named("SendPhoto"), [])
         self.assertEqual(self.session.sent_texts(), [messages.NO_PHOTOS])
 
-    async def test_the_card_button_counts_the_sittings_the_history_holds(self):
+    async def test_the_card_button_counts_the_photos_that_will_open(self):
         await self.seed_three_sittings()
 
         await self.feed(callback_update(PlantCallback(action=PlantAction.OPEN, plant_id=self.plant_id).pack()))
@@ -291,4 +291,4 @@ class PhotoHistoryCarouselTestCase(BaseBehaviourTestCase):
             for row in call.reply_markup.inline_keyboard
             for button in row
         ]
-        self.assertIn("Історія (3)", buttons)
+        self.assertIn("Фото (3)", buttons)
