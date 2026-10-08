@@ -184,6 +184,23 @@ class ReviewPlantPhotoTestCase(BaseIntegrationTestCase):
         self.assertEqual(context.schedules[0].interval_days, 3)
         self.assertEqual(context.schedules[0].days_since_last_performed, 2)
 
+    async def test_review_plant_photo_counts_care_from_today_not_from_the_photo(self):
+        """Watering after the photo was taken used to come out as «востаннє -2 дн. тому»."""
+        await self.seed_care_schedule(
+            plant_id=self.plant_id,
+            task_type=CareTaskType.WATERING,
+            interval_days=7,
+            last_performed_at=FROZEN_NOW - timedelta(days=1),
+        )
+        await self.seed_plant_photo(
+            plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW - timedelta(days=4)
+        )
+
+        await self.build_use_case()(self.plant_id)
+
+        context = self.photo_analyst.reviewed_contexts[0]
+        self.assertEqual(context.schedules[0].days_since_last_performed, 1)
+
     async def test_review_plant_photo_passes_the_written_protocol_of_each_task(self):
         """Without the dose a review could only point at «графік», which a care line may never do."""
         await self.seed_care_schedule(
