@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-10-08
+
 ### Виправлено
 
 - **Картка дискомфорту більше не сперечається сама з собою.** «💧 Тігл — сухо: 44%, треба 42–90%» — 44%
