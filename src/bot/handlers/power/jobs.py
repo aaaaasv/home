@@ -87,7 +87,10 @@ class MainsWatchJob:
         self.power_topic = power_topic
         self.ecoflow_station = ecoflow_station
         self.pi_ups = pi_ups
-        self.monitor = MainsMonitor(confirmations=settings.ECOFLOW_MAINS_CONFIRMATIONS)
+        self.monitor = MainsMonitor(
+            confirmations=settings.ECOFLOW_MAINS_CONFIRMATIONS,
+            station_feeds_the_pi=settings.PI_UPS_FED_BY_STATION,
+        )
 
     async def __call__(self) -> None:
         ups = await self.pi_ups.read_state()

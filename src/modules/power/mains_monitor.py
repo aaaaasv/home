@@ -2,19 +2,24 @@
 from src.modules.power.domain import EcoFlowState, GridState, UpsState
 
 
-def classify_grid(ups: UpsState | None, station: EcoFlowState | None) -> GridState:
+def classify_grid(ups: UpsState | None, station: EcoFlowState | None, station_feeds_the_pi: bool = False) -> GridState:
     """
     Answer from the pi's own hat where it can, from the station's watts where it cannot, and refuse otherwise.
 
-    the hat's line is wired to the socket, so it is a measurement rather than an inference — but after the
-    transfer switch is thrown the whole flat, this pi included, runs off the station, and the line then reports
-    the station's power as if it were the city's. the station feeding the flat is what tells those two apart.
+    the hat's line is wired to whatever socket the pi is plugged into, so it is a measurement rather than an
+    inference — but only of that socket. plugged into the station, it reports the station's output as if it
+    were the city's, and then only the station's own reading tells those two apart.
     """
     if ups is not None:
         if not ups.mains_present:
             return GridState.ON_BATTERY
+        # a hat living behind the station cannot be read alone, and an outage is exactly when the station tends
+        # to drop off bluetooth — so this answered "світло є" in the middle of a blackout. silence is the honest
+        # answer: the docstring below already says a guess here reads exactly like a blackout
+        if station_feeds_the_pi and station is None:
+            return GridState.UNKNOWN
         # only a discharging station is evidence of the switch: one drawing from the wall while it feeds the
-        # flat is proof of the opposite, and an idle or unreachable one is no evidence either way
+        # flat is proof of the opposite, and a readable idle one is a full station sitting on mains
         if classify_grid_from_station(station) is GridState.ON_BATTERY:
             return GridState.ON_BATTERY
         return GridState.ON_GRID
@@ -50,15 +55,16 @@ class MainsMonitor:
     reading after a restart, so a deploy cannot fire a spurious "світло зникло".
     """
 
-    def __init__(self, confirmations: int = 2):
+    def __init__(self, confirmations: int = 2, station_feeds_the_pi: bool = False):
         self.confirmations = confirmations
+        self.station_feeds_the_pi = station_feeds_the_pi
         self._announced: GridState | None = None
         self._pending: GridState | None = None
         self._seen = 0
 
     def update(self, ups: UpsState | None, station: EcoFlowState | None) -> GridState | None:
         """Return the new grid state at the moment it is confirmed, and None every other time."""
-        grid = classify_grid(ups, station)
+        grid = classify_grid(ups, station, self.station_feeds_the_pi)
         if grid is GridState.UNKNOWN:
             return None
 
