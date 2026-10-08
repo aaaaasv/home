@@ -110,6 +110,8 @@ STRAY_PHOTO = "Щоб фото лягло до рослини, натисни �
 
 PHOTO_ADDED = "📸 Фото додано."
 PHOTOS_ADDED = "📸 Додано {count} кадри. Перший — для порівняння, решта в зібранні."
+# an album frame that reached the bot after its album was already closed off
+PHOTO_ADDED_LATE = "📸 Ще один кадр того ж альбому додано до зібрання."
 
 PHOTO_REVIEW_IN_PROGRESS = "🔎 Дивлюсь, що змінилось…"
 # a typed question carries no image of its own, so the attached frames are named in the order they are sent
@@ -184,18 +186,17 @@ EDIT_FIELD_PLACEHOLDERS: dict[PlantField, str] = {
 CARE_INSTRUCTIONS_PLACEHOLDER = "Як саме робити"
 
 # one standing card per uncomfortable plant, so a line names its own plant; fires on a crossing that held for a
-# full day, not on a number — a heated flat is simply dry all winter
+# full day, not on a number — a heated flat is simply dry all winter.
+#
+# the card states the fact and no measurement. it used to quote the reading and the ideal range, which read as an
+# argument with itself the moment the two stopped agreeing («сухо: 44%, треба 42–90%»), and the number changed
+# nothing anybody does about it — /climate is where the numbers live. air, not soil, is spelled out: the pot
+# probes report their own moisture and 💧 alone was read as a dry pot
 CLIMATE_PROBLEM_LINES: dict[tuple[ClimateDimension, ClimateStatus], str] = {
-    (ClimateDimension.HUMIDITY, ClimateStatus.TOO_LOW): "💧 <b>{plant}</b> — сухо: {value}%, треба {low}–{high}%",
-    (ClimateDimension.HUMIDITY, ClimateStatus.TOO_HIGH): "💦 <b>{plant}</b> — волого: {value}%, треба {low}–{high}%",
-    (
-        ClimateDimension.TEMPERATURE,
-        ClimateStatus.TOO_LOW,
-    ): "🥶 <b>{plant}</b> — холодно: {value}°, треба {low}–{high}°",
-    (
-        ClimateDimension.TEMPERATURE,
-        ClimateStatus.TOO_HIGH,
-    ): "🔥 <b>{plant}</b> — жарко: {value}°, треба {low}–{high}°",
+    (ClimateDimension.HUMIDITY, ClimateStatus.TOO_LOW): "💧 <b>{plant}</b> — сухе повітря",
+    (ClimateDimension.HUMIDITY, ClimateStatus.TOO_HIGH): "💦 <b>{plant}</b> — надто вологе повітря",
+    (ClimateDimension.TEMPERATURE, ClimateStatus.TOO_LOW): "🥶 <b>{plant}</b> — холодно",
+    (ClimateDimension.TEMPERATURE, ClimateStatus.TOO_HIGH): "🔥 <b>{plant}</b> — жарко",
 }
 # posted once, when every dimension is back in range and the plant's discomfort card is deleted
 PLANT_COMFORT_RESTORED = "✅ <b>{plant}</b> — знову комфортно"

@@ -75,7 +75,9 @@ class Settings(BaseSettings):
     # a plant alerts only when the median over this window crosses its ideal range — a heated flat is dry all winter,
     # so a level check would fire every day and get the group muted
     CLIMATE_ALERT_WINDOW_HOURS: int = 24
-    # the median must climb this far back inside the range before "fixed" is announced, so it cannot flap on the edge
+    # how far CLEAR of its range the median must go before a plant is called uncomfortable; it is called
+    # comfortable again the moment the median is back inside. the slack sits outside the range so a card can
+    # never name a plant dry while the air is within the range the card quotes
     CLIMATE_HYSTERESIS_TEMPERATURE_CELSIUS: float = 1.0
     CLIMATE_HYSTERESIS_HUMIDITY_PERCENT: float = 3.0
 

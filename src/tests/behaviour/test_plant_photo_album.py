@@ -88,3 +88,86 @@ class PlantPhotoAlbumTestCase(BaseBehaviourTestCase):
         await self.feed_album("only")
 
         self.assertEqual(self.session.sent_texts()[-1], messages.PHOTO_ADDED)
+
+
+class StragglingAlbumFrameTestCase(BaseBehaviourTestCase):
+    """
+    A frame that reached the bot after its album had been closed off.
+
+    there is no "album finished" update, so the session closes after a couple of quiet seconds. a frame held up
+    past that — a slow upload, or the bot waiting on sqlite's write lock — used to be answered «натисни 📸 на
+    картці» and never stored at all.
+    """
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.plant_id = await self.seed_plant(name="Містер Біг")
+        async with self.uow as uow:
+            await uow.family_members.upsert(ACTOR_ID, "Тест")
+        await self.feed(callback_update(PlantCallback(action=PlantAction.ADD_PHOTO, plant_id=self.plant_id).pack()))
+        self.session.calls.clear()
+        photos._closed_albums.clear()
+        self.addCleanup(photos._closed_albums.clear)
+
+    async def upload_album(self, *unique_ids: str, media_group_id: str = "album-1") -> None:
+        with patch.object(photos, "ALBUM_SETTLE_SECONDS", 0.05):
+            for index, unique_id in enumerate(unique_ids):
+                await self.feed(photo_update(unique_id, update_id=index + 10, media_group_id=media_group_id))
+            await photos._open_sessions[(CHAT_ID, ACTOR_ID)].closing
+
+    async def saved_frames(self) -> dict[str, str]:
+        async with self.uow as uow:
+            return {
+                photo.telegram_file_unique_id: photo.frame
+                for photo in await uow.plant_photos.list_by_plant_id(self.plant_id)
+            }
+
+    async def test_a_frame_arriving_after_its_album_closed_is_stored_on_the_same_plant(self):
+        await self.upload_album("first", "second")
+
+        await self.feed(photo_update("late", update_id=20, media_group_id="album-1"))
+
+        self.assertEqual(
+            await self.saved_frames(),
+            {
+                "first": PlantPhotoFrame.OVERVIEW.value,
+                "second": PlantPhotoFrame.DETAIL.value,
+                "late": PlantPhotoFrame.DETAIL.value,
+            },
+        )
+
+    async def test_a_frame_arriving_after_its_album_closed_says_it_joined_the_collection(self):
+        await self.upload_album("first", "second")
+        self.session.calls.clear()
+
+        await self.feed(photo_update("late", update_id=20, media_group_id="album-1"))
+
+        self.assertEqual(self.session.sent_texts(), [messages.PHOTO_ADDED_LATE])
+
+    async def test_a_frame_of_a_different_album_is_still_refused_as_a_stray_photo(self):
+        await self.upload_album("first", "second")
+        self.session.calls.clear()
+
+        await self.feed(photo_update("other", update_id=20, media_group_id="album-2"))
+
+        self.assertEqual(self.session.sent_texts(), [messages.STRAY_PHOTO])
+        self.assertNotIn("other", await self.saved_frames())
+
+    async def test_a_lone_photo_with_no_album_is_still_refused_as_a_stray_photo(self):
+        await self.upload_album("first", "second")
+        self.session.calls.clear()
+
+        await self.feed(photo_update("lone", update_id=20))
+
+        self.assertEqual(self.session.sent_texts(), [messages.STRAY_PHOTO])
+        self.assertNotIn("lone", await self.saved_frames())
+
+    async def test_a_frame_arriving_long_after_its_album_closed_is_refused_as_a_stray_photo(self):
+        await self.upload_album("first", "second")
+        self.session.calls.clear()
+
+        with patch.object(photos, "STRAGGLER_GRACE_SECONDS", -1.0):
+            await self.feed(photo_update("late", update_id=20, media_group_id="album-1"))
+
+        self.assertEqual(self.session.sent_texts(), [messages.STRAY_PHOTO])
+        self.assertNotIn("late", await self.saved_frames())
