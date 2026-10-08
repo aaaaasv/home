@@ -1,6 +1,7 @@
 import asyncio
 import time
 from collections.abc import Callable
+from html import escape
 from typing import NamedTuple
 
 from aiogram import F, Router
@@ -21,10 +22,12 @@ from src.common.domain import Actor
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.plant_care.commands import AddPlantPhotoCommand, TelegramPhoto
+from src.modules.plant_care.domain import PlantPhotoDetails
 from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 from src.modules.plant_care.services.photo_storage import PhotoStorage
 from src.modules.plant_care.use_cases.add_plant_photo import AddPlantPhotoUseCase
 from src.modules.plant_care.use_cases.list_plant_photos import ListPlantPhotosUseCase
+from src.modules.plant_care.use_cases.retrieve_plant_card import RetrievePlantCardUseCase
 from src.modules.plant_care.use_cases.review_plant_photo import ReviewPlantPhotoUseCase
 
 router = Router(name="photos")
@@ -290,18 +293,43 @@ async def show_photo_timeline(
     household_calendar: HouseholdCalendar,
 ) -> None:
     await callback.answer()
+    plant = await RetrievePlantCardUseCase(uow=uow_factory(), household_calendar=household_calendar)(
+        callback_data.plant_id
+    )
     photos = await ListPlantPhotosUseCase(uow=uow_factory())(callback_data.plant_id)
-    if not photos:
+    history = build_photo_history(photos)
+    if not history:
         await callback.message.answer(messages.NO_PHOTOS)
         return
 
-    timeline = photos[-TIMELINE_PHOTO_LIMIT:]
+    # telegram opens an album in its own viewer and swipes between its frames, so the album IS the carousel —
+    # newest first, because what the plant looks like now is what somebody opening this wants first
     await callback.message.answer_media_group(
         [
             InputMediaPhoto(
                 media=photo.telegram_file_id,
-                caption=format_moment(photo.taken_at, household_calendar),
+                caption=render_history_caption(plant.name, photo, index, household_calendar),
             )
-            for photo in timeline
+            for index, photo in enumerate(history)
         ]
     )
+
+
+def build_photo_history(photos: list[PlantPhotoDetails]) -> list[PlantPhotoDetails]:
+    """
+    One frame per session, newest first — the plant's growth and nothing else.
+
+    the close-ups of a single day are evidence about that day, not history: mixed into the same album they
+    bury the one thing the album is for, which is seeing the plant then and now. an album holds ten frames,
+    so a collection older than ten sessions shows the ten most recent.
+    """
+    overviews = [photo for photo in photos if photo.frame == PlantPhotoFrame.OVERVIEW]
+    return list(reversed(overviews[-TIMELINE_PHOTO_LIMIT:]))
+
+
+def render_history_caption(
+    plant_name: str, photo: PlantPhotoDetails, index: int, household_calendar: HouseholdCalendar
+) -> str:
+    """The album scrolls away from the card it was opened from, so the first frame carries the plant's name."""
+    moment = format_moment(photo.taken_at, household_calendar)
+    return f"<b>{escape(plant_name)}</b> · {moment}" if index == 0 else moment
