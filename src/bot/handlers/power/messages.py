@@ -67,10 +67,10 @@ POWER_SCHEDULE_EMERGENCY_NOTE = (
     "<blockquote>🚨 <b>Аварійні відключення</b>\n"
     "Графік не діє — світло можуть вимкнути будь-коли й повернути без попередження.</blockquote>"
 )
-# when YASNO last changed the schedule, not when the bot last redrew the board. the bot's own moment said
-# nothing anybody could act on; this says whether the hours below are yesterday's plan or this hour's
-POWER_SCHEDULE_PUBLISHED_TODAY = "<i>Ясно оновило о {time}</i>"
-POWER_SCHEDULE_PUBLISHED_EARLIER = "<i>Ясно оновило {day}, {time}</i>"
+# the moment the SCHEDULE is from, not the moment the bot redrew the board — the bot's own moment said nothing
+# anybody could act on. who published it does not need saying: there is one source of outage hours
+POWER_SCHEDULE_AS_OF = "<i>станом на {time}</i>"
+POWER_SCHEDULE_AS_OF_EARLIER = "<i>станом на {day}, {time}</i>"
 POWER_SCHEDULE_BUTTON_REFRESH = "Оновити"
 POWER_SCHEDULE_REFRESHED = "Оновлено"
 POWER_SCHEDULE_REFRESHING = "🔄 оновлюю…"
