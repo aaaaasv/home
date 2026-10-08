@@ -169,6 +169,7 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
             task_type=CareTaskType(schedule.task_type),
             interval_days=schedule.interval_days,
             days_since_last_performed=days_since_last_performed,
+            instructions=schedule.instructions,
         )
 
     def _days_between(self, previous: PlantPhoto, current: PlantPhoto) -> int:

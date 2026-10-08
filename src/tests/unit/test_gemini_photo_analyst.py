@@ -12,7 +12,7 @@ from src.bot.handlers.plants.gemini_photo_analyst import (
     build_review_parts,
     parse_review,
 )
-from src.bot.handlers.plants.photo_review_prompt import SYSTEM_PROMPT
+from src.bot.handlers.plants.photo_review_prompt import SYSTEM_PROMPT, describe_plant
 from src.common.constants import CareTaskType, PlantPhotoReviewStatus
 from src.modules.plant_care.domain import PhotoReviewSchedule, PlantPhotoReviewContext
 
@@ -138,3 +138,41 @@ class ReviewRequestShapeTestCase(unittest.IsolatedAsyncioTestCase):
         sent = await self.ask()
 
         self.assertEqual(sent["retry_delays_seconds"], (60.0, 240.0))
+
+
+class DescribePlantTestCase(unittest.TestCase):
+    """What the model is told about the household's own protocol for this plant."""
+
+    def context_with(self, instructions: str | None) -> PlantPhotoReviewContext:
+        context = make_context("current.jpg")
+        return context.model_copy(
+            update={
+                "schedules": [
+                    PhotoReviewSchedule(
+                        task_type=CareTaskType.FERTILIZING,
+                        interval_days=30,
+                        days_since_last_performed=48,
+                        instructions=instructions,
+                    )
+                ]
+            }
+        )
+
+    def test_describe_plant_spells_out_the_protocol_so_the_action_can_name_the_dose(self):
+        described = describe_plant(self.context_with("0.5 мл STIMUL на 1 л води"))
+
+        self.assertIn("— добриво — раз на 30 дн., востаннє 48 дн. тому; як саме: 0.5 мл STIMUL на 1 л води", described)
+
+    def test_describe_plant_for_a_task_with_no_protocol_leaves_the_line_as_it_was(self):
+        described = describe_plant(self.context_with(None))
+
+        self.assertIn("— добриво — раз на 30 дн., востаннє 48 дн. тому", described)
+        self.assertNotIn("як саме", described)
+
+
+class ReviewPromptRulesTestCase(unittest.TestCase):
+    def test_the_prompt_forbids_pointing_at_the_schedule_instead_of_naming_the_number(self):
+        self.assertIn("Ніколи не відсилай до графіка чи до інструкції", SYSTEM_PROMPT)
+
+    def test_the_prompt_asks_for_the_singular_imperative_the_rest_of_the_bot_speaks(self):
+        self.assertIn("Звертайся на «ти» в однині й у наказовому способі", SYSTEM_PROMPT)

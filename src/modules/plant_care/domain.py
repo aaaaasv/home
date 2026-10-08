@@ -352,6 +352,9 @@ class PhotoReviewSchedule(DomainModel):
     task_type: CareTaskType
     interval_days: int
     days_since_last_performed: int | None
+    # the household's own written protocol for this task on this plant — the dose, the water, the "never".
+    # without it a review could only point at «графік», which is the one thing a care line may not do
+    instructions: str | None = None
 
 
 class ClimateInterval(DomainModel):
