@@ -283,3 +283,48 @@ class ReviewPlantPhotoTestCase(BaseIntegrationTestCase):
 
         context = self.photo_analyst.reviewed_contexts[0]
         self.assertEqual((context.room_temperature_celsius, context.room_humidity_percent), (None, None))
+
+
+class RememberingTheReviewTestCase(ReviewPlantPhotoTestCase):
+    """
+    The dearest output this house makes used to be rendered into one message and lost.
+
+    kept, it lets the next review refer to this one, makes the reviewer falsifiable, and gives the herbarium
+    sheet the record of observations a herbarium sheet should have.
+    """
+
+    async def stored_reviews(self):
+        async with self.uow as uow:
+            return await uow.plant_photo_reviews.list_by_plant_id(self.plant_id)
+
+    async def test_a_review_is_written_down_against_the_photo_it_was_about(self):
+        older = await self.seed_plant_photo(
+            plant_id=self.plant_id, local_path="photos/old.jpg", taken_at=FROZEN_NOW - timedelta(days=20)
+        )
+        newer = await self.seed_plant_photo(
+            plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW, telegram_file_unique_id="b"
+        )
+
+        await self.build_use_case()(self.plant_id)
+
+        stored = await self.stored_reviews()
+        self.assertEqual(len(stored), 1)
+        self.assertEqual(stored[0].photo_id, newer)
+        self.assertEqual(stored[0].compared_to_photo_id, older)
+        self.assertEqual(stored[0].summary, self.photo_analyst.review.summary)
+
+    async def test_a_first_photo_with_nothing_to_compare_against_stores_no_comparison(self):
+        await self.seed_plant_photo(plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW)
+
+        await self.build_use_case()(self.plant_id)
+
+        stored = await self.stored_reviews()
+        self.assertIsNone(stored[0].compared_to_photo_id)
+
+    async def test_a_review_the_model_could_not_make_stores_nothing(self):
+        self.photo_analyst.review = None
+        await self.seed_plant_photo(plant_id=self.plant_id, local_path="photos/new.jpg", taken_at=FROZEN_NOW)
+
+        await self.build_use_case()(self.plant_id)
+
+        self.assertEqual(await self.stored_reviews(), [])

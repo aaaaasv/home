@@ -544,3 +544,31 @@ class GridEvent(Base):
     # "on_grid" or "on_battery", in the GridState the monitor announced
     state = Column(String(16), nullable=False)
     at = Column(UtcDateTime, nullable=False)
+
+
+class PlantPhotoReviewRecord(Base):
+    """
+    What the reviewer said about a photo, kept. Named for the row, because the domain owns PlantPhotoReview.
+
+    the dearest output this house produces — opus at high effort, two images, four tools — used to be
+    rendered into one telegram message and lost. three things follow from keeping it: a review can refer to
+    what it said before, the reviewer becomes falsifiable (was it right in june?), and the herbarium sheet
+    gains the one thing such a sheet should have and did not — observations over time.
+
+    the photo it is about is the anchor rather than the plant, so a review can never be attached to the
+    wrong sitting.
+    """
+
+    __tablename__ = "plant_photo_reviews"
+    __table_args__ = (Index("ix_plant_photo_reviews_plant_id_at", "plant_id", "at"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    plant_id = Column(Integer, ForeignKey("plants.id", ondelete="CASCADE"), nullable=False)
+    photo_id = Column(Integer, ForeignKey("plant_photos.id", ondelete="CASCADE"), nullable=False)
+    # the frame it was compared against, or None when there was nothing to compare with
+    compared_to_photo_id = Column(Integer, ForeignKey("plant_photos.id", ondelete="SET NULL"), nullable=True)
+    status = Column(String(16), nullable=False)
+    summary = Column(Text, nullable=False)
+    change = Column(Text, nullable=True)
+    action = Column(Text, nullable=True)
+    at = Column(UtcDateTime, nullable=False)
