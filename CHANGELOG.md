@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-10-08
+
 ### Виправлено
 
 - **Дошка графіка більше не зникає під час аварійних відключень.** День в аварійному режимі без опублікованих
