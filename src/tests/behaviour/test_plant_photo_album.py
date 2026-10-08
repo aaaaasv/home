@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from src.bot.handlers.plants import messages, photos
@@ -171,3 +172,73 @@ class StragglingAlbumFrameTestCase(BaseBehaviourTestCase):
 
         self.assertEqual(self.session.sent_texts(), [messages.STRAY_PHOTO])
         self.assertNotIn("late", await self.saved_frames())
+
+
+class PhotoHistoryCarouselTestCase(BaseBehaviourTestCase):
+    """
+    The card's photo button opens the plant's growth as one album, which telegram swipes through natively.
+
+    it used to hand over the last ten frames of any kind in the order they were taken, so the close-ups of one
+    afternoon buried the one thing the album is for: the plant then and now.
+    """
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.plant_id = await self.seed_plant(name="Містер Біг")
+
+    async def open_history(self):
+        return await self.feed(callback_update(PlantCallback(action=PlantAction.PHOTOS, plant_id=self.plant_id).pack()))
+
+    async def seed_frame(self, unique_id: str, day: int, frame: PlantPhotoFrame) -> None:
+        await self.seed_plant_photo(
+            plant_id=self.plant_id,
+            telegram_file_id=f"file-{unique_id}",
+            telegram_file_unique_id=unique_id,
+            frame=frame.value,
+            taken_at=datetime(2026, 7, day, 10, 0, tzinfo=timezone.utc),
+        )
+
+    async def test_opening_the_history_sends_the_general_frames_newest_first(self):
+        await self.seed_frame("july-first", 1, PlantPhotoFrame.OVERVIEW)
+        await self.seed_frame("july-first-close-up", 1, PlantPhotoFrame.DETAIL)
+        await self.seed_frame("july-fifth", 5, PlantPhotoFrame.OVERVIEW)
+
+        await self.open_history()
+
+        sent = self.session.calls_named("SendMediaGroup")
+        self.assertEqual(len(sent), 1)
+        self.assertEqual([item.media for item in sent[0].media], ["file-july-fifth", "file-july-first"])
+
+    async def test_opening_the_history_names_the_plant_on_the_first_frame_only(self):
+        await self.seed_frame("july-first", 1, PlantPhotoFrame.OVERVIEW)
+        await self.seed_frame("july-fifth", 5, PlantPhotoFrame.OVERVIEW)
+
+        await self.open_history()
+
+        sent = self.session.calls_named("SendMediaGroup")
+        self.assertEqual(
+            [item.caption for item in sent[0].media],
+            ["<b>Містер Біг</b> · 5 липня, 13:00", "1 липня, 13:00"],
+        )
+
+    async def test_opening_the_history_of_a_plant_with_no_photos_says_so(self):
+        await self.open_history()
+
+        self.assertEqual(self.session.calls_named("SendMediaGroup"), [])
+        self.assertEqual(self.session.sent_texts(), [messages.NO_PHOTOS])
+
+    async def test_the_card_button_counts_the_sittings_the_album_holds(self):
+        await self.seed_frame("july-first", 1, PlantPhotoFrame.OVERVIEW)
+        await self.seed_frame("july-first-close-up", 1, PlantPhotoFrame.DETAIL)
+        await self.seed_frame("july-fifth", 5, PlantPhotoFrame.OVERVIEW)
+
+        await self.feed(callback_update(PlantCallback(action=PlantAction.OPEN, plant_id=self.plant_id).pack()))
+
+        buttons = [
+            button.text
+            for call in self.session.calls
+            if getattr(call, "reply_markup", None) is not None
+            for row in call.reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertIn("Історія (2)", buttons)
