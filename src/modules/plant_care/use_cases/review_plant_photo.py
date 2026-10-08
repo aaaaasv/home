@@ -66,6 +66,7 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
         if current is None:
             return None
         return PlantPhotoReviewContext(
+            plant_id=plant.id,
             plant_name=plant.name,
             species=plant.species,
             location=plant.location,
@@ -77,9 +78,7 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
             room_humidity_percent=room_climate.relative_humidity_percent if room_climate else None,
             # the photo schedule itself says nothing about the plant's health, so it stays out of the context
             schedules=[
-                self._describe_schedule(schedule, current)
-                for schedule in schedules
-                if schedule.task_type != CareTaskType.PHOTO
+                self._describe_schedule(schedule) for schedule in schedules if schedule.task_type != CareTaskType.PHOTO
             ],
             current_photo_path=current.local_path,
             current_photo_taken_on=self.household_calendar.local_date(current.taken_at),
@@ -158,12 +157,14 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
             for row in rows
         )
 
-    def _describe_schedule(self, schedule: CareSchedule, current: PlantPhoto) -> PhotoReviewSchedule:
+    def _describe_schedule(self, schedule: CareSchedule) -> PhotoReviewSchedule:
+        # counted from today, not from the photo: the action the review asks for is for today, and care given
+        # after the photo was taken made this negative — «востаннє -2 дн. тому», which is not a fact about
+        # anything. the photo's own dates travel separately, so nothing is lost by measuring from now
         days_since_last_performed = None
         if schedule.last_performed_at is not None:
             days_since_last_performed = (
-                self.household_calendar.local_date(current.taken_at)
-                - self.household_calendar.local_date(schedule.last_performed_at)
+                self.household_calendar.today() - self.household_calendar.local_date(schedule.last_performed_at)
             ).days
         return PhotoReviewSchedule(
             task_type=CareTaskType(schedule.task_type),

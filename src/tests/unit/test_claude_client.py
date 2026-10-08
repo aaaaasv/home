@@ -114,3 +114,105 @@ class TextOfTestCase(unittest.TestCase):
         response = SimpleNamespace(content=[SimpleNamespace(type="server_tool_use", id="x")])
 
         self.assertIsNone(text_of(response))
+
+
+class StubToolMessages:
+    """Answers with a scripted sequence of responses, recording each conversation it was sent."""
+
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.conversations: list[list] = []
+
+    async def create(self, **request):
+        self.conversations.append(request["messages"])
+        return self.responses.pop(0)
+
+
+def build_tool_call(name: str, arguments: dict, tool_use_id: str = "call-1"):
+    return SimpleNamespace(
+        content=[SimpleNamespace(type="tool_use", id=tool_use_id, name=name, input=arguments)],
+        stop_reason="tool_use",
+        usage=SimpleNamespace(input_tokens=500, output_tokens=40),
+    )
+
+
+class CompleteWithToolsTestCase(unittest.IsolatedAsyncioTestCase):
+    """The model may ask for more on its way to answering, and every round is billed on its own."""
+
+    def build_client(self, ledger, responses):
+        client = ClaudeClient(api_key="test-key", ledger=ledger)
+        client.client = SimpleNamespace(messages=StubToolMessages(responses))
+        return client
+
+    async def ask(self, client, run_tool):
+        return await client.complete_with_tools(
+            purpose="Photo review",
+            model="claude-opus-5-5",
+            tools=[{"name": "care_log"}],
+            run_tool=run_tool,
+            messages=[{"role": "user", "content": "дивись"}],
+        )
+
+    async def test_an_answer_that_needs_no_tool_comes_straight_back(self):
+        ledger = RecordingLedger()
+        asked = []
+
+        answer = await self.ask(self.build_client(ledger, [build_response()]), lambda *_: asked.append(_))
+
+        self.assertEqual(text_of(answer), "так")
+        self.assertEqual(asked, [])
+        self.assertEqual(len(ledger.recorded), 1)
+
+    async def test_a_tool_the_model_asks_for_is_run_and_its_answer_sent_back(self):
+        ledger = RecordingLedger()
+        client = self.build_client(ledger, [build_tool_call("care_log", {}), build_response(text="полито вчора")])
+
+        async def run_tool(name, arguments):
+            return f"журнал {name}"
+
+        answer = await self.ask(client, run_tool)
+
+        self.assertEqual(text_of(answer), "полито вчора")
+        last_turn = client.client.messages.conversations[-1][-1]
+        self.assertEqual(
+            last_turn["content"], [{"type": "tool_result", "tool_use_id": "call-1", "content": "журнал care_log"}]
+        )
+
+    async def test_every_round_is_billed_separately(self):
+        ledger = RecordingLedger()
+        client = self.build_client(ledger, [build_tool_call("care_log", {}), build_response()])
+
+        await self.ask(client, lambda name, arguments: _answer("щось"))
+
+        self.assertEqual(len(ledger.recorded), 2)
+
+    async def test_a_tool_that_raises_is_reported_to_the_model_rather_than_losing_the_review(self):
+        ledger = RecordingLedger()
+        client = self.build_client(ledger, [build_tool_call("care_log", {}), build_response()])
+
+        async def run_tool(name, arguments):
+            raise RuntimeError("база впала")
+
+        await self.ask(client, run_tool)
+
+        last_turn = client.client.messages.conversations[-1][-1]
+        self.assertEqual(last_turn["content"][0]["content"], "Інструмент не відповів.")
+
+    async def test_a_model_that_never_stops_asking_is_cut_off(self):
+        ledger = RecordingLedger()
+        client = self.build_client(ledger, [build_tool_call("care_log", {}) for _ in range(6)])
+
+        answer = await client.complete_with_tools(
+            purpose="Photo review",
+            model="claude-opus-5-5",
+            tools=[{"name": "care_log"}],
+            run_tool=lambda name, arguments: _answer("ще"),
+            messages=[{"role": "user", "content": "дивись"}],
+            max_rounds=6,
+        )
+
+        self.assertIsNone(answer)
+
+
+async def _answer(text: str) -> str:
+    return text

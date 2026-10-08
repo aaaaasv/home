@@ -303,6 +303,8 @@ def build_photo_analyst(settings: Settings) -> PhotoAnalyst | None:
             client=client,
             model=settings.PLANT_PHOTO_REVIEW_MODEL,
             effort=settings.PLANT_PHOTO_REVIEW_EFFORT,
+            uow_factory=UnitOfWork,
+            household_calendar=HouseholdCalendar(timezone=settings.timezone),
         )
     if settings.GEMINI_API_KEY:
         return GeminiPhotoAnalyst(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)

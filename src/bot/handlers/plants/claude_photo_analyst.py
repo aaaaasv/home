@@ -1,12 +1,17 @@
 import json
 import logging
+from collections.abc import Callable
 
 from pydantic import ValidationError
 
 from src.bot.handlers.plants.photo_review_prompt import SYSTEM_PROMPT, describe_plant, format_day
+from src.bot.handlers.plants.review_tools import REVIEW_TOOLS, PlantReviewTools
 from src.common.constants import PlantPhotoReviewStatus
+from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.adapters.claude_client import ClaudeClient, text_of
+from src.infrastructure.adapters.claude_language_model import WEB_SEARCH_TOOL
 from src.infrastructure.adapters.image_encoding import read_image_base64
+from src.infrastructure.db.uow import UnitOfWork
 from src.modules.model_budget.services.usage_ledger import BudgetSpent
 from src.modules.plant_care.domain import PlantPhotoReview, PlantPhotoReviewContext
 
@@ -28,12 +33,27 @@ REVIEW_SCHEMA = {
 
 
 class ClaudePhotoAnalyst:
-    """The plant photo reviewer on anthropic — the same PhotoAnalyst contract as the gemini one."""
+    """
+    The plant photo reviewer on anthropic — the same PhotoAnalyst contract as the gemini one.
 
-    def __init__(self, client: ClaudeClient, model: str, effort: str):
+    it is handed two frames and the plant's record, and it may go looking for the rest: earlier photos, the
+    care log, the room's weather, the web. nothing it can reach says more than the herbarium sheet already
+    shows the family, and most reviews never ask for any of it.
+    """
+
+    def __init__(
+        self,
+        client: ClaudeClient,
+        model: str,
+        effort: str,
+        uow_factory: Callable[[], UnitOfWork] | None = None,
+        household_calendar: HouseholdCalendar | None = None,
+    ):
         self.client = client
         self.model = model
         self.effort = effort
+        self.uow_factory = uow_factory
+        self.household_calendar = household_calendar
 
     async def review_photo(self, context: PlantPhotoReviewContext) -> PlantPhotoReview | None:
         try:
@@ -43,15 +63,30 @@ class ClaudePhotoAnalyst:
             return None
 
         purpose = f"Photo review for '{context.plant_name}'"
+        request = {
+            "max_tokens": MAX_TOKENS,
+            "system": SYSTEM_PROMPT,
+            "output_config": {"effort": self.effort, "format": {"type": "json_schema", "schema": REVIEW_SCHEMA}},
+        }
         try:
-            response = await self.client.complete(
-                purpose=purpose,
-                model=self.model,
-                max_tokens=MAX_TOKENS,
-                system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": content}],
-                output_config={"effort": self.effort, "format": {"type": "json_schema", "schema": REVIEW_SCHEMA}},
-            )
+            if self.uow_factory is None or self.household_calendar is None or context.plant_id is None:
+                response = await self.client.complete(
+                    purpose=purpose, model=self.model, messages=[{"role": "user", "content": content}], **request
+                )
+            else:
+                tools = PlantReviewTools(
+                    plant_id=context.plant_id,
+                    uow_factory=self.uow_factory,
+                    household_calendar=self.household_calendar,
+                )
+                response = await self.client.complete_with_tools(
+                    purpose=purpose,
+                    model=self.model,
+                    tools=[*REVIEW_TOOLS, WEB_SEARCH_TOOL],
+                    run_tool=tools.run,
+                    messages=[{"role": "user", "content": content}],
+                    **request,
+                )
         except BudgetSpent:
             logger.warning("%s refused: the model budget is spent", purpose)
             return None

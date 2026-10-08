@@ -378,6 +378,8 @@ class ClimateInterval(DomainModel):
 class PlantPhotoReviewContext(DomainModel):
     """Everything the bot knows about a plant at the moment its photo was taken"""
 
+    # so a reviewer that can look things up knows which plant it is allowed to look up
+    plant_id: int | None = None
     plant_name: str
     species: str | None
     location: str | None
