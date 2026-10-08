@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.2] - 2026-10-08
+
 ### Змінено
 
 - **Типовий рівень обдумування — `medium`, а не `low`.** На домашніх обсягах гроші тут не компроміс: краща
