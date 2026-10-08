@@ -478,3 +478,26 @@ class PresenceEvent(Base):
     # what the arrival rule made of it: None for a departure, otherwise "raised" or why it refused
     outcome = Column(String(24), nullable=True)
     at = Column(UtcDateTime, nullable=False)
+
+
+class ModelUsage(Base):
+    """
+    Every paid model call, with what it cost.
+
+    it is on disk because the thing it guards against is a loop that restarts: an in-memory counter is reset
+    by the very crash it is supposed to notice. the cost is stored as it was charged rather than recomputed
+    from today's price list, so a price change cannot rewrite what a past month spent.
+    """
+
+    __tablename__ = "model_usage"
+    __table_args__ = (Index("ix_model_usage_at", "at"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # what the call was for, in the bot's own words: «Photo review», «Assistant answer» …
+    purpose = Column(String(64), nullable=False)
+    model = Column(String(64), nullable=False)
+    input_tokens = Column(Integer, nullable=False)
+    output_tokens = Column(Integer, nullable=False)
+    # millionths of a dollar: an integer, because money must not drift through floats
+    cost_micro_usd = Column(Integer, nullable=False)
+    at = Column(UtcDateTime, nullable=False)

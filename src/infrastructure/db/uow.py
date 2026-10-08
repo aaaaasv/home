@@ -13,6 +13,7 @@ from src.infrastructure.repositories.chore import ChoreRepository
 from src.infrastructure.repositories.conservation import ConservationRepository
 from src.infrastructure.repositories.family_member import FamilyMemberRepository
 from src.infrastructure.repositories.forum_topic import ForumTopicRepository
+from src.infrastructure.repositories.model_usage import ModelUsageRepository
 from src.infrastructure.repositories.newspaper_issue import NewspaperIssueRepository
 from src.infrastructure.repositories.place import PlaceRepository
 from src.infrastructure.repositories.plant import PlantRepository
@@ -59,6 +60,7 @@ class UnitOfWork:
         self.air_alert_state: AirAlertStateRepository | None = None
         self.air_alert_events: AirAlertEventRepository | None = None
         self.presence_events: PresenceEventRepository | None = None
+        self.model_usage: ModelUsageRepository | None = None
 
     async def __aenter__(self):
         self.session = self.session_factory()
@@ -87,6 +89,7 @@ class UnitOfWork:
         self.air_alert_state = AirAlertStateRepository(session=self.session)
         self.air_alert_events = AirAlertEventRepository(session=self.session)
         self.presence_events = PresenceEventRepository(session=self.session)
+        self.model_usage = ModelUsageRepository(session=self.session)
         return self
 
     async def __aexit__(self, exception_type, exception_value, exception_traceback):
