@@ -29,7 +29,7 @@ class StubClaudeClient:
 
 class ClaudeLanguageModelTestCase(unittest.IsolatedAsyncioTestCase):
     def build_model(self, client) -> ClaudeLanguageModel:
-        return ClaudeLanguageModel(client=client, model="claude-sonnet-5-5")
+        return ClaudeLanguageModel(client=client, model="claude-sonnet-5-5", effort="low")
 
     async def test_generate_returns_the_answer_text(self):
         answer = await self.build_model(StubClaudeClient(text="Схоже на перелив.")).generate(
@@ -45,6 +45,14 @@ class ClaudeLanguageModelTestCase(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.requests[0]["tools"], [WEB_SEARCH_TOOL])
         self.assertEqual(client.requests[0]["system"], "факти")
+
+    async def test_generate_asks_for_the_effort_it_was_configured_with(self):
+        """Somebody is watching the chat for this answer, so the wait is the cost."""
+        client = StubClaudeClient()
+
+        await self.build_model(client).generate([ConversationTurn(role=USER_ROLE, text="питання")], "факти")
+
+        self.assertEqual(client.requests[0]["output_config"], {"effort": "low"})
 
     async def test_generate_with_the_budget_spent_tells_the_family_in_the_words_it_already_has(self):
         """The topic has a message for a spent quota; an allowance is the same thing to whoever is waiting."""
