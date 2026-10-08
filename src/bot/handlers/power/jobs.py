@@ -243,23 +243,45 @@ class YasnoScheduleJob:
         if not await self.outage_schedule_board.refresh(outlook):
             await self.outage_schedule_board.post(outlook)
 
-        if today.status == OutageScheduleStatus.EMERGENCY_SHUTDOWNS:
-            await self._push_emergency(today)
+        await self._push_emergency(today)
         await self._ping_upcoming_outage(today)
 
     async def _push_emergency(self, today: OutageSchedule) -> None:
-        reference = today.day.isoformat()
-        if await self._already_posted(OUTAGE_EMERGENCY_KIND, reference):
+        """
+        One ping when the group goes onto emergency shutdowns, and nothing more until it comes back off.
+
+        it used to be keyed on the calendar day, so a spell that lasted past midnight announced itself again
+        at six minutes past — a notification, in the night, saying what had already been said that morning
+        and what the board was showing all along.
+        """
+        is_emergency = today.status is OutageScheduleStatus.EMERGENCY_SHUTDOWNS
+        announced = bool(await self._list_posted(OUTAGE_EMERGENCY_KIND))
+        if not is_emergency:
+            if announced:
+                # forgotten, not deleted: the announcement is a record of what happened and stays in the topic
+                await self._forget_posted(OUTAGE_EMERGENCY_KIND)
+                logger.info("Emergency shutdowns are over; the next spell will announce itself again")
             return
+        if announced:
+            return
+
         message = await self.bot.send_message(
             chat_id=self.chat_id,
             message_thread_id=await self.power_topic.resolve(),
             text=POWER_OUTAGE_EMERGENCY,
-            # an emergency shutdown can hit any moment — the one push a day that earns a ping here
+            # the regime changing is the one thing here worth waking somebody for, and it happens once
             disable_notification=False,
         )
-        await self.tracker.remember(OUTAGE_EMERGENCY_KIND, message, reference=reference)
-        logger.info("Announced emergency shutdowns for %s", reference)
+        await self.tracker.remember(OUTAGE_EMERGENCY_KIND, message, reference=today.day.isoformat())
+        logger.info("Announced emergency shutdowns starting %s", today.day.isoformat())
+
+    async def _list_posted(self, kind: str) -> list:
+        async with self.uow_factory() as uow:
+            return await uow.posted_messages.list_by_kind(kind)
+
+    async def _forget_posted(self, kind: str) -> None:
+        async with self.uow_factory() as uow:
+            await uow.posted_messages.delete_by_kind(kind)
 
     async def _ping_upcoming_outage(self, today: OutageSchedule) -> None:
         now = datetime.now(self.timezone)
