@@ -232,9 +232,10 @@ def build_plant_card_keyboard(
         )
     ]
     if card.photo_count:
+        # the count is of sittings, not frames, because that is what the album behind it holds
         photo_row.append(
             InlineKeyboardButton(
-                text=f"Фото ({card.photo_count})",
+                text=f"Історія ({card.history_photo_count})",
                 callback_data=PlantCallback(action=PlantAction.PHOTOS, plant_id=card.id).pack(),
             )
         )

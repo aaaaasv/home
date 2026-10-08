@@ -133,6 +133,9 @@ class PlantCard(DomainModel):
     recent_events: list[CareEventDetails]
     cover_photo: PlantPhotoDetails | None
     photo_count: int
+    # the general frames alone, which is what the card's album opens: one per session, so it counts sittings
+    # rather than frames and the number on the button matches what swiping through it shows
+    history_photo_count: int = 0
     # what the pot's own probe says, or the room's air when it has none — see services/plant_air.py
     air: PlantAir | None = None
 
@@ -163,6 +166,7 @@ class PlantCard(DomainModel):
             cover_photo=find_cover_photo([PlantPhotoDetails.from_photo(photo) for photo in photos]),
             air=air,
             photo_count=len(photos),
+            history_photo_count=sum(1 for photo in photos if photo.frame == PlantPhotoFrame.OVERVIEW.value),
         )
 
 
