@@ -43,14 +43,14 @@ from src.bot.handlers.power.messages import (
     POWER_RESERVE_TITLE_ON_GRID,
     POWER_RESERVE_TITLE_UNKNOWN,
     POWER_RESERVE_UNREACHABLE,
+    POWER_SCHEDULE_AS_OF,
+    POWER_SCHEDULE_AS_OF_EARLIER,
     POWER_SCHEDULE_DAY_DATE,
     POWER_SCHEDULE_DAY_TODAY,
     POWER_SCHEDULE_DAY_TOMORROW,
     POWER_SCHEDULE_EMERGENCY_NOTE,
     POWER_SCHEDULE_INTERVAL,
     POWER_SCHEDULE_INTERVAL_NOW,
-    POWER_SCHEDULE_PUBLISHED_EARLIER,
-    POWER_SCHEDULE_PUBLISHED_TODAY,
     POWER_SCHEDULE_TITLE,
 )
 from src.modules.power.domain import (
@@ -200,21 +200,21 @@ def render_outage_outlook(outlook: OutageOutlook, generated_at: datetime) -> str
         if section:
             lines.append("")
             lines.extend(section)
-    published = _render_published_at(outlook.today.updated_on, generated_at)
-    if published:
-        lines.extend(["", published])
+    as_of = _render_as_of(outlook.today.updated_on, generated_at)
+    if as_of:
+        lines.extend(["", as_of])
     return "\n".join(lines)
 
 
-def _render_published_at(updated_on: datetime | None, generated_at: datetime) -> str:
-    """When yasno last changed this, which is the only freshness anybody can act on."""
+def _render_as_of(updated_on: datetime | None, generated_at: datetime) -> str:
+    """The moment these hours are from — the only freshness anybody can act on."""
     if updated_on is None:
         return ""
     local = updated_on.astimezone(generated_at.tzinfo)
     if local.date() == generated_at.date():
-        return POWER_SCHEDULE_PUBLISHED_TODAY.format(time=f"{local:%H:%M}")
+        return POWER_SCHEDULE_AS_OF.format(time=f"{local:%H:%M}")
     day = f"{local.day} {GENITIVE_MONTH_NAMES[local.month - 1]}"
-    return POWER_SCHEDULE_PUBLISHED_EARLIER.format(day=day, time=f"{local:%H:%M}")
+    return POWER_SCHEDULE_AS_OF_EARLIER.format(day=day, time=f"{local:%H:%M}")
 
 
 def _render_day_section(schedule: OutageSchedule, generated_at: datetime) -> list[str]:
