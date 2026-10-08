@@ -28,9 +28,10 @@ class ClaudeLanguageModel:
     adapter worked in, which is why swapping providers is this class and nothing else.
     """
 
-    def __init__(self, client: ClaudeClient, model: str, temperature: float = 0.2):
+    def __init__(self, client: ClaudeClient, model: str, effort: str, temperature: float = 0.2):
         self.client = client
         self.model = model
+        self.effort = effort
         self.temperature = temperature
 
     async def generate(self, conversation: Sequence[ConversationTurn], system_instruction: str) -> str | None:
@@ -43,6 +44,7 @@ class ClaudeLanguageModel:
                 system=system_instruction,
                 messages=[build_turn(turn) for turn in conversation],
                 tools=[WEB_SEARCH_TOOL],
+                output_config={"effort": self.effort},
             )
         except BudgetSpent as refusal:
             # the family is told about an allowance in the words it already has for a spent quota

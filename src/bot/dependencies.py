@@ -299,7 +299,11 @@ def build_photo_analyst(settings: Settings) -> PhotoAnalyst | None:
         return None
     client = build_claude_client(settings)
     if client is not None:
-        return ClaudePhotoAnalyst(client=client, model=settings.PLANT_PHOTO_REVIEW_MODEL)
+        return ClaudePhotoAnalyst(
+            client=client,
+            model=settings.PLANT_PHOTO_REVIEW_MODEL,
+            effort=settings.PLANT_PHOTO_REVIEW_EFFORT,
+        )
     if settings.GEMINI_API_KEY:
         return GeminiPhotoAnalyst(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
     return None
@@ -315,7 +319,7 @@ def build_newspaper_word_sources(settings: Settings) -> tuple[WordSource, ...]:
     """Fresh words first when there is a key to ask for them, and the checked bank behind them either way."""
     client = build_claude_client(settings)
     if client is not None:
-        return ClaudeWordSource(client=client, model=settings.CLAUDE_MODEL), WordBank()
+        return ClaudeWordSource(client=client, model=settings.CLAUDE_MODEL, effort=settings.CLAUDE_EFFORT), WordBank()
     if settings.GEMINI_API_KEY:
         return GeminiWordSource(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL), WordBank()
     return (WordBank(),)
@@ -328,7 +332,7 @@ def build_plant_identifier(settings: Settings) -> PlantIdentifier | None:
         return None
     client = build_claude_client(settings)
     if client is not None:
-        return ClaudePlantIdentifier(client=client, model=settings.CLAUDE_MODEL)
+        return ClaudePlantIdentifier(client=client, model=settings.CLAUDE_MODEL, effort=settings.CLAUDE_EFFORT)
     if settings.GEMINI_API_KEY:
         return GeminiPlantIdentifier(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
     return None
@@ -403,7 +407,7 @@ def build_language_model(settings: Settings) -> LanguageModel | None:
 
     client = build_claude_client(settings)
     if client is not None:
-        return ClaudeLanguageModel(client=client, model=settings.CLAUDE_MODEL)
+        return ClaudeLanguageModel(client=client, model=settings.CLAUDE_MODEL, effort=settings.CLAUDE_EFFORT)
     if settings.GEMINI_API_KEY:
         return GeminiLanguageModel(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
     return None
