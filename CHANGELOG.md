@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-08
+
 ### Змінено
 
 - **Кнопка фото на картці рослини стала історією зростання.** Було «Фото (7)» і альбом із десяти останніх
