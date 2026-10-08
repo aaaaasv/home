@@ -34,9 +34,10 @@ class ClaudePlantIdentifier:
     keeping their ukrainian prompts next to the labels the family reads.
     """
 
-    def __init__(self, client: ClaudeClient, model: str):
+    def __init__(self, client: ClaudeClient, model: str, effort: str):
         self.client = client
         self.model = model
+        self.effort = effort
 
     async def identify(self, photo: bytes) -> PlantIdentification | None:
         content = [
@@ -57,7 +58,10 @@ class ClaudePlantIdentifier:
                 max_tokens=MAX_TOKENS,
                 temperature=TEMPERATURE,
                 messages=[{"role": "user", "content": content}],
-                output_config={"format": {"type": "json_schema", "schema": IDENTIFICATION_SCHEMA}},
+                output_config={
+                    "effort": self.effort,
+                    "format": {"type": "json_schema", "schema": IDENTIFICATION_SCHEMA},
+                },
             )
         except BudgetSpent:
             logger.warning("Plant identification refused: the model budget is spent")

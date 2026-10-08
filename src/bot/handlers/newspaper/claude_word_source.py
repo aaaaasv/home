@@ -41,9 +41,10 @@ class ClaudeWordSource:
     is asked for them.
     """
 
-    def __init__(self, client: ClaudeClient, model: str):
+    def __init__(self, client: ClaudeClient, model: str, effort: str):
         self.client = client
         self.model = model
+        self.effort = effort
 
     async def fetch_clues(self, excluded_answers: set[str]) -> list[CrosswordClue]:
         excluded = ", ".join(sorted(excluded_answers)[:EXCLUDED_WORDS_IN_PROMPT]) or "—"
@@ -54,7 +55,7 @@ class ClaudeWordSource:
                 max_tokens=MAX_TOKENS,
                 temperature=TEMPERATURE,
                 messages=[{"role": "user", "content": PROMPT.format(count=REQUESTED_WORDS, excluded=excluded)}],
-                output_config={"format": {"type": "json_schema", "schema": CLUES_SCHEMA}},
+                output_config={"effort": self.effort, "format": {"type": "json_schema", "schema": CLUES_SCHEMA}},
             )
         except BudgetSpent:
             logger.warning("Crossword words refused: the model budget is spent, the bank covers this week")

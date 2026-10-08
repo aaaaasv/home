@@ -350,7 +350,13 @@ class Settings(BaseSettings):
     CLAUDE_API_SECRET_KEY: str = ""
     # the assistant and anything else that only needs words; the photo review buys the dearer model below
     CLAUDE_MODEL: str = "claude-sonnet-5-5"
+    # how hard the model thinks before answering: low | medium | high | xhigh | max. low for anything a person
+    # is sitting and waiting for — the assistant, naming a plant from a photo — because the wait is the cost
+    CLAUDE_EFFORT: str = "low"
     PLANT_PHOTO_REVIEW_MODEL: str = "claude-opus-5-5"
+    # the review is the one answer the family acts on, it happens twice a day, and comparing two photos taken
+    # weeks apart is the one job here that is actually reasoning. it gets the dear model and real effort
+    PLANT_PHOTO_REVIEW_EFFORT: str = "high"
     # ceilings on what the paid models may cost, in dollars. the day is the one that matters: a job that wakes
     # every minute and asks the same question forever is how the credit would actually be lost, and the free
     # tier used to stop that by accident. the month is the rolling thirty days, not a calendar one

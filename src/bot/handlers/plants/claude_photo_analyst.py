@@ -30,9 +30,10 @@ REVIEW_SCHEMA = {
 class ClaudePhotoAnalyst:
     """The plant photo reviewer on anthropic — the same PhotoAnalyst contract as the gemini one."""
 
-    def __init__(self, client: ClaudeClient, model: str):
+    def __init__(self, client: ClaudeClient, model: str, effort: str):
         self.client = client
         self.model = model
+        self.effort = effort
 
     async def review_photo(self, context: PlantPhotoReviewContext) -> PlantPhotoReview | None:
         try:
@@ -49,7 +50,7 @@ class ClaudePhotoAnalyst:
                 max_tokens=MAX_TOKENS,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": content}],
-                output_config={"format": {"type": "json_schema", "schema": REVIEW_SCHEMA}},
+                output_config={"effort": self.effort, "format": {"type": "json_schema", "schema": REVIEW_SCHEMA}},
             )
         except BudgetSpent:
             logger.warning("%s refused: the model budget is spent", purpose)
