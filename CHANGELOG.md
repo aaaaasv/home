@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-08
+
 ### Виправлено
 
 - **Порада в огляді фото більше не відсилає «за графіком».** Два з трьох оглядів 7 жовтня казали «внесіть
