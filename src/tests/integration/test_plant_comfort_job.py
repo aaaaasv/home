@@ -73,7 +73,7 @@ class PlantComfortJobTestCase(BaseIntegrationTestCase):
         self.assertEqual(self.bot.edited, [])
         self.assertEqual(self.bot.deleted, [])
         self.assertEqual(len(self.bot.sent), 1)
-        self.assertEqual(self.bot.sent[0]["text"], "💧 <b>Кактус</b> — сухо: 32%, треба 50–70%")
+        self.assertEqual(self.bot.sent[0]["text"], "💧 <b>Кактус</b> — сухе повітря")
         self.assertEqual(self.bot.sent[0]["silent"], False)
         self.assertEqual(self.bot.sent[0]["message_thread_id"], THREAD_ID)
         cards = await self.list_discomfort_cards()
@@ -122,7 +122,7 @@ class PlantComfortJobTestCase(BaseIntegrationTestCase):
         self.assertEqual(self.bot.edited[0]["message_id"], 500)
         self.assertEqual(
             self.bot.edited[0]["text"],
-            "🔥 <b>Кактус</b> — жарко: 30°, треба 18–27°\n💧 <b>Кактус</b> — сухо: 30%, треба 50–70%",
+            "🔥 <b>Кактус</b> — жарко\n💧 <b>Кактус</b> — сухе повітря",
         )
         cards = await self.list_discomfort_cards()
         self.assertEqual(len(cards), 1)
@@ -141,7 +141,7 @@ class PlantComfortJobTestCase(BaseIntegrationTestCase):
 
         self.assertEqual(self.bot.edited, [])
         self.assertEqual(len(self.bot.sent), 1)
-        self.assertEqual(self.bot.sent[0]["text"], "💧 <b>Кактус</b> — сухо: 40%, треба 45–90%")
+        self.assertEqual(self.bot.sent[0]["text"], "💧 <b>Кактус</b> — сухе повітря")
         self.assertEqual(self.bot.sent[0]["silent"], True)
         self.assertEqual(self.bot.sent[0]["message_thread_id"], THREAD_ID)
         cards = await self.list_discomfort_cards()

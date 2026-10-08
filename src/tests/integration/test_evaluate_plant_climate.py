@@ -178,7 +178,8 @@ class EvaluatePlantClimateTestCase(BaseIntegrationTestCase):
         self.assertEqual(changes[0].problems, [])
         self.assertEqual(len(await self.retrieve_plant_climate_alerts()), 2)
 
-    async def test_evaluate_plant_climate_recovering_just_inside_the_floor_holds_the_alert(self):
+    async def test_evaluate_plant_climate_recovering_just_inside_the_floor_reports_the_plant_comfortable(self):
+        """The card must never outlive the problem: back inside the range is comfortable, margin or no margin."""
         await self.seed_plant_wanting_humidity()
         await self.seed_window(temperature=22.0, humidity=32.0)
         await self.build_use_case()()
@@ -187,7 +188,42 @@ class EvaluatePlantClimateTestCase(BaseIntegrationTestCase):
 
         changes = await self.build_use_case()()
 
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(changes[0].transition, ClimateComfortTransition.BECAME_COMFORTABLE)
+        self.assertEqual(changes[0].problems, [])
+        self.assertEqual(len(await self.retrieve_plant_climate_alerts()), 2)
+
+    async def test_evaluate_plant_climate_still_under_the_floor_after_an_alert_holds_it(self):
+        """48% is under the 50% floor, so the card stands — the margin only governs raising it."""
+        await self.seed_plant_wanting_humidity()
+        await self.seed_window(temperature=22.0, humidity=32.0)
+        await self.build_use_case()()
+        await self.clear_sensor_readings()
+        await self.seed_window(temperature=22.0, humidity=48.0)
+
+        changes = await self.build_use_case()()
+
         self.assertEqual(changes, [])
+        self.assertEqual(len(await self.retrieve_plant_climate_alerts()), 1)
+
+    async def test_evaluate_plant_climate_dipping_less_than_the_margin_under_the_floor_says_nothing(self):
+        """The slack that stops the verdict flapping sits under the floor, where no card is standing yet."""
+        await self.seed_plant_wanting_humidity()
+        await self.seed_window(temperature=22.0, humidity=48.0)
+
+        changes = await self.build_use_case()()
+
+        self.assertEqual(changes, [])
+        self.assertEqual(await self.retrieve_plant_climate_alerts(), [])
+
+    async def test_evaluate_plant_climate_dropping_clear_of_the_floor_reports_the_plant_uncomfortable(self):
+        await self.seed_plant_wanting_humidity()
+        await self.seed_window(temperature=22.0, humidity=46.0)
+
+        changes = await self.build_use_case()()
+
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(changes[0].transition, ClimateComfortTransition.BECAME_UNCOMFORTABLE)
         self.assertEqual(len(await self.retrieve_plant_climate_alerts()), 1)
 
     async def test_evaluate_plant_climate_ignores_a_single_shower_spike(self):

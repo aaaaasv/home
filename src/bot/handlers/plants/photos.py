@@ -1,7 +1,10 @@
 import asyncio
+import time
 from collections.abc import Callable
+from typing import NamedTuple
 
 from aiogram import F, Router
+from aiogram.filters import Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message
@@ -29,6 +32,8 @@ router = Router(name="photos")
 TIMELINE_PHOTO_LIMIT = 10
 # an album's frames land milliseconds apart; this is how long the session waits for another one
 ALBUM_SETTLE_SECONDS = 2.0
+# how long a finished album still takes in a frame that only now arrived
+STRAGGLER_GRACE_SECONDS = 180.0
 
 
 class PhotoSession:
@@ -46,10 +51,22 @@ class PhotoSession:
         self.closing: asyncio.Task | None = None
         # the message id and saved photo id of the frame currently marked as the overview
         self.overview: tuple[int, int] | None = None
+        # the albums this session has taken frames from, so a straggler can be recognised after it closes
+        self.media_group_ids: set[str] = set()
+
+
+class ClosedAlbum(NamedTuple):
+    plant_id: int
+    closed_at: float
 
 
 # one open photo session per person per chat, kept here because neither a lock nor a task can live in fsm data
 _open_sessions: dict[tuple[int, int], PhotoSession] = {}
+# albums whose session has already closed. there is no "album finished" update, so the session closes after a
+# couple of quiet seconds — and a frame delayed past that (a slow upload, or the bot held up by sqlite's write
+# lock) used to be refused as a stray photo and lost without a trace. it is still the same album, so it is
+# still the same plant
+_closed_albums: dict[tuple[int, int, str], ClosedAlbum] = {}
 
 
 class AddPhotoStates(StatesGroup):
@@ -122,6 +139,8 @@ async def add_photo(
             )
             if is_earliest_frame:
                 session.overview = (message.message_id, saved.id)
+            if message.media_group_id:
+                session.media_group_ids.add(message.media_group_id)
             await state.update_data(frames_saved=frames_saved + 1)
     finally:
         session.frames_arriving -= 1
@@ -155,6 +174,7 @@ def _close_when_quiet(
         # read after the wait, so the count and the transient messages are whatever the whole album left behind
         session_data = await state.get_data()
         _open_sessions.pop(key, None)
+        _remember_closed_albums(key, session, session_data["plant_id"])
         await state.clear()
         saved = session_data.get("frames_saved", 1)
         # the photo settles the plant's photo task, so its reminder card loses the line or goes altogether
@@ -164,6 +184,30 @@ def _close_when_quiet(
         await _review_photo(message, session_data["plant_id"], uow_factory, household_calendar, photo_analyst)
 
     session.closing = asyncio.create_task(close_when_quiet())
+
+
+def _remember_closed_albums(key: tuple[int, int], session: PhotoSession, plant_id: int) -> None:
+    closed_at = time.monotonic()
+    for media_group_id in session.media_group_ids:
+        _closed_albums[(*key, media_group_id)] = ClosedAlbum(plant_id=plant_id, closed_at=closed_at)
+    _forget_stale_albums(closed_at)
+
+
+def _forget_stale_albums(now: float) -> None:
+    for stale in [key for key, album in _closed_albums.items() if now - album.closed_at > STRAGGLER_GRACE_SECONDS]:
+        del _closed_albums[stale]
+
+
+class BelongsToAFinishedAlbum(Filter):
+    """Passes a photo whose album this person finished uploading moments ago, and hands the handler its plant."""
+
+    async def __call__(self, message: Message) -> dict[str, int] | bool:
+        if not message.media_group_id or message.from_user is None:
+            return False
+        album = _closed_albums.get((message.chat.id, message.from_user.id, message.media_group_id))
+        if album is None or time.monotonic() - album.closed_at > STRAGGLER_GRACE_SECONDS:
+            return False
+        return {"album_plant_id": album.plant_id}
 
 
 async def _review_photo(
@@ -194,8 +238,44 @@ async def reject_non_photo(message: Message) -> None:
     await message.answer(messages.ADD_PLANT_EXPECTS_PHOTO)
 
 
+# before the stray-photo handler, and outside the flow's state on purpose: this frame arrives after the session
+# that owned its album has already closed and cleared the state
+@router.message(F.photo, BelongsToAFinishedAlbum())
+async def add_a_straggling_album_frame(
+    message: Message,
+    album_plant_id: int,
+    actor: Actor,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_storage: PhotoStorage,
+) -> None:
+    """
+    Takes in a frame that lost its album, rather than refusing it as a stray photo.
+
+    it is always a later frame than the one the overview was chosen from — an album arrives in order — so it
+    joins the collection as evidence and the general frame already picked stands.
+    """
+    largest_photo = message.photo[-1]
+    use_case = AddPlantPhotoUseCase(
+        uow=uow_factory(), actor=actor, photo_storage=photo_storage, household_calendar=household_calendar
+    )
+    await use_case(
+        AddPlantPhotoCommand(
+            plant_id=album_plant_id,
+            photo=TelegramPhoto(
+                file_id=largest_photo.file_id,
+                file_unique_id=largest_photo.file_unique_id,
+                caption=message.caption,
+            ),
+            taken_at=household_calendar.now(),
+            frame=PlantPhotoFrame.DETAIL,
+        )
+    )
+    await message.answer(messages.PHOTO_ADDED_LATE)
+
+
 # last of the photo handlers, so it only sees what no upload flow claimed: a photo dropped into the topic by
-# itself, or the tail of an album whose first frame already finished its flow. either way it must not vanish
+# itself. it must not vanish
 @router.message(F.photo)
 async def explain_a_stray_photo(message: Message) -> None:
     """A photo nobody asked for used to disappear without a word, which reads exactly like the bot losing it."""

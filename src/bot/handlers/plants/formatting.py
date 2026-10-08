@@ -1,5 +1,4 @@
 """How plants, their care cards and their comfort cards render."""
-import math
 from datetime import datetime
 from html import escape
 
@@ -22,7 +21,7 @@ from src.bot.handlers.plants.messages import (
     SCHEDULE_REMOVE_CONFIRM,
     SCHEDULE_REMOVE_CONFIRM_INSTRUCTIONS,
 )
-from src.common.constants import CareTaskType, ClimateStatus
+from src.common.constants import CareTaskType
 from src.common.household_calendar import HouseholdCalendar
 from src.modules.plant_care.domain import (
     CareHistoryEntry,
@@ -99,17 +98,7 @@ def render_plant_comfort_restored(plant_name: str) -> str:
 
 
 def _render_climate_problem(problem: ClimateProblem, plant_name: str) -> str:
-    # round toward the deviation (down when too low, up when too high) so the number never lands inside the range
-    if problem.status == ClimateStatus.TOO_LOW:
-        value = math.floor(problem.value)
-    else:
-        value = math.ceil(problem.value)
-    return CLIMATE_PROBLEM_LINES[(problem.dimension, problem.status)].format(
-        plant=escape(plant_name),
-        value=value,
-        low=_trim_number(problem.ideal_min),
-        high=_trim_number(problem.ideal_max),
-    )
+    return CLIMATE_PROBLEM_LINES[(problem.dimension, problem.status)].format(plant=escape(plant_name))
 
 
 def _trim_number(number: float) -> str:
