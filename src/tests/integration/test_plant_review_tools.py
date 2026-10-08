@@ -100,3 +100,75 @@ class PlantReviewToolsTestCase(BaseIntegrationTestCase):
 
     async def test_a_tool_nobody_defined_is_refused_rather_than_crashing(self):
         self.assertEqual(await self.tools.run("delete_everything", {}), "Такого інструмента немає.")
+
+
+class PastReviewsToolTestCase(BaseIntegrationTestCase):
+    """
+    The reviewer may read what it said before — but only the worries, never the «all is well».
+
+    a model handed its own past verdicts anchors on them, and an «ok» from August confirms itself for free.
+    only a claim that something was wrong is worth checking against what the plant actually did next.
+    """
+
+    def uow_factory(self) -> UnitOfWork:
+        return UnitOfWork(session_factory=self.session_factory)
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.plant_id = await self.seed_plant(name="Марті", room="кухня-вітальня")
+        self.photo_id = await self.seed_plant_photo(plant_id=self.plant_id, local_path="/photos/one.jpg")
+        self.tools = PlantReviewTools(
+            plant_id=self.plant_id, uow_factory=self.uow_factory, household_calendar=self.household_calendar
+        )
+
+    async def seed_review(self, status: str, summary: str, action: str | None = None, days_ago: int = 0) -> None:
+        async with self.uow_factory() as uow:
+            await uow.plant_photo_reviews.create(
+                {
+                    "plant_id": self.plant_id,
+                    "photo_id": self.photo_id,
+                    "compared_to_photo_id": None,
+                    "status": status,
+                    "summary": summary,
+                    "change": None,
+                    "action": action,
+                    "at": FROZEN_NOW - timedelta(days=days_ago),
+                }
+            )
+
+    async def test_past_reviews_hands_over_the_worries_oldest_first(self):
+        await self.seed_review("watch", "Сухий край на нижньому листку.", days_ago=60)
+        await self.seed_review("problem", "Плями поширились.", action="Промацай ґрунт на 3 см.", days_ago=10)
+
+        reported = await self.tools.run("past_reviews", {})
+
+        self.assertEqual(
+            reported,
+            f"13 травня 2026 · про знімок id={self.photo_id} · watch · Сухий край на нижньому листку.\n"
+            f"2 липня 2026 · про знімок id={self.photo_id} · problem · Плями поширились. · "
+            "радили: Промацай ґрунт на 3 см.",
+        )
+
+    async def test_past_reviews_leaves_out_the_ones_that_said_all_is_well(self):
+        await self.seed_review("ok", "Все добре.", days_ago=5)
+
+        self.assertEqual(
+            await self.tools.run("past_reviews", {}),
+            "Попередніх оглядів, які заявляли б проблему, немає.",
+        )
+
+    async def test_past_reviews_for_a_plant_never_reviewed_says_so(self):
+        self.assertEqual(
+            await self.tools.run("past_reviews", {}),
+            "Попередніх оглядів, які заявляли б проблему, немає.",
+        )
+
+    async def test_past_reviews_keeps_only_the_newest_few(self):
+        for day in range(8):
+            await self.seed_review("watch", f"Турбота {day}.", days_ago=day)
+
+        reported = await self.tools.run("past_reviews", {})
+
+        self.assertEqual(len(reported.splitlines()), 5)
+        self.assertIn("Турбота 0.", reported)
+        self.assertNotIn("Турбота 5.", reported)

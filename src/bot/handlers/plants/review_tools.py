@@ -24,6 +24,8 @@ from src.infrastructure.db.uow import UnitOfWork
 logger = logging.getLogger(__name__)
 
 CARE_EVENTS_LIMIT = 40
+# far enough back to see whether a worry came true, short enough that the reviewer is not reading a diary
+PAST_REVIEWS_LIMIT = 5
 # a day either side of the pair is not worth a round trip; months are
 CLIMATE_DAYS_LIMIT = 120
 
@@ -56,6 +58,16 @@ REVIEW_TOOLS: list[dict[str, Any]] = [
             "Що насправді робили з цією рослиною і коли: полив, підживлення, промивання, пересадка, "
             "обрізка — з датою, хто робив і нотаткою, якщо лишили. Розклад каже, як мало б бути; цей журнал "
             "каже, як було. Беріть його, коли підозрюєте, що проміжки між доглядом нерівні."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "past_reviews",
+        "description": (
+            "Що попередні огляди казали про цю рослину — лише ті, що тоді заявляли проблему, від старішого "
+            "до новішого, з датою й знімком, якого стосувались. Це записані **думки**, а не факти: тоді так "
+            "здалося, і могло бути помилкою. Беріть, щоб перевірити, чи справдилось — «сухий край, про який "
+            "казали в серпні, за два місяці не поширився» варте більше за новий здогад."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -95,6 +107,8 @@ class PlantReviewTools:
             return await self.view_photo(int(arguments["photo_id"]))
         if name == "care_log":
             return await self.care_log()
+        if name == "past_reviews":
+            return await self.past_reviews()
         if name == "room_climate":
             return await self.room_climate(int(arguments["days"]))
         logger.warning("The review asked for a tool that does not exist: %s", name)
@@ -141,6 +155,13 @@ class PlantReviewTools:
             for event in events
         )
 
+    async def past_reviews(self) -> str:
+        async with self.uow_factory() as uow:
+            reviews = await uow.plant_photo_reviews.list_worth_remembering(self.plant_id, PAST_REVIEWS_LIMIT)
+        if not reviews:
+            return "Попередніх оглядів, які заявляли б проблему, немає."
+        return "\n".join(_render_past_review(review, self.household_calendar) for review in reviews)
+
     async def room_climate(self, days: int) -> str:
         async with self.uow_factory() as uow:
             plant = await uow.plants.retrieve_active(self.plant_id)
@@ -172,3 +193,11 @@ def _span(low: float | None, high: float | None, unit: str) -> str:
 
 def _format_day(day: date | datetime) -> str:
     return f"{day.day} {GENITIVE_MONTH_NAMES[day.month - 1]} {day.year}"
+
+
+def _render_past_review(review, calendar: HouseholdCalendar) -> str:
+    when = _format_day(calendar.local_date(review.at))
+    parts = [f"{when} · про знімок id={review.photo_id} · {review.status} · {review.summary}"]
+    if review.action:
+        parts.append(f"радили: {review.action}")
+    return " · ".join(parts)

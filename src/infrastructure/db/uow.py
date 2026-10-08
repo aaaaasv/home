@@ -21,6 +21,7 @@ from src.infrastructure.repositories.place import PlaceRepository
 from src.infrastructure.repositories.plant import PlantRepository
 from src.infrastructure.repositories.plant_climate_alert import PlantClimateAlertRepository
 from src.infrastructure.repositories.plant_photo import PlantPhotoRepository
+from src.infrastructure.repositories.plant_photo_review import PlantPhotoReviewRepository
 from src.infrastructure.repositories.posted_message import PostedMessageRepository
 from src.infrastructure.repositories.presence_event import PresenceEventRepository
 from src.infrastructure.repositories.price_check import PriceCheckRepository
@@ -65,6 +66,7 @@ class UnitOfWork:
         self.model_usage: ModelUsageRepository | None = None
         self.grid_events: GridEventRepository | None = None
         self.outdoor_weather_days: OutdoorWeatherDayRepository | None = None
+        self.plant_photo_reviews: PlantPhotoReviewRepository | None = None
 
     async def __aenter__(self):
         self.session = self.session_factory()
@@ -96,6 +98,7 @@ class UnitOfWork:
         self.model_usage = ModelUsageRepository(session=self.session)
         self.grid_events = GridEventRepository(session=self.session)
         self.outdoor_weather_days = OutdoorWeatherDayRepository(session=self.session)
+        self.plant_photo_reviews = PlantPhotoReviewRepository(session=self.session)
         return self
 
     async def __aexit__(self, exception_type, exception_value, exception_traceback):

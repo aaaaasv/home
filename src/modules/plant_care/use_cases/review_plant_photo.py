@@ -52,7 +52,30 @@ class ReviewPlantPhotoUseCase(BaseUseCase):
         if context is None:
             return None
 
-        return await self.photo_analyst.review_photo(context)
+        review = await self.photo_analyst.review_photo(context)
+        if review is not None:
+            await self._remember(plant_id, current, previous, review)
+        return review
+
+    async def _remember(self, plant_id: int, current, previous, review: PlantPhotoReview) -> None:
+        """
+        Kept so the next review can refer to this one, and so the reviewer can be checked against what
+        actually happened. the photo is the anchor rather than the plant, so a verdict can never end up
+        attached to the wrong sitting.
+        """
+        async with self.uow as uow:
+            await uow.plant_photo_reviews.create(
+                {
+                    "plant_id": plant_id,
+                    "photo_id": current.id,
+                    "compared_to_photo_id": previous.id if previous else None,
+                    "status": review.status.value,
+                    "summary": review.summary,
+                    "change": review.change,
+                    "action": review.action,
+                    "at": self.household_calendar.now(),
+                }
+            )
 
     def _build_context(
         self,
