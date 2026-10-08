@@ -3,8 +3,15 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
-from src.bot.handlers.plants.gemini_photo_analyst import RESPONSE_FORMAT_INSTRUCTION, build_review_parts, parse_review
+from src.bot.handlers.plants import gemini_photo_analyst
+from src.bot.handlers.plants.gemini_photo_analyst import (
+    RESPONSE_FORMAT_INSTRUCTION,
+    GeminiPhotoAnalyst,
+    build_review_parts,
+    parse_review,
+)
 from src.bot.handlers.plants.photo_review_prompt import SYSTEM_PROMPT
 from src.common.constants import CareTaskType, PlantPhotoReviewStatus
 from src.modules.plant_care.domain import PhotoReviewSchedule, PlantPhotoReviewContext
@@ -97,3 +104,37 @@ class BuildReviewPartsTestCase(unittest.TestCase):
         self.assertEqual(parts[2], {"inline_data": {"mime_type": "image/jpeg", "data": "AA=="}})
         self.assertEqual(parts[3]["text"], "Нове фото — 28 серпня 2026, через 5 дн.:")
         self.assertEqual(parts[4], {"inline_data": {"mime_type": "image/jpeg", "data": "AQ=="}})
+
+
+class ReviewRequestShapeTestCase(unittest.IsolatedAsyncioTestCase):
+    """What the analyst actually asks google for, which no test looked at before."""
+
+    async def ask(self) -> dict:
+        sent = {}
+
+        async def record(**arguments):
+            sent.update(arguments)
+            return None
+
+        with tempfile.TemporaryDirectory() as directory:
+            current_photo_path = Path(directory) / "current.jpg"
+            current_photo_path.write_bytes(b"\x00")
+            with patch.object(gemini_photo_analyst, "generate_content", record):
+                await GeminiPhotoAnalyst(api_key="test-key", model="gemini-test").review_photo(
+                    make_context(str(current_photo_path))
+                )
+        return sent
+
+    async def test_review_photo_asks_for_json_and_for_no_thinking_at_all(self):
+        """942 thinking tokens against 77 of answer, and a heavier request is the one a busy free tier refuses."""
+        sent = await self.ask()
+
+        self.assertEqual(
+            sent["body"]["generationConfig"],
+            {"temperature": 0.2, "responseMimeType": "application/json", "thinkingConfig": {"thinkingBudget": 0}},
+        )
+
+    async def test_review_photo_waits_minutes_rather_than_seconds_between_attempts(self):
+        sent = await self.ask()
+
+        self.assertEqual(sent["retry_delays_seconds"], (60.0, 240.0))

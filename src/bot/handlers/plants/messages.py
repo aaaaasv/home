@@ -114,6 +114,10 @@ PHOTOS_ADDED = "📸 Додано {count} кадри. Перший — для п
 PHOTO_ADDED_LATE = "📸 Ще один кадр того ж альбому додано до зібрання."
 
 PHOTO_REVIEW_IN_PROGRESS = "🔎 Дивлюсь, що змінилось…"
+# the look did not happen. deleting this message instead left «фото додано» and then nothing, which reads as
+# the bot having ignored the photo — and three photos in a row read that way on 7 october
+PHOTO_REVIEW_FAILED = "🔎 Зараз не вдалось подивитись на це фото."
+PHOTO_REVIEW_RETRY_BUTTON = "Спробувати ще"
 # a typed question carries no image of its own, so the attached frames are named in the order they are sent
 PLANT_QUESTION_PHOTO_NOTE = "До питання додано фото з колекції, у цьому порядку:"
 PLANT_QUESTION_PHOTO_LINE = "— {plant}, {day}"

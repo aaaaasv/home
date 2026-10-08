@@ -16,9 +16,12 @@ logger = logging.getLogger(__name__)
 
 GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 TOO_MANY_REQUESTS = 429
+BAD_REQUEST = 400
 OVERLOADED_STATUSES = frozenset({500, 502, 503, 504})
 # the waits grow so the last attempt lands well clear of the spike that refused the first
 DEFAULT_RETRY_DELAYS_SECONDS = (5, 20)
+# enough of google's answer to name the trouble, short enough not to fill the journal with one refusal
+LOGGED_BODY_LIMIT = 300
 
 
 class GeminiQuotaRefused(Exception):
@@ -27,6 +30,20 @@ class GeminiQuotaRefused(Exception):
     def __init__(self, body: str):
         super().__init__("Gemini quota refused")
         self.body = body
+
+
+class GeminiRefused(Exception):
+    """Any other refusal, carrying what google actually said rather than only the number it said it with."""
+
+    def __init__(self, status: int, body: str):
+        super().__init__(f"Gemini refused with HTTP {status}")
+        self.status = status
+        self.body = body
+
+
+def _shorten(body: str) -> str:
+    collapsed = " ".join(body.split())
+    return collapsed if len(collapsed) <= LOGGED_BODY_LIMIT else f"{collapsed[:LOGGED_BODY_LIMIT]}…"
 
 
 async def generate_content(
@@ -48,14 +65,17 @@ async def generate_content(
                 async with session.post(url, headers=headers, json=body) as response:
                     if response.status == TOO_MANY_REQUESTS:
                         raise GeminiQuotaRefused(await response.text())
-                    response.raise_for_status()
+                    if response.status >= BAD_REQUEST:
+                        raise GeminiRefused(response.status, _shorten(await response.text()))
                     return await response.json()
-        except aiohttp.ClientResponseError as error:
+        except GeminiRefused as refusal:
             # never the error object in a log line: its repr carries the request headers, the api key among them
-            if error.status not in OVERLOADED_STATUSES:
-                logger.warning("%s failed: HTTP %s", purpose, error.status)
+            if refusal.status not in OVERLOADED_STATUSES:
+                logger.warning("%s failed: HTTP %s — %s", purpose, refusal.status, refusal.body)
                 return None
-            failure = f"HTTP {error.status}"
+            # the body is what names the actual trouble; the status alone sent me measuring the key, the model
+            # and the network for an hour over a plain "the model is overloaded"
+            failure = f"HTTP {refusal.status} — {refusal.body}"
         except (aiohttp.ClientError, asyncio.TimeoutError) as error:
             failure = type(error).__name__
 
