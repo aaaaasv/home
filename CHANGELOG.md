@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-10-09
+
 ### Додано
 
 - **Огляди фото зберігаються.** Найдорожчий вихід, який робить цей дім — Opus на high, два знімки, п'ять
