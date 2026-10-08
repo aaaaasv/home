@@ -135,13 +135,21 @@ class EvaluatePlantClimateUseCase(BaseUseCase):
     def _resolve_status(
         self, value: float, low: float, high: float, previous_status: ClimateStatus, margin: float
     ) -> ClimateStatus:
-        if value < low:
+        """
+        Raised only once the median is clear of the range by a margin, and dropped the moment it is back inside.
+
+        the dead band sits OUTSIDE the ideal range on purpose. holding the alert through the recovery instead —
+        which is what this did — left a window where the card called a plant dry while the air was already within
+        the range the card quoted: «сухо: 44%, треба 42–90%». a card that argues with itself teaches the family
+        to stop reading cards, so there is no in-between state any more: either it is out of range now, or the
+        card goes.
+        """
+        if previous_status == ClimateStatus.TOO_LOW:
+            return ClimateStatus.TOO_LOW if value < low else ClimateStatus.OK
+        if previous_status == ClimateStatus.TOO_HIGH:
+            return ClimateStatus.TOO_HIGH if value > high else ClimateStatus.OK
+        if value < low - margin:
             return ClimateStatus.TOO_LOW
-        if value > high:
-            return ClimateStatus.TOO_HIGH
-        # inside the range: hold the alert until the median has climbed a margin back in, so it cannot flap on the edge
-        if previous_status == ClimateStatus.TOO_LOW and value < low + margin:
-            return ClimateStatus.TOO_LOW
-        if previous_status == ClimateStatus.TOO_HIGH and value > high - margin:
+        if value > high + margin:
             return ClimateStatus.TOO_HIGH
         return ClimateStatus.OK

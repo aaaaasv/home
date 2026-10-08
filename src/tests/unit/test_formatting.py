@@ -714,7 +714,7 @@ class RenderPlantDiscomfortCardTestCase(unittest.TestCase):
             problems=problems,
         )
 
-    def test_render_plant_discomfort_card_rounds_a_low_reading_down_away_from_the_range(self):
+    def test_render_plant_discomfort_card_names_dry_air_without_quoting_a_reading(self):
         change = self.build_change(
             [
                 ClimateProblem(
@@ -729,9 +729,9 @@ class RenderPlantDiscomfortCardTestCase(unittest.TestCase):
 
         rendered = render_plant_discomfort_card(change)
 
-        self.assertEqual(rendered, "💧 <b>Фікус</b> — сухо: 32%, треба 50–70%")
+        self.assertEqual(rendered, "💧 <b>Фікус</b> — сухе повітря")
 
-    def test_render_plant_discomfort_card_rounds_a_high_reading_up_away_from_the_range(self):
+    def test_render_plant_discomfort_card_names_heat_without_quoting_a_reading(self):
         change = self.build_change(
             [
                 ClimateProblem(
@@ -746,7 +746,7 @@ class RenderPlantDiscomfortCardTestCase(unittest.TestCase):
 
         rendered = render_plant_discomfort_card(change)
 
-        self.assertEqual(rendered, "🔥 <b>Фікус</b> — жарко: 30°, треба 18–27°")
+        self.assertEqual(rendered, "🔥 <b>Фікус</b> — жарко")
 
     def test_render_plant_discomfort_card_lists_one_line_per_problem(self):
         change = self.build_change(
@@ -772,7 +772,7 @@ class RenderPlantDiscomfortCardTestCase(unittest.TestCase):
 
         self.assertEqual(
             rendered,
-            "🔥 <b>Фікус</b> — жарко: 30°, треба 18–27°\n💧 <b>Фікус</b> — сухо: 30%, треба 50–70%",
+            "🔥 <b>Фікус</b> — жарко\n💧 <b>Фікус</b> — сухе повітря",
         )
 
     def test_render_plant_comfort_restored_names_the_plant(self):

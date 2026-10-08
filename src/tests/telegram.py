@@ -83,11 +83,16 @@ def message_update(text: str, update_id: int = 1, topic: int = PLANTS_TOPIC) -> 
     return Update(update_id=update_id, message=build_message(text, message_id=update_id, topic=topic))
 
 
-def photo_update(unique_id: str, update_id: int = 1, topic: int = PLANTS_TOPIC) -> Update:
+def photo_update(
+    unique_id: str, update_id: int = 1, topic: int = PLANTS_TOPIC, media_group_id: str | None = None
+) -> Update:
     """One frame of an album — telegram delivers each as its own update, which is the whole point here."""
     message = build_message("", message_id=update_id, topic=topic)
     photo = PhotoSize(file_id=f"file-{unique_id}", file_unique_id=unique_id, width=1280, height=960)
-    return Update(update_id=update_id, message=message.model_copy(update={"text": None, "photo": [photo]}))
+    return Update(
+        update_id=update_id,
+        message=message.model_copy(update={"text": None, "photo": [photo], "media_group_id": media_group_id}),
+    )
 
 
 def callback_update(data: str, update_id: int = 1, message_id: int = 1, topic: int = PLANTS_TOPIC) -> Update:
