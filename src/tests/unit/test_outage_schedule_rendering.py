@@ -46,7 +46,7 @@ class RenderOutageOutlookTestCase(unittest.TestCase):
             "<b>8 жовтня</b>\n"
             "🕯 15:00–18:30\n"
             "\n"
-            "<i>станом на 7 жовтня, 21:10</i>",
+            "<i>станом на 23:00</i>",
         )
 
     def test_render_drops_an_hour_that_has_already_finished(self):
@@ -64,7 +64,7 @@ class RenderOutageOutlookTestCase(unittest.TestCase):
             "<b>Завтра</b>\n"
             "🕯 15:00–18:30\n"
             "\n"
-            "<i>станом на 21:10</i>",
+            "<i>станом на 09:00</i>",
         )
 
     def test_render_inside_an_outage_marks_the_hour_that_is_running(self):
@@ -82,7 +82,7 @@ class RenderOutageOutlookTestCase(unittest.TestCase):
 
         self.assertEqual(
             rendered,
-            "🗓 <b>Графік відключень</b>\n" "\n" "<b>Завтра</b>\n" "🕯 15:00–18:30\n" "\n" "<i>станом на 21:10</i>",
+            "🗓 <b>Графік відключень</b>\n" "\n" "<b>Завтра</b>\n" "🕯 15:00–18:30\n" "\n" "<i>станом на 23:00</i>",
         )
 
     def test_render_a_day_with_no_outages_leaves_its_heading_out(self):
@@ -101,7 +101,7 @@ class RenderOutageOutlookTestCase(unittest.TestCase):
 
         self.assertEqual(
             rendered,
-            "🗓 <b>Графік відключень</b>\n" "\n" "<b>Сьогодні</b>\n" "🕯 18:00–21:30\n" "\n" "<i>станом на 21:10</i>",
+            "🗓 <b>Графік відключень</b>\n" "\n" "<b>Сьогодні</b>\n" "🕯 18:00–21:30\n" "\n" "<i>станом на 09:00</i>",
         )
 
 
@@ -132,7 +132,7 @@ class RenderEmergencyShutdownsTestCase(unittest.TestCase):
             "<b>Завтра</b>\n"
             "🕯 15:00–18:30\n"
             "\n"
-            "<i>станом на 21:10</i>",
+            "<i>станом на 14:00</i>",
         )
 
     def test_render_an_emergency_day_with_no_published_hours_still_shows_the_banner(self):
@@ -149,7 +149,7 @@ class RenderEmergencyShutdownsTestCase(unittest.TestCase):
             "<b>Завтра</b>\n"
             "🕯 15:00–18:30\n"
             "\n"
-            "<i>станом на 21:10</i>",
+            "<i>станом на 14:00</i>",
         )
 
     def test_render_an_emergency_day_whose_hours_are_all_spent_keeps_the_banner(self):
@@ -163,7 +163,7 @@ class RenderEmergencyShutdownsTestCase(unittest.TestCase):
 
         self.assertEqual(
             rendered,
-            "🗓 <b>Графік відключень</b>\n" + EMERGENCY_BANNER + "\n" "\n" "<i>станом на 21:10</i>",
+            "🗓 <b>Графік відключень</b>\n" + EMERGENCY_BANNER + "\n" "\n" "<i>станом на 14:00</i>",
         )
 
 
