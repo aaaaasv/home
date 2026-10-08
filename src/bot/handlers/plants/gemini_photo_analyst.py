@@ -12,6 +12,9 @@ from src.modules.plant_care.domain import PlantPhotoReview, PlantPhotoReviewCont
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 60
+# minutes, not seconds: on 7 october every attempt inside the first half-minute was refused and the whole
+# review was lost, while the service was back well before the family would have noticed a gap
+REVIEW_RETRY_DELAYS_SECONDS = (60.0, 240.0)
 
 # gemini honours responseMimeType=application/json, but not a fixed shape — so the keys are spelled out here and
 # the result is validated on parse rather than trusted
@@ -37,7 +40,14 @@ class GeminiPhotoAnalyst:
 
         body = {
             "contents": [{"parts": parts}],
-            "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
+            "generationConfig": {
+                "temperature": 0.2,
+                "responseMimeType": "application/json",
+                # 2.5-flash thinks by default, and on a real review that was 942 thinking tokens against 77 of
+                # answer — twelve times the work for a verdict in four short fields, and a heavier request is
+                # the one that gets refused when the free tier is busy
+                "thinkingConfig": {"thinkingBudget": 0},
+            },
         }
         try:
             payload = await generate_content(
@@ -46,6 +56,7 @@ class GeminiPhotoAnalyst:
                 body=body,
                 purpose=f"Photo review for '{context.plant_name}'",
                 timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+                retry_delays_seconds=REVIEW_RETRY_DELAYS_SECONDS,
             )
         except GeminiQuotaRefused:
             logger.warning("Photo review for '%s' refused: the gemini quota is spent", context.plant_name)

@@ -81,3 +81,30 @@ class GenerateContentTestCase(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(context.exception.body, '{"error": {"message": "PerDay quota"}}')
         self.assertEqual(len(self.server.requests), 1)
+
+    async def test_generate_content_with_a_rejected_request_logs_what_google_said(self):
+        """The status alone sent me measuring the key, the model and the network over a plain refusal."""
+        self.server.statuses = [400]
+
+        with self.assertLogs("src.infrastructure.adapters.gemini_client", level="WARNING") as logged:
+            await self.call()
+
+        self.assertEqual(
+            logged.output,
+            [
+                'WARNING:src.infrastructure.adapters.gemini_client:Test call failed: HTTP 400 — {"error": '
+                '{"message": "PerDay quota"}}'
+            ],
+        )
+
+    async def test_generate_content_overloaded_on_every_attempt_logs_what_google_said(self):
+        self.server.statuses = [503]
+
+        with self.assertLogs("src.infrastructure.adapters.gemini_client", level="INFO") as logged:
+            await self.call()
+
+        self.assertEqual(
+            logged.output[-1],
+            "WARNING:src.infrastructure.adapters.gemini_client:Test call failed after 3 attempts: "
+            'HTTP 503 — {"error": {"message": "PerDay quota"}}',
+        )
