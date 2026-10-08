@@ -259,6 +259,28 @@ async def _write_review_into(
     await notice.edit_text(render_plant_photo_review(review))
 
 
+@router.callback_query(PlantCallback.filter(F.action == PlantAction.REVIEW_NOW))
+async def review_the_latest_photo(
+    callback: CallbackQuery,
+    callback_data: PlantCallback,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+    photo_analyst: PhotoAnalyst | None = None,
+) -> None:
+    """
+    Asking for a review from the plant's card, rather than waiting for the next photo to trigger one.
+
+    it answers beneath the card instead of rewriting it: the card is the thing with the buttons, and a
+    review in place of it would take the rest of them away.
+    """
+    await callback.answer()
+    if photo_analyst is None:
+        return
+
+    notice = await callback.message.answer(messages.PHOTO_REVIEW_IN_PROGRESS)
+    await _write_review_into(notice, callback_data.plant_id, uow_factory, household_calendar, photo_analyst)
+
+
 @router.callback_query(PlantCallback.filter(F.action == PlantAction.REVIEW_PHOTO))
 async def retry_photo_review(
     callback: CallbackQuery,

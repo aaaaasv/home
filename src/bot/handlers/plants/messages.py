@@ -118,6 +118,7 @@ PHOTO_REVIEW_IN_PROGRESS = "🔎 Дивлюсь, що змінилось…"
 # the bot having ignored the photo — and three photos in a row read that way on 7 october
 PHOTO_REVIEW_FAILED = "🔎 Зараз не вдалось подивитись на це фото."
 PHOTO_REVIEW_RETRY_BUTTON = "Спробувати ще"
+PHOTO_REVIEW_NOW_BUTTON = "Оглянути"
 # the history card steps one sitting at a time; the words say which way, because two bare arrows next to a
 # photo do not say whether they move through time or through the collection
 PHOTO_HISTORY_NEWER_BUTTON = "← новіше"

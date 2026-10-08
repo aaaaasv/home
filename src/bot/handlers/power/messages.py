@@ -67,10 +67,10 @@ POWER_SCHEDULE_EMERGENCY_NOTE = (
     "<blockquote>🚨 <b>Аварійні відключення</b>\n"
     "Графік не діє — світло можуть вимкнути будь-коли й повернути без попередження.</blockquote>"
 )
-# the moment the SCHEDULE is from, not the moment the bot redrew the board — the bot's own moment said nothing
-# anybody could act on. who published it does not need saying: there is one source of outage hours
+# when the bot last ASKED yasno, not when yasno last published. hanging it on the publish time was clever and
+# wrong: tapping «Оновити» then changed nothing on screen, so the button read as broken. this is also the more
+# useful of the two — a time that has stopped moving means the bot has stopped checking
 POWER_SCHEDULE_AS_OF = "<i>станом на {time}</i>"
-POWER_SCHEDULE_AS_OF_EARLIER = "<i>станом на {day}, {time}</i>"
 POWER_SCHEDULE_BUTTON_REFRESH = "Оновити"
 POWER_SCHEDULE_REFRESHED = "Оновлено"
 POWER_SCHEDULE_REFRESHING = "🔄 оновлюю…"

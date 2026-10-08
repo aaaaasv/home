@@ -21,6 +21,7 @@ from src.bot.handlers.plants.messages import (
     CARE_UNDO_BUTTON,
     PHOTO_HISTORY_NEWER_BUTTON,
     PHOTO_HISTORY_OLDER_BUTTON,
+    PHOTO_REVIEW_NOW_BUTTON,
     PHOTO_REVIEW_RETRY_BUTTON,
     PLANT_FIELD_LABELS,
     PLANT_RESTORE_BUTTON,
@@ -44,6 +45,7 @@ class PlantAction(StrEnum):
     PHOTOS = "photos"
     ADD_PHOTO = "add_photo"
     REVIEW_PHOTO = "review_photo"
+    REVIEW_NOW = "review_now"
     # same upload flow as ADD_PHOTO, but entered from a digest card the bot must delete afterwards
     ADD_PHOTO_DUE = "photo_due"
     EDIT = "edit"
@@ -275,11 +277,20 @@ def build_plant_card_keyboard(
         )
     ]
     if card.photo_count:
-        # the count is of sittings, not frames, because that is what the album behind it holds
+        # the count is of sittings, not of every frame ever taken, because the card behind it steps through
+        # one frame per sitting — so the number on the button is exactly how many photos open
         photo_row.append(
             InlineKeyboardButton(
-                text=f"Історія ({card.history_photo_count})",
+                text=f"Фото ({card.history_photo_count})",
                 callback_data=PlantCallback(action=PlantAction.PHOTOS, plant_id=card.id).pack(),
+            )
+        )
+        # the review normally happens on its own when a photo is added; this is for asking again later,
+        # which is also the only way to get one for a plant whose photo arrived before the reviews existed
+        photo_row.append(
+            InlineKeyboardButton(
+                text=PHOTO_REVIEW_NOW_BUTTON,
+                callback_data=PlantCallback(action=PlantAction.REVIEW_NOW, plant_id=card.id).pack(),
             )
         )
     builder.row(*photo_row)
