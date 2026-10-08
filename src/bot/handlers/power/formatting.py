@@ -43,14 +43,14 @@ from src.bot.handlers.power.messages import (
     POWER_RESERVE_TITLE_ON_GRID,
     POWER_RESERVE_TITLE_UNKNOWN,
     POWER_RESERVE_UNREACHABLE,
-    POWER_SCHEDULE_AS_OF,
     POWER_SCHEDULE_DAY_DATE,
     POWER_SCHEDULE_DAY_TODAY,
     POWER_SCHEDULE_DAY_TOMORROW,
     POWER_SCHEDULE_EMERGENCY_NOTE,
     POWER_SCHEDULE_INTERVAL,
     POWER_SCHEDULE_INTERVAL_NOW,
-    POWER_SCHEDULE_INTERVAL_PASSED,
+    POWER_SCHEDULE_PUBLISHED_EARLIER,
+    POWER_SCHEDULE_PUBLISHED_TODAY,
     POWER_SCHEDULE_TITLE,
 )
 from src.modules.power.domain import (
@@ -191,23 +191,51 @@ def render_outage_outlook(outlook: OutageOutlook, generated_at: datetime) -> str
     intervals at 21:10 and the board announced two outages that were over, which is worse than saying nothing
     """
     lines = [POWER_SCHEDULE_TITLE]
+    # the banner belongs to the grid, not to a calendar day: when the schedule stops applying it stops
+    # applying for whatever comes next, so it stands above both days rather than under one of them
+    if outlook.today.status is OutageScheduleStatus.EMERGENCY_SHUTDOWNS:
+        lines.append(POWER_SCHEDULE_EMERGENCY_NOTE)
     for schedule in (outlook.today, outlook.tomorrow):
-        if schedule is None or not schedule.has_outages:
-            continue
-        lines.append("")
-        lines.extend(_render_day_section(schedule, generated_at))
-    lines.extend(["", POWER_SCHEDULE_AS_OF.format(time=f"{generated_at:%H:%M}")])
+        section = _render_day_section(schedule, generated_at) if schedule is not None else []
+        if section:
+            lines.append("")
+            lines.extend(section)
+    published = _render_published_at(outlook.today.updated_on, generated_at)
+    if published:
+        lines.extend(["", published])
     return "\n".join(lines)
 
 
+def _render_published_at(updated_on: datetime | None, generated_at: datetime) -> str:
+    """When yasno last changed this, which is the only freshness anybody can act on."""
+    if updated_on is None:
+        return ""
+    local = updated_on.astimezone(generated_at.tzinfo)
+    if local.date() == generated_at.date():
+        return POWER_SCHEDULE_PUBLISHED_TODAY.format(time=f"{local:%H:%M}")
+    day = f"{local.day} {GENITIVE_MONTH_NAMES[local.month - 1]}"
+    return POWER_SCHEDULE_PUBLISHED_EARLIER.format(day=day, time=f"{local:%H:%M}")
+
+
 def _render_day_section(schedule: OutageSchedule, generated_at: datetime) -> list[str]:
-    lines = [_render_day_heading(schedule.day, generated_at.date())]
-    if schedule.status == OutageScheduleStatus.EMERGENCY_SHUTDOWNS:
-        lines.append(POWER_SCHEDULE_EMERGENCY_NOTE)
+    """
+    A day's remaining hours, or nothing at all when it has none left.
+
+    an hour that has finished is dropped rather than struck through: the board answers «коли вимкнуть», and a
+    spent hour is not an answer to that.
+    """
     # only the day the clock is actually in can have an interval behind or around it
     minute_of_day = generated_at.hour * 60 + generated_at.minute if schedule.day == generated_at.date() else None
-    for interval in schedule.off_intervals:
-        lines.append(_render_interval(interval, minute_of_day))
+    ahead = [
+        interval
+        for interval in schedule.off_intervals
+        if minute_of_day is None or not interval.has_ended_by(minute_of_day)
+    ]
+    if not ahead:
+        return []
+
+    lines = [_render_day_heading(schedule.day, generated_at.date())]
+    lines.extend(_render_interval(interval, minute_of_day) for interval in ahead)
     return lines
 
 
@@ -221,11 +249,7 @@ def _render_day_heading(day: date, today: date) -> str:
 
 def _render_interval(interval: OutageInterval, minute_of_day: int | None) -> str:
     hours = {"start": f"{interval.start:%H:%M}", "end": f"{interval.end:%H:%M}"}
-    if minute_of_day is None:
-        return POWER_SCHEDULE_INTERVAL.format(**hours)
-    if interval.has_ended_by(minute_of_day):
-        return POWER_SCHEDULE_INTERVAL_PASSED.format(**hours)
-    if interval.contains_minute(minute_of_day):
+    if minute_of_day is not None and interval.contains_minute(minute_of_day):
         return POWER_SCHEDULE_INTERVAL_NOW.format(**hours)
     return POWER_SCHEDULE_INTERVAL.format(**hours)
 

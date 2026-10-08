@@ -108,6 +108,26 @@ class OutageScheduleBoardTestCase(BaseIntegrationTestCase):
 
         self.assertNotIn("<b>Сьогодні</b>", bot.sent[0])
 
+    async def test_post_during_emergency_shutdowns_with_no_hours_still_puts_up_the_banner(self):
+        """The board used to vanish at exactly the moment the published schedule stopped applying."""
+        bot = RecordingBoardBot()
+        today = datetime.now(KYIV).date()
+        outlook = OutageOutlook(
+            today=OutageSchedule(
+                day=today,
+                status=OutageScheduleStatus.EMERGENCY_SHUTDOWNS,
+                off_intervals=(),
+                updated_on=None,
+            ),
+            tomorrow=None,
+        )
+
+        await self.build_board(bot, StubScheduleProvider(outlook)).post()
+
+        self.assertEqual(len(bot.sent), 1)
+        self.assertIn("🚨 <b>Аварійні відключення</b>", bot.sent[0])
+        self.assertEqual(await self.remembered_message_ids(), [701])
+
     async def test_post_with_every_interval_spent_and_no_tomorrow_says_nothing(self):
         bot = RecordingBoardBot()
 

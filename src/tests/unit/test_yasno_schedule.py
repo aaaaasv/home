@@ -169,6 +169,15 @@ class OutlookAheadTestCase(unittest.TestCase):
     def test_has_anything_ahead_on_a_day_the_clock_has_left_behind_is_false(self):
         self.assertFalse(self.outlook.has_anything_ahead(datetime(2026, 8, 12, 7, 0, tzinfo=KYIV)))
 
+    def test_has_anything_ahead_during_emergency_shutdowns_is_true_with_no_hours_at_all(self):
+        """The schedule has stopped applying, which is the one thing worth a board even with nothing to list."""
+        payload = deepcopy(SAMPLE)
+        payload["2.1"]["today"]["slots"] = []
+        payload["2.1"]["today"]["status"] = "EmergencyShutdowns"
+        outlook = parse_outage_outlook(payload, "2.1")
+
+        self.assertTrue(outlook.has_anything_ahead(datetime(2026, 8, 11, 20, 0, tzinfo=KYIV)))
+
     def test_has_outages_with_a_clear_group_is_false(self):
         self.assertFalse(parse_outage_outlook(SAMPLE, "1.1").has_outages)
 

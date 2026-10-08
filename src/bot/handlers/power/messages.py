@@ -60,9 +60,17 @@ POWER_SCHEDULE_DAY_TOMORROW = "<b>Завтра</b>"
 POWER_SCHEDULE_DAY_DATE = "<b>{day}</b>"
 POWER_SCHEDULE_INTERVAL = "🕯 {start}–{end}"
 POWER_SCHEDULE_INTERVAL_NOW = "🕯 {start}–{end} — зараз"
-POWER_SCHEDULE_INTERVAL_PASSED = "🕯 <s>{start}–{end}</s>"
-POWER_SCHEDULE_EMERGENCY_NOTE = "⚠️ аварійні відключення"
-POWER_SCHEDULE_AS_OF = "<i>станом на {time}</i>"
+# a banner rather than a line: during emergency shutdowns the published hours stop meaning anything, and
+# that has to be visible at a glance next to them. blockquote is the only block telegram gives a bot —
+# custom emoji need an emoji set the bot owns, which this one does not have
+POWER_SCHEDULE_EMERGENCY_NOTE = (
+    "<blockquote>🚨 <b>Аварійні відключення</b>\n"
+    "Графік не діє — світло можуть вимкнути будь-коли й повернути без попередження.</blockquote>"
+)
+# when YASNO last changed the schedule, not when the bot last redrew the board. the bot's own moment said
+# nothing anybody could act on; this says whether the hours below are yesterday's plan or this hour's
+POWER_SCHEDULE_PUBLISHED_TODAY = "<i>Ясно оновило о {time}</i>"
+POWER_SCHEDULE_PUBLISHED_EARLIER = "<i>Ясно оновило {day}, {time}</i>"
 POWER_SCHEDULE_BUTTON_REFRESH = "Оновити"
 POWER_SCHEDULE_REFRESHED = "Оновлено"
 POWER_SCHEDULE_REFRESHING = "🔄 оновлюю…"

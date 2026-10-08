@@ -219,6 +219,10 @@ class OutageOutlook:
             return True
         if self.today.day != moment.date():
             return False
+        # emergency shutdowns are themselves the thing to say, hours or no hours: the published schedule has
+        # stopped applying, and that is exactly when a board must not quietly disappear
+        if self.today.status is OutageScheduleStatus.EMERGENCY_SHUTDOWNS:
+            return True
         return any(not interval.has_ended_by(_minute_of_day(moment)) for interval in self.today.off_intervals)
 
 
