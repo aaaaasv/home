@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 from src.bot.handlers.plants import messages, photos
-from src.bot.handlers.plants.keyboards import PlantAction, PlantCallback
+from src.bot.handlers.plants.keyboards import PhotoHistoryCallback, PlantAction, PlantCallback
 from src.common.constants import PlantPhotoFrame
 from src.tests.behaviour.base import BaseBehaviourTestCase
 from src.tests.telegram import ACTOR_ID, CHAT_ID, callback_update, photo_update
@@ -176,10 +176,11 @@ class StragglingAlbumFrameTestCase(BaseBehaviourTestCase):
 
 class PhotoHistoryCarouselTestCase(BaseBehaviourTestCase):
     """
-    The card's photo button opens the plant's growth as one album, which telegram swipes through natively.
+    The card's photo button opens the plant's growth one large frame at a time.
 
-    it used to hand over the last ten frames of any kind in the order they were taken, so the close-ups of one
-    afternoon buried the one thing the album is for: the plant then and now.
+    an album was the first attempt and it renders as a grid — which buries the one thing this is for. the bot
+    api has no carousel of its own (telegram's «show as carousel» is a send-time option in the clients and
+    nothing in api 10.3 sets it), so the card edits its own photo in place instead.
     """
 
     async def asyncSetUp(self):
@@ -188,6 +189,9 @@ class PhotoHistoryCarouselTestCase(BaseBehaviourTestCase):
 
     async def open_history(self):
         return await self.feed(callback_update(PlantCallback(action=PlantAction.PHOTOS, plant_id=self.plant_id).pack()))
+
+    async def step_to(self, index: int):
+        return await self.feed(callback_update(PhotoHistoryCallback(plant_id=self.plant_id, index=index).pack()))
 
     async def seed_frame(self, unique_id: str, day: int, frame: PlantPhotoFrame) -> None:
         await self.seed_plant_photo(
@@ -198,39 +202,85 @@ class PhotoHistoryCarouselTestCase(BaseBehaviourTestCase):
             taken_at=datetime(2026, 7, day, 10, 0, tzinfo=timezone.utc),
         )
 
-    async def test_opening_the_history_sends_the_general_frames_newest_first(self):
+    async def seed_three_sittings(self) -> None:
         await self.seed_frame("july-first", 1, PlantPhotoFrame.OVERVIEW)
         await self.seed_frame("july-first-close-up", 1, PlantPhotoFrame.DETAIL)
         await self.seed_frame("july-fifth", 5, PlantPhotoFrame.OVERVIEW)
+        await self.seed_frame("july-ninth", 9, PlantPhotoFrame.OVERVIEW)
+
+    def labels(self, call) -> list[str]:
+        if call.reply_markup is None:
+            return []
+        return [button.text for row in call.reply_markup.inline_keyboard for button in row]
+
+    async def test_opening_the_history_shows_the_newest_sitting_alone(self):
+        await self.seed_three_sittings()
 
         await self.open_history()
 
-        sent = self.session.calls_named("SendMediaGroup")
+        sent = self.session.calls_named("SendPhoto")
         self.assertEqual(len(sent), 1)
-        self.assertEqual([item.media for item in sent[0].media], ["file-july-fifth", "file-july-first"])
+        self.assertEqual(sent[0].photo, "file-july-ninth")
+        self.assertEqual(sent[0].caption, "<b>Містер Біг</b> · 9 липня, 13:00 · 1/3")
+        self.assertEqual(self.labels(sent[0]), ["старіше →"])
 
-    async def test_opening_the_history_names_the_plant_on_the_first_frame_only(self):
-        await self.seed_frame("july-first", 1, PlantPhotoFrame.OVERVIEW)
-        await self.seed_frame("july-fifth", 5, PlantPhotoFrame.OVERVIEW)
+    async def test_opening_the_history_sends_no_album(self):
+        await self.seed_three_sittings()
 
         await self.open_history()
 
-        sent = self.session.calls_named("SendMediaGroup")
-        self.assertEqual(
-            [item.caption for item in sent[0].media],
-            ["<b>Містер Біг</b> · 5 липня, 13:00", "1 липня, 13:00"],
-        )
+        self.assertEqual(self.session.calls_named("SendMediaGroup"), [])
+
+    async def test_stepping_back_rewrites_the_same_card_with_the_older_sitting(self):
+        await self.seed_three_sittings()
+        await self.open_history()
+        self.session.calls.clear()
+
+        await self.step_to(1)
+
+        edited = self.session.calls_named("EditMessageMedia")
+        self.assertEqual(len(edited), 1)
+        self.assertEqual(edited[0].media.media, "file-july-fifth")
+        self.assertEqual(edited[0].media.caption, "<b>Містер Біг</b> · 5 липня, 13:00 · 2/3")
+        self.assertEqual(self.labels(edited[0]), ["← новіше", "старіше →"])
+
+    async def test_the_oldest_sitting_offers_only_the_way_back(self):
+        await self.seed_three_sittings()
+        await self.open_history()
+        self.session.calls.clear()
+
+        await self.step_to(2)
+
+        edited = self.session.calls_named("EditMessageMedia")[0]
+        self.assertEqual(edited.media.media, "file-july-first")
+        self.assertEqual(self.labels(edited), ["← новіше"])
+
+    async def test_a_single_sitting_opens_without_any_buttons(self):
+        await self.seed_frame("july-first", 1, PlantPhotoFrame.OVERVIEW)
+
+        await self.open_history()
+
+        sent = self.session.calls_named("SendPhoto")[0]
+        self.assertEqual(sent.caption, "<b>Містер Біг</b> · 1 липня, 13:00 · 1/1")
+        self.assertIsNone(sent.reply_markup)
+
+    async def test_stepping_past_a_collection_that_shrank_lands_on_the_oldest_it_still_has(self):
+        """The card outlives the collection it was posted from, so the index is clamped, not trusted."""
+        await self.seed_frame("july-first", 1, PlantPhotoFrame.OVERVIEW)
+
+        await self.step_to(7)
+
+        edited = self.session.calls_named("EditMessageMedia")[0]
+        self.assertEqual(edited.media.media, "file-july-first")
 
     async def test_opening_the_history_of_a_plant_with_no_photos_says_so(self):
         await self.open_history()
 
-        self.assertEqual(self.session.calls_named("SendMediaGroup"), [])
+        self.assertEqual(self.session.calls_named("SendPhoto"), [])
         self.assertEqual(self.session.sent_texts(), [messages.NO_PHOTOS])
 
-    async def test_the_card_button_counts_the_sittings_the_album_holds(self):
-        await self.seed_frame("july-first", 1, PlantPhotoFrame.OVERVIEW)
-        await self.seed_frame("july-first-close-up", 1, PlantPhotoFrame.DETAIL)
-        await self.seed_frame("july-fifth", 5, PlantPhotoFrame.OVERVIEW)
+    async def test_the_card_button_counts_the_sittings_the_history_holds(self):
+        await self.seed_three_sittings()
 
         await self.feed(callback_update(PlantCallback(action=PlantAction.OPEN, plant_id=self.plant_id).pack()))
 
@@ -241,4 +291,4 @@ class PhotoHistoryCarouselTestCase(BaseBehaviourTestCase):
             for row in call.reply_markup.inline_keyboard
             for button in row
         ]
-        self.assertIn("Історія (2)", buttons)
+        self.assertIn("Історія (3)", buttons)

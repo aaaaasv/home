@@ -19,6 +19,8 @@ from src.bot.handlers.plants.messages import (
     CARE_POSTPONE_BUTTON,
     CARE_TASK_LABELS,
     CARE_UNDO_BUTTON,
+    PHOTO_HISTORY_NEWER_BUTTON,
+    PHOTO_HISTORY_OLDER_BUTTON,
     PHOTO_REVIEW_RETRY_BUTTON,
     PLANT_FIELD_LABELS,
     PLANT_RESTORE_BUTTON,
@@ -75,6 +77,13 @@ class CareCallback(CallbackData, prefix="care"):
 class PlantCallback(CallbackData, prefix="plant"):
     action: PlantAction
     plant_id: int = 0
+
+
+class PhotoHistoryCallback(CallbackData, prefix="hist"):
+    """One step through a plant's history. The index is where the card lands, not how far it moves."""
+
+    plant_id: int
+    index: int
 
 
 class ScheduleCallback(CallbackData, prefix="schedule"):
@@ -159,6 +168,29 @@ def build_archived_plant_keyboard(plant_id: int) -> InlineKeyboardMarkup:
         style=SUCCESS_STYLE,
     )
     return builder.as_markup()
+
+
+def build_photo_history_keyboard(plant_id: int, index: int, total: int) -> InlineKeyboardMarkup | None:
+    """
+    One step back, one step forward, and only the ones that lead somewhere.
+
+    the bot api has no carousel: telegram's own «show as carousel» is a send-time option in the clients and
+    nothing in the api sets it (checked against bot api 10.3). one photo edited in place is the nearest a bot
+    can get to one large frame at a time.
+    """
+    builder = InlineKeyboardBuilder()
+    if index > 0:
+        builder.button(
+            text=PHOTO_HISTORY_NEWER_BUTTON,
+            callback_data=PhotoHistoryCallback(plant_id=plant_id, index=index - 1),
+        )
+    if index + 1 < total:
+        builder.button(
+            text=PHOTO_HISTORY_OLDER_BUTTON,
+            callback_data=PhotoHistoryCallback(plant_id=plant_id, index=index + 1),
+        )
+    # a single sitting has nowhere to step, and two dead arrows read as something being broken
+    return builder.as_markup() if total > 1 else None
 
 
 def build_photo_review_retry_keyboard(plant_id: int) -> InlineKeyboardMarkup:

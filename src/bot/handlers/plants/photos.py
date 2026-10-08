@@ -14,7 +14,13 @@ from src.bot.formatting import format_moment
 from src.bot.handlers.plants import messages
 from src.bot.handlers.plants.care_cards import refresh_care_cards
 from src.bot.handlers.plants.formatting import render_plant_photo_review
-from src.bot.handlers.plants.keyboards import PlantAction, PlantCallback, build_photo_review_retry_keyboard
+from src.bot.handlers.plants.keyboards import (
+    PhotoHistoryCallback,
+    PlantAction,
+    PlantCallback,
+    build_photo_history_keyboard,
+    build_photo_review_retry_keyboard,
+)
 from src.bot.message_cleanup import remember_transient_message, sweep_transient_messages
 from src.common.config import Settings
 from src.common.constants import PlantPhotoFrame
@@ -336,16 +342,45 @@ async def show_photo_timeline(
         await callback.message.answer(messages.NO_PHOTOS)
         return
 
-    # telegram opens an album in its own viewer and swipes between its frames, so the album IS the carousel —
-    # newest first, because what the plant looks like now is what somebody opening this wants first
-    await callback.message.answer_media_group(
-        [
-            InputMediaPhoto(
-                media=photo.telegram_file_id,
-                caption=render_history_caption(plant.name, photo, index, household_calendar),
-            )
-            for index, photo in enumerate(history)
-        ]
+    # one frame at a time, newest first — an album renders as a grid, and the grid is what buries the growth
+    await callback.message.answer_photo(
+        history[0].telegram_file_id,
+        caption=render_history_caption(plant.name, history[0], 0, len(history), household_calendar),
+        reply_markup=build_photo_history_keyboard(callback_data.plant_id, 0, len(history)),
+    )
+
+
+@router.callback_query(PhotoHistoryCallback.filter())
+async def step_through_photo_history(
+    callback: CallbackQuery,
+    callback_data: PhotoHistoryCallback,
+    uow_factory: Callable[[], UnitOfWork],
+    household_calendar: HouseholdCalendar,
+) -> None:
+    """
+    One sitting back or forward, rewriting the same card.
+
+    the bot api has no carousel of its own — telegram's «show as carousel» is a send-time option in the
+    clients, and nothing in the api (checked against 10.3) lets a bot ask for it. editing the photo in place
+    is the nearest thing: one large frame, and the buttons move through the collection.
+    """
+    await callback.answer()
+    plant = await RetrievePlantCardUseCase(uow=uow_factory(), household_calendar=household_calendar)(
+        callback_data.plant_id
+    )
+    history = build_photo_history(await ListPlantPhotosUseCase(uow=uow_factory())(callback_data.plant_id))
+    # the collection can have grown since this card was posted, so the index is clamped rather than trusted
+    index = min(callback_data.index, len(history) - 1)
+    if index < 0:
+        await callback.message.answer(messages.NO_PHOTOS)
+        return
+
+    await callback.message.edit_media(
+        InputMediaPhoto(
+            media=history[index].telegram_file_id,
+            caption=render_history_caption(plant.name, history[index], index, len(history), household_calendar),
+        ),
+        reply_markup=build_photo_history_keyboard(callback_data.plant_id, index, len(history)),
     )
 
 
@@ -353,17 +388,17 @@ def build_photo_history(photos: list[PlantPhotoDetails]) -> list[PlantPhotoDetai
     """
     One frame per session, newest first — the plant's growth and nothing else.
 
-    the close-ups of a single day are evidence about that day, not history: mixed into the same album they
-    bury the one thing the album is for, which is seeing the plant then and now. an album holds ten frames,
-    so a collection older than ten sessions shows the ten most recent.
+    the close-ups of a single day are evidence about that day, not history: mixed in among the sittings they
+    bury the one thing this is for, which is seeing the plant then and now. ten sittings is as far back as it
+    steps, so a longer collection shows the ten most recent.
     """
     overviews = [photo for photo in photos if photo.frame == PlantPhotoFrame.OVERVIEW]
     return list(reversed(overviews[-TIMELINE_PHOTO_LIMIT:]))
 
 
 def render_history_caption(
-    plant_name: str, photo: PlantPhotoDetails, index: int, household_calendar: HouseholdCalendar
+    plant_name: str, photo: PlantPhotoDetails, index: int, total: int, household_calendar: HouseholdCalendar
 ) -> str:
-    """The album scrolls away from the card it was opened from, so the first frame carries the plant's name."""
+    """The card scrolls away from the one it was opened from, so every frame names its plant and its place."""
     moment = format_moment(photo.taken_at, household_calendar)
-    return f"<b>{escape(plant_name)}</b> · {moment}" if index == 0 else moment
+    return f"<b>{escape(plant_name)}</b> · {moment} · {index + 1}/{total}"
