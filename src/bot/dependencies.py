@@ -7,10 +7,12 @@ from aiogram import Bot
 from src.bot.handlers.air_alert import facts as air_alert_facts
 from src.bot.handlers.chores import facts as chores_facts
 from src.bot.handlers.chores.board import ChoresBoard
+from src.bot.handlers.newspaper.claude_word_source import ClaudeWordSource
 from src.bot.handlers.newspaper.gemini_word_source import GeminiWordSource
 from src.bot.handlers.places.board import PlacesBoard
 from src.bot.handlers.plants import facts as plant_facts
 from src.bot.handlers.plants.claude_photo_analyst import ClaudePhotoAnalyst
+from src.bot.handlers.plants.claude_plant_identifier import ClaudePlantIdentifier
 from src.bot.handlers.plants.gemini_photo_analyst import GeminiPhotoAnalyst
 from src.bot.handlers.plants.gemini_plant_identifier import GeminiPlantIdentifier
 from src.bot.handlers.power.conservation_board import ConservationBoard
@@ -27,6 +29,8 @@ from src.bot.services.telegram_photo_storage import TelegramPhotoStorage
 from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.adapters.alarm_map_air_raid_alert_source import AlarmMapAirRaidAlertSource
+from src.infrastructure.adapters.claude_client import ClaudeClient
+from src.infrastructure.adapters.claude_language_model import ClaudeLanguageModel
 from src.infrastructure.adapters.ecoflow_ble_station import EcoFlowBleStation
 from src.infrastructure.adapters.file_panel_light import FilePanelLight
 from src.infrastructure.adapters.gemini_language_model import GeminiLanguageModel
@@ -56,6 +60,8 @@ from src.modules.assistant.services.knowledge_source import FileKnowledgeSource
 from src.modules.assistant.services.language_model import LanguageModel
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
 from src.modules.lighting.services.panel_light import PanelLight
+from src.modules.model_budget.services.model_budget import ModelBudget
+from src.modules.model_budget.services.price_list import MICRO_USD_PER_USD
 from src.modules.newspaper.services.print_queue import PrintQueue
 from src.modules.newspaper.services.word_source import WordBank, WordSource
 from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
@@ -264,15 +270,38 @@ def build_price_source(settings: Settings) -> HotlinePriceSource:
     )
 
 
+# one client for the whole process: the budget has to be shared, or two clients each check an allowance the
+# other is also spending and neither sees the total. Settings is not hashable, so the cache is kept by hand
+_claude_client: ClaudeClient | None = None
+
+
+def build_claude_client(settings: Settings) -> ClaudeClient | None:
+    global _claude_client
+    if not settings.CLAUDE_API_SECRET_KEY:
+        return None
+    if _claude_client is not None:
+        return _claude_client
+
+    budget = ModelBudget(
+        uow_factory=UnitOfWork,
+        household_calendar=HouseholdCalendar(timezone=settings.timezone),
+        daily_allowance_micro_usd=round(settings.CLAUDE_DAILY_BUDGET_USD * MICRO_USD_PER_USD),
+        monthly_allowance_micro_usd=round(settings.CLAUDE_MONTHLY_BUDGET_USD * MICRO_USD_PER_USD),
+    )
+    _claude_client = ClaudeClient(api_key=settings.CLAUDE_API_SECRET_KEY, ledger=budget)
+    return _claude_client
+
+
 def build_photo_analyst(settings: Settings) -> PhotoAnalyst | None:
-    # not a null object like the sensors: the handler must know whether to promise the user a verdict at all
-    # prefer the free gemini; fall back to anthropic only when that is the key on file
+    # not a null object like the sensors: the handler must know whether to promise the user a verdict at all.
+    # claude first — gemini's free tier refuses after twenty requests a day, and it did, twice
     if not settings.PLANT_PHOTO_REVIEW_ENABLED:
         return None
+    client = build_claude_client(settings)
+    if client is not None:
+        return ClaudePhotoAnalyst(client=client, model=settings.PLANT_PHOTO_REVIEW_MODEL)
     if settings.GEMINI_API_KEY:
         return GeminiPhotoAnalyst(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
-    if settings.ANTHROPIC_API_KEY:
-        return ClaudePhotoAnalyst(api_key=settings.ANTHROPIC_API_KEY, model=settings.PLANT_PHOTO_REVIEW_MODEL)
     return None
 
 
@@ -284,6 +313,9 @@ def build_newspaper_print_queue(settings: Settings) -> PrintQueue | None:
 
 def build_newspaper_word_sources(settings: Settings) -> tuple[WordSource, ...]:
     """Fresh words first when there is a key to ask for them, and the checked bank behind them either way."""
+    client = build_claude_client(settings)
+    if client is not None:
+        return ClaudeWordSource(client=client, model=settings.CLAUDE_MODEL), WordBank()
     if settings.GEMINI_API_KEY:
         return GeminiWordSource(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL), WordBank()
     return (WordBank(),)
@@ -292,9 +324,14 @@ def build_newspaper_word_sources(settings: Settings) -> tuple[WordSource, ...]:
 def build_plant_identifier(settings: Settings) -> PlantIdentifier | None:
     # None rather than a null object, the same way the analyst is: the add-plant flow must know whether it can
     # offer to name the plant at all, or should go straight to asking
-    if not settings.PLANT_IDENTIFICATION_ENABLED or not settings.GEMINI_API_KEY:
+    if not settings.PLANT_IDENTIFICATION_ENABLED:
         return None
-    return GeminiPlantIdentifier(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
+    client = build_claude_client(settings)
+    if client is not None:
+        return ClaudePlantIdentifier(client=client, model=settings.CLAUDE_MODEL)
+    if settings.GEMINI_API_KEY:
+        return GeminiPlantIdentifier(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
+    return None
 
 
 def build_presence_source(settings: Settings) -> PresenceSource:
@@ -361,10 +398,15 @@ def build_compose_transit_report(
 
 def build_language_model(settings: Settings) -> LanguageModel | None:
     # not a null object: the topic and use case are built only when a model exists, so absence is the off switch
-    if not settings.ASSISTANT_ENABLED or not settings.GEMINI_API_KEY:
+    if not settings.ASSISTANT_ENABLED:
         return None
 
-    return GeminiLanguageModel(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
+    client = build_claude_client(settings)
+    if client is not None:
+        return ClaudeLanguageModel(client=client, model=settings.CLAUDE_MODEL)
+    if settings.GEMINI_API_KEY:
+        return GeminiLanguageModel(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
+    return None
 
 
 def build_answer_question(settings: Settings, language_model: LanguageModel | None) -> AnswerQuestionUseCase | None:
