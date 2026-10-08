@@ -30,6 +30,7 @@ from src.modules.shopping.services.price_source import PriceSource
 from src.modules.system_health.services.disk_health_source import DiskHealthSource
 from src.modules.system_health.services.pi_health_sensor import PiHealthSensor
 from src.modules.transit.services.route_shape_catalog import RouteShapeCatalog
+from src.modules.weather.services.weather_provider import WeatherProvider
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,9 @@ class SchedulerContext:
     uow_factory: Callable[[], UnitOfWork] = UnitOfWork
     weather_topic: ForumTopicRegistry | None = None
     weather_digest_board: WeatherDigestBoard | None = None
+    # the day fold reads the sky directly: the digest only refreshes through waking hours, and the
+    # coldest part of a night is exactly what a heat-loss reading needs
+    weather_provider: WeatherProvider | None = None
     air_conditioner: AirConditioner | None = None
     tech_topic: ForumTopicRegistry | None = None
     pi_health_sensor: PiHealthSensor | None = None
