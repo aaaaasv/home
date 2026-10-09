@@ -32,6 +32,7 @@ from src.common.household_calendar import HouseholdCalendar
 from src.infrastructure.adapters.alarm_map_air_raid_alert_source import AlarmMapAirRaidAlertSource
 from src.infrastructure.adapters.claude_client import ClaudeClient
 from src.infrastructure.adapters.claude_language_model import ClaudeLanguageModel
+from src.infrastructure.adapters.dtek_outage_mirror import DtekOutageMirror
 from src.infrastructure.adapters.ecoflow_ble_station import EcoFlowBleStation
 from src.infrastructure.adapters.file_panel_light import FilePanelLight
 from src.infrastructure.adapters.gemini_language_model import GeminiLanguageModel
@@ -69,7 +70,9 @@ from src.modules.plant_care.services.photo_analyst import PhotoAnalyst
 from src.modules.plant_care.services.photo_storage import NullPhotoStorage, PhotoStorage
 from src.modules.plant_care.services.plant_identifier import PlantIdentifier
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
+from src.modules.power.services.filled_outage_schedule_provider import FilledOutageScheduleProvider
 from src.modules.power.services.media_server_battery import MediaServerBattery
+from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.power.services.pi_ups import NullPiUps, PiUps
 from src.modules.power.services.router_link import RouterLink
 from src.modules.presence.services.family_phones import FamilyPhones
@@ -228,16 +231,28 @@ def build_media_server_battery(settings: Settings) -> MediaServerBattery | None:
     )
 
 
-def build_yasno_schedule_provider(settings: Settings) -> YasnoScheduleProvider | None:
+def build_yasno_schedule_provider(settings: Settings) -> OutageScheduleProvider | None:
     # not a null object: the board and poll job are only created when a provider exists, so absence is the off switch
     if not settings.YASNO_ENABLED:
         return None
 
-    return YasnoScheduleProvider(
+    published = YasnoScheduleProvider(
         group=settings.YASNO_GROUP,
         timezone_name=settings.TIMEZONE,
         region_id=settings.YASNO_REGION_ID,
         dso_id=settings.YASNO_DSO_ID,
+    )
+    if not settings.DTEK_OUTAGE_MIRROR_URL:
+        return published
+
+    return FilledOutageScheduleProvider(
+        published=published,
+        operator_table=DtekOutageMirror(
+            url=settings.DTEK_OUTAGE_MIRROR_URL,
+            group=settings.YASNO_GROUP,
+            timezone_name=settings.TIMEZONE,
+            stale_after=timedelta(hours=settings.DTEK_OUTAGE_MIRROR_STALE_AFTER_HOURS),
+        ),
     )
 
 

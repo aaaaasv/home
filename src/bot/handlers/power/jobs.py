@@ -307,6 +307,11 @@ class YasnoScheduleJob:
             await uow.posted_messages.delete_by_kind(kind)
 
     async def _ping_upcoming_outage(self, today: OutageSchedule) -> None:
+        # the hours shown during emergency shutdowns are the operator's plan, which the operator itself says is
+        # not in force — a heads-up for one of them would be wrong about as often as it was right
+        if today.status is OutageScheduleStatus.EMERGENCY_SHUTDOWNS:
+            return
+
         now = datetime.now(self.timezone)
         upcoming = today.next_off_interval(now)
         if upcoming is None:
