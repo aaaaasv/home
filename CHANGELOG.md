@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.1] - 2026-10-09
+
 ### Виправлено
 
 - **Світло повернулось, а бот промовчав.** Стан мережі визначався не лише хатом на Pi, а ще й показаннями
