@@ -25,6 +25,7 @@ from src.modules.power.outage_forecast import forecast_outage
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.power.services.pi_ups import NullPiUps, PiUps
+from src.modules.power.use_cases.record_grid_change import RecordGridChangeUseCase
 from src.modules.power.use_cases.track_conservation import TrackConservationUseCase
 
 logger = logging.getLogger(__name__)
@@ -108,14 +109,14 @@ class MainsWatchJob:
         if grid is None:
             return
 
-        # written before the message is sent: a telegram outage must not cost the record of what happened
-        async with self.uow_factory() as uow:
-            await uow.grid_events.create({"state": grid.value, "at": self.household_calendar.now()})
+        # written before the message is sent: a telegram outage must not cost the record of what happened,
+        # and the record is also where the span in the message comes from
+        lasted = await RecordGridChangeUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(grid)
 
         await self.bot.send_message(
             chat_id=self.chat_id,
             message_thread_id=await self.power_topic.resolve(),
-            text=render_mains_change(grid),
+            text=render_mains_change(grid, lasted),
             # the one push in this house that must arrive the moment it is sent
             disable_notification=False,
         )

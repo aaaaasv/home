@@ -33,6 +33,9 @@ POWER_ECOFLOW_WORKING_TOAST = "🔄 читаю Delta 2…"
 # glance away and already current — putting them here only buried the one word the push exists to deliver
 POWER_MAINS_LOST = "🕯 <b>Світло зникло</b>"
 POWER_MAINS_RESTORED = "💡 <b>Світло є</b>"
+# how long the state before this one lasted — the half of the message the family repeats to each other
+POWER_MAINS_LOST_AFTER = "🕯 <b>Світло зникло</b> (було {duration})"
+POWER_MAINS_RESTORED_AFTER = "💡 <b>Світло є</b> (не було {duration})"
 
 # said once per outage, and only when the answer is bad: "you reach" is not worth a notification, and a
 # push that speaks every time gets the whole group muted
