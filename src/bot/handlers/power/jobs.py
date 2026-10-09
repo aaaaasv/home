@@ -9,7 +9,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.handlers.power.formatting import render_mains_change, render_outage_forecast
-from src.bot.handlers.power.messages import POWER_OUTAGE_EMERGENCY, POWER_OUTAGE_SOON
+from src.bot.handlers.power.messages import POWER_OUTAGE_SOON
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.scheduling import SchedulerContext
@@ -19,7 +19,7 @@ from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.power.domain import GridState, OutageSchedule, OutageScheduleStatus, Reserve
+from src.modules.power.domain import GridState, OutageOutlook, OutageSchedule, OutageScheduleStatus, Reserve
 from src.modules.power.mains_monitor import MainsMonitor
 from src.modules.power.outage_forecast import forecast_outage
 from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
@@ -71,6 +71,9 @@ class MainsWatchJob:
     the pi's own hat answers first because its line is wired to the socket; the station is read alongside it,
     both to fill in how much is left and to tell the city's power from the station's after the transfer switch
     is thrown. with neither able to answer it stays silent, because a guess here reads exactly like a blackout.
+
+    the monitor is seeded from the recorded events on the first tick, not on construction: the job is built
+    while the scheduler is being assembled, long before anything may touch the database.
     """
 
     def __init__(
@@ -91,12 +94,14 @@ class MainsWatchJob:
         self.pi_ups = pi_ups
         self.uow_factory = uow_factory
         self.household_calendar = household_calendar
+        self._seeded = False
         self.monitor = MainsMonitor(
             confirmations=settings.ECOFLOW_MAINS_CONFIRMATIONS,
             station_feeds_the_pi=settings.PI_UPS_FED_BY_STATION,
         )
 
     async def __call__(self) -> None:
+        await self._seed_once()
         ups = await self.pi_ups.read_state()
         station = await self.ecoflow_station.read_state()
         grid = self.monitor.update(ups, station)
@@ -115,6 +120,16 @@ class MainsWatchJob:
             disable_notification=False,
         )
         logger.info("Announced the grid going %s", grid.value)
+
+    async def _seed_once(self) -> None:
+        if self._seeded:
+            return
+        self._seeded = True
+        async with self.uow_factory() as uow:
+            latest = await uow.grid_events.retrieve_latest()
+        if latest is not None:
+            self.monitor.seed(GridState(latest.state))
+            logger.info("Resuming the grid watch from the last recorded state: %s", latest.state)
 
 
 class ReserveBoardJob:
@@ -215,8 +230,8 @@ class OutageForecastJob:
 class YasnoScheduleJob:
     """
     Every ~20 min: re-read the outage schedule, keep the daily board current (silent), and fire the only two pushes
-    this topic allows — one heads-up ~30 min before each planned outage, and one alert a day when the group turns to
-    emergency shutdowns. facts only, no advice; quiet whenever nothing is planned.
+    this topic allows — one heads-up ~30 min before each planned outage, and one when the group turns to emergency
+    shutdowns. facts only, no advice; quiet whenever nothing is planned.
     """
 
     def __init__(
@@ -246,42 +261,42 @@ class YasnoScheduleJob:
             logger.info("Yasno schedule fetch failed; leaving the board as it is")
             return
 
+        # the regime turning announces itself by reposting the board, so it speaks before the silent refresh
+        if not await self._announce_emergency_regime(outlook):
+            # keep the board current: edit in place, or post the first one once something is planned and ahead
+            if not await self.outage_schedule_board.refresh(outlook):
+                await self.outage_schedule_board.post(outlook)
+
+        await self._ping_upcoming_outage(outlook.today)
+
+    async def _announce_emergency_regime(self, outlook: OutageOutlook) -> bool:
+        """
+        Repost the board with a ping when the group goes onto emergency shutdowns — once, until it comes back off.
+
+        there used to be a separate alert sentence here, and it said what the board's own banner says a line
+        lower: two messages, one regime. the board is the thing worth reading, so it is the board that pings.
+
+        it is also not keyed on the calendar day any more — a spell that lasted past midnight announced itself
+        again at six minutes past, in the night, with news from that morning.
+        """
         today = outlook.today
-        # keep the board current: edit it in place, or post the first one once something is planned and still ahead
-        if not await self.outage_schedule_board.refresh(outlook):
-            await self.outage_schedule_board.post(outlook)
-
-        await self._push_emergency(today)
-        await self._ping_upcoming_outage(today)
-
-    async def _push_emergency(self, today: OutageSchedule) -> None:
-        """
-        One ping when the group goes onto emergency shutdowns, and nothing more until it comes back off.
-
-        it used to be keyed on the calendar day, so a spell that lasted past midnight announced itself again
-        at six minutes past — a notification, in the night, saying what had already been said that morning
-        and what the board was showing all along.
-        """
         is_emergency = today.status is OutageScheduleStatus.EMERGENCY_SHUTDOWNS
         announced = bool(await self._list_posted(OUTAGE_EMERGENCY_KIND))
         if not is_emergency:
             if announced:
-                # forgotten, not deleted: the announcement is a record of what happened and stays in the topic
+                # forgotten, not deleted: the board stays where it is and goes back to refreshing silently
                 await self._forget_posted(OUTAGE_EMERGENCY_KIND)
                 logger.info("Emergency shutdowns are over; the next spell will announce itself again")
-            return
+            return False
         if announced:
-            return
+            return False
 
-        message = await self.bot.send_message(
-            chat_id=self.chat_id,
-            message_thread_id=await self.power_topic.resolve(),
-            text=POWER_OUTAGE_EMERGENCY,
-            # the regime changing is the one thing here worth waking somebody for, and it happens once
-            disable_notification=False,
-        )
+        message = await self.outage_schedule_board.post(outlook, notify=True)
+        if message is None:
+            return False
         await self.tracker.remember(OUTAGE_EMERGENCY_KIND, message, reference=today.day.isoformat())
         logger.info("Announced emergency shutdowns starting %s", today.day.isoformat())
+        return True
 
     async def _list_posted(self, kind: str) -> list:
         async with self.uow_factory() as uow:
