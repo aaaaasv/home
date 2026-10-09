@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-10-09
+
 ### Додано
 
 - **Повідомлення про світло кажуть, скільки це тривало.** «💡 Світло є (не було 2 год 26 хв)» і
