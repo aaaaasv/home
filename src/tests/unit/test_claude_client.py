@@ -216,3 +216,26 @@ class CompleteWithToolsTestCase(unittest.IsolatedAsyncioTestCase):
 
 async def _answer(text: str) -> str:
     return text
+
+
+class RefusingTemperatureTestCase(unittest.IsolatedAsyncioTestCase):
+    """
+    The 5.x models answer 400 to `temperature`, and the error used to vanish into a log line.
+
+    the assistant stopped answering for a whole day that way: APIError was caught, turned into None, and
+    the family saw «не вдалось» with nothing saying why. effort is the knob now, so the parameter is
+    refused here rather than at the far end.
+    """
+
+    async def test_a_call_carrying_temperature_is_refused_before_it_is_sent(self):
+        ledger = RecordingLedger()
+        client = ClaudeClient(api_key="test-key", ledger=ledger)
+        client.client = SimpleNamespace(messages=StubMessages(response=build_response()))
+
+        with self.assertRaises(AssertionError) as context:
+            await client.complete(
+                purpose="Assistant answer", model="claude-sonnet-5-5", max_tokens=10, temperature=0.2, messages=[]
+            )
+
+        self.assertEqual(str(context.exception), "the 5.x models refuse `temperature`; set effort instead")
+        self.assertEqual(client.client.messages.requests, [])

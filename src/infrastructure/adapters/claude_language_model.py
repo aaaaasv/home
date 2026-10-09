@@ -45,19 +45,16 @@ class ClaudeLanguageModel:
         client: ClaudeClient,
         model: str,
         effort: str,
-        temperature: float = 0.2,
         tools: HouseholdToolbox | None = None,
     ):
         self.client = client
         self.model = model
         self.effort = effort
-        self.temperature = temperature
         self.tools = tools
 
     async def generate(self, conversation: Sequence[ConversationTurn], system_instruction: str) -> str | None:
         request = {
             "max_tokens": MAX_TOKENS,
-            "temperature": self.temperature,
             "system": system_instruction,
             "output_config": {"effort": self.effort},
         }
