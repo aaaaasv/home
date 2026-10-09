@@ -3,13 +3,25 @@
 import base64
 import logging
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Protocol
 
 from src.infrastructure.adapters.claude_client import ClaudeClient, text_of
 from src.modules.assistant.services.language_model import MODEL_ROLE, ConversationTurn, QuotaExhausted
 from src.modules.model_budget.services.usage_ledger import BudgetSpent
 
 logger = logging.getLogger(__name__)
+
+
+class HouseholdToolbox(Protocol):
+    """What the assistant may look things up with — a protocol, so the adapter stays an adapter."""
+
+    @property
+    def definitions(self) -> list[dict[str, Any]]:
+        ...
+
+    async def run(self, name: str, arguments: dict[str, Any]) -> str:
+        ...
+
 
 MAX_TOKENS = 2000
 # somebody is watching the chat for this answer, so the model gets a few searches and not a research project
@@ -28,24 +40,46 @@ class ClaudeLanguageModel:
     adapter worked in, which is why swapping providers is this class and nothing else.
     """
 
-    def __init__(self, client: ClaudeClient, model: str, effort: str, temperature: float = 0.2):
+    def __init__(
+        self,
+        client: ClaudeClient,
+        model: str,
+        effort: str,
+        temperature: float = 0.2,
+        tools: HouseholdToolbox | None = None,
+    ):
         self.client = client
         self.model = model
         self.effort = effort
         self.temperature = temperature
+        self.tools = tools
 
     async def generate(self, conversation: Sequence[ConversationTurn], system_instruction: str) -> str | None:
+        request = {
+            "max_tokens": MAX_TOKENS,
+            "temperature": self.temperature,
+            "system": system_instruction,
+            "output_config": {"effort": self.effort},
+        }
+        messages = [build_turn(turn) for turn in conversation]
         try:
-            response = await self.client.complete(
-                purpose="Assistant answer",
-                model=self.model,
-                max_tokens=MAX_TOKENS,
-                temperature=self.temperature,
-                system=system_instruction,
-                messages=[build_turn(turn) for turn in conversation],
-                tools=[WEB_SEARCH_TOOL],
-                output_config={"effort": self.effort},
-            )
+            if self.tools is None:
+                response = await self.client.complete(
+                    purpose="Assistant answer",
+                    model=self.model,
+                    messages=messages,
+                    tools=[WEB_SEARCH_TOOL],
+                    **request,
+                )
+            else:
+                response = await self.client.complete_with_tools(
+                    purpose="Assistant answer",
+                    model=self.model,
+                    tools=[*self.tools.definitions, WEB_SEARCH_TOOL],
+                    run_tool=self.tools.run,
+                    messages=messages,
+                    **request,
+                )
         except BudgetSpent as refusal:
             # the family is told about an allowance in the words it already has for a spent quota
             raise QuotaExhausted(is_daily=refusal.is_daily) from None
