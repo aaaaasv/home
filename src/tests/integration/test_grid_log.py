@@ -102,13 +102,13 @@ class GridLogTestCase(BaseIntegrationTestCase):
 
     async def test_a_restart_inside_an_outage_still_announces_the_grid_coming_back(self):
         async with self.uow_factory() as uow:
-            await uow.grid_events.create({"state": GridState.ON_BATTERY.value, "at": FROZEN_NOW})
+            await uow.grid_events.create({"state": GridState.ON_BATTERY.value, "at": FROZEN_NOW - timedelta(hours=1)})
         bot = RecordingBot()
         job = self.build_job(bot, mains_present=True, ecoflow=on_grid())
 
         await job()
 
-        self.assertEqual(bot.sent, ["💡 <b>Світло є</b>"])
+        self.assertEqual(bot.sent, ["💡 <b>Світло є</b> (не було 1 год)"])
 
     async def test_an_outage_that_began_before_the_bot_could_read_anything_is_announced_on_the_first_reading(self):
         """
@@ -124,6 +124,38 @@ class GridLogTestCase(BaseIntegrationTestCase):
 
         self.assertEqual(bot.sent, ["🕯 <b>Світло зникло</b>"])
         self.assertEqual(await self.logged(), [GridState.ON_BATTERY.value])
+
+    async def test_the_grid_returning_says_how_long_the_outage_lasted(self):
+        async with self.uow_factory() as uow:
+            await uow.grid_events.create(
+                {"state": GridState.ON_BATTERY.value, "at": FROZEN_NOW - timedelta(hours=2, minutes=26)}
+            )
+        bot = RecordingBot()
+        job = self.build_job(bot, mains_present=True, ecoflow=on_grid())
+
+        await job()
+
+        self.assertEqual(bot.sent, ["💡 <b>Світло є</b> (не було 2 год 26 хв)"])
+
+    async def test_the_grid_going_says_how_long_there_had_been_light(self):
+        async with self.uow_factory() as uow:
+            await uow.grid_events.create(
+                {"state": GridState.ON_GRID.value, "at": FROZEN_NOW - timedelta(hours=5, minutes=20)}
+            )
+        bot = RecordingBot()
+        job = self.build_job(bot, mains_present=False, ecoflow=on_battery())
+
+        await job()
+
+        self.assertEqual(bot.sent, ["🕯 <b>Світло зникло</b> (було 5 год 20 хв)"])
+
+    async def test_the_very_first_change_recorded_carries_no_span(self):
+        bot = RecordingBot()
+        job = self.build_job(bot, mains_present=False, ecoflow=on_battery())
+
+        await job()
+
+        self.assertEqual(bot.sent, ["🕯 <b>Світло зникло</b>"])
 
     async def test_a_poll_that_changes_nothing_writes_nothing(self):
         bot = RecordingBot()

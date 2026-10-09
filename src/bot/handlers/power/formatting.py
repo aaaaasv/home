@@ -22,7 +22,9 @@ from src.bot.handlers.power.messages import (
     POWER_ECOFLOW_TIME_TO_FULL,
     POWER_ECOFLOW_TITLE,
     POWER_MAINS_LOST,
+    POWER_MAINS_LOST_AFTER,
     POWER_MAINS_RESTORED,
+    POWER_MAINS_RESTORED_AFTER,
     POWER_OUTAGE_SHORTFALL,
     POWER_RESERVE_ALIVE,
     POWER_RESERVE_AS_OF,
@@ -101,15 +103,47 @@ def _format_runtime(minutes: int) -> str:
     return f"{remaining_minutes} хв"
 
 
-def render_mains_change(grid: GridState) -> str:
+def render_mains_change(grid: GridState, lasted: timedelta | None = None) -> str:
     """
-    What the family reads when the lights go out, and when they come back — the fact, and nothing beside it.
+    What the family reads when the lights go out, and when they come back — the fact, and how long it has been.
 
     it used to carry the station's charge and runtime too, and that was the wrong place for them: this push
     fires at three in the morning, and what it has to deliver in one glance is a single word. the numbers are
     on the reserve board, which is refreshed every minute through an outage and is one tap away.
+
+    the span is the exception, because it is the one thing nobody can look up afterwards — by the time anybody
+    opens a board the outage is over and the clock has moved on.
     """
-    return POWER_MAINS_RESTORED if grid is GridState.ON_GRID else POWER_MAINS_LOST
+    if lasted is None:
+        return POWER_MAINS_RESTORED if grid is GridState.ON_GRID else POWER_MAINS_LOST
+    duration = format_span(lasted)
+    if grid is GridState.ON_GRID:
+        return POWER_MAINS_RESTORED_AFTER.format(duration=duration)
+    return POWER_MAINS_LOST_AFTER.format(duration=duration)
+
+
+def format_span(span: timedelta) -> str:
+    """
+    A stretch of time as the family would say it out loud, up to days.
+
+    this is not `_format_runtime`: a station's runtime is hours at most, while the light is routinely on for
+    days between outages, and "76 год 15 хв" is not an answer anybody reads.
+    """
+    minutes = max(round(span.total_seconds() / 60), 0)
+    days, minutes_of_day = divmod(minutes, 24 * 60)
+    hours, remaining_minutes = divmod(minutes_of_day, 60)
+    if days:
+        return f"{days} {_days_word(days)} {hours} год" if hours else f"{days} {_days_word(days)}"
+    return _format_runtime(minutes_of_day) if (hours or remaining_minutes) else "менше хвилини"
+
+
+def _days_word(days: int) -> str:
+    # 1 день, 2-4 дні, 5-20 днів, 21 день, 22-24 дні — the teens are all "днів"
+    if days % 10 == 1 and days % 100 != 11:
+        return "день"
+    if days % 10 in (2, 3, 4) and days % 100 not in (12, 13, 14):
+        return "дні"
+    return "днів"
 
 
 RESERVE_LAYER_LABELS = {
