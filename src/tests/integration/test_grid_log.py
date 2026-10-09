@@ -3,10 +3,10 @@ from types import SimpleNamespace
 
 from src.bot.handlers.power.jobs import MainsWatchJob
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.power.domain import EcoFlowState, GridState
+from src.modules.power.domain import GridState
 from src.tests.fakes import StubForumTopic
 from src.tests.integration.base import FROZEN_NOW, BaseIntegrationTestCase
-from src.tests.integration.test_mains_detection import hat, on_battery, on_grid
+from src.tests.integration.test_mains_detection import hat
 
 CHAT_ID = -1001234567890
 
@@ -18,14 +18,6 @@ class RecordingBot:
     async def send_message(self, chat_id, message_thread_id, text, **options):
         self.sent.append(text)
         return SimpleNamespace(message_id=1, chat=SimpleNamespace(id=chat_id))
-
-
-class StubStation:
-    def __init__(self, state):
-        self.state = state
-
-    async def read_state(self):
-        return self.state
 
 
 class StubUps:
@@ -47,14 +39,13 @@ class GridLogTestCase(BaseIntegrationTestCase):
     def uow_factory(self) -> UnitOfWork:
         return UnitOfWork(session_factory=self.session_factory)
 
-    def build_job(self, bot, mains_present: bool, ecoflow: EcoFlowState) -> MainsWatchJob:
+    def build_job(self, bot, mains_present: bool) -> MainsWatchJob:
         return MainsWatchJob(
             bot=bot,
             chat_id=CHAT_ID,
             power_topic=StubForumTopic(),
-            ecoflow_station=StubStation(ecoflow),
             pi_ups=StubUps(mains_present),
-            settings=SimpleNamespace(ECOFLOW_MAINS_CONFIRMATIONS=1, PI_UPS_FED_BY_STATION=False),
+            settings=SimpleNamespace(ECOFLOW_MAINS_CONFIRMATIONS=1),
             uow_factory=self.uow_factory,
             household_calendar=self.household_calendar,
         )
@@ -65,7 +56,7 @@ class GridLogTestCase(BaseIntegrationTestCase):
 
     async def test_the_grid_going_is_written_down_as_well_as_announced(self):
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=True, ecoflow=on_grid())
+        job = self.build_job(bot, mains_present=True)
         await job()
         job.pi_ups = StubUps(mains_present=False)
 
@@ -76,13 +67,11 @@ class GridLogTestCase(BaseIntegrationTestCase):
 
     async def test_the_grid_returning_is_written_down_too(self):
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=True, ecoflow=on_grid())
+        job = self.build_job(bot, mains_present=True)
         await job()
         job.pi_ups = StubUps(mains_present=False)
-        job.ecoflow_station = StubStation(on_battery())
         await job()
         job.pi_ups = StubUps(mains_present=True)
-        job.ecoflow_station = StubStation(on_grid())
 
         await job()
 
@@ -93,7 +82,7 @@ class GridLogTestCase(BaseIntegrationTestCase):
         async with self.uow_factory() as uow:
             await uow.grid_events.create({"state": GridState.ON_BATTERY.value, "at": FROZEN_NOW})
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=False, ecoflow=on_battery())
+        job = self.build_job(bot, mains_present=False)
 
         for _ in range(3):
             await job()
@@ -104,7 +93,7 @@ class GridLogTestCase(BaseIntegrationTestCase):
         async with self.uow_factory() as uow:
             await uow.grid_events.create({"state": GridState.ON_BATTERY.value, "at": FROZEN_NOW - timedelta(hours=1)})
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=True, ecoflow=on_grid())
+        job = self.build_job(bot, mains_present=True)
 
         await job()
 
@@ -118,7 +107,7 @@ class GridLogTestCase(BaseIntegrationTestCase):
         treated as establishing a baseline rather than as the blackout it was.
         """
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=False, ecoflow=on_battery())
+        job = self.build_job(bot, mains_present=False)
 
         await job()
 
@@ -131,7 +120,7 @@ class GridLogTestCase(BaseIntegrationTestCase):
                 {"state": GridState.ON_BATTERY.value, "at": FROZEN_NOW - timedelta(hours=2, minutes=26)}
             )
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=True, ecoflow=on_grid())
+        job = self.build_job(bot, mains_present=True)
 
         await job()
 
@@ -143,7 +132,7 @@ class GridLogTestCase(BaseIntegrationTestCase):
                 {"state": GridState.ON_GRID.value, "at": FROZEN_NOW - timedelta(hours=5, minutes=20)}
             )
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=False, ecoflow=on_battery())
+        job = self.build_job(bot, mains_present=False)
 
         await job()
 
@@ -151,7 +140,7 @@ class GridLogTestCase(BaseIntegrationTestCase):
 
     async def test_the_very_first_change_recorded_carries_no_span(self):
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=False, ecoflow=on_battery())
+        job = self.build_job(bot, mains_present=False)
 
         await job()
 
@@ -159,7 +148,7 @@ class GridLogTestCase(BaseIntegrationTestCase):
 
     async def test_a_poll_that_changes_nothing_writes_nothing(self):
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=True, ecoflow=on_grid())
+        job = self.build_job(bot, mains_present=True)
 
         for _ in range(3):
             await job()
