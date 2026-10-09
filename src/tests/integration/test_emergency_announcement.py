@@ -3,7 +3,6 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 from src.bot.handlers.power.jobs import YasnoScheduleJob
-from src.bot.handlers.power.messages import POWER_OUTAGE_EMERGENCY
 from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.domain import OutageOutlook, OutageSchedule, OutageScheduleStatus
@@ -46,11 +45,28 @@ class StubProvider:
 
 
 class StubBoard:
+    """Records how the board was drawn: silently refreshed in place, or reposted with a ping."""
+
+    def __init__(self):
+        self.refreshes = 0
+        self.notified_posts = 0
+
     async def refresh(self, outlook=None) -> bool:
+        self.refreshes += 1
         return True
 
-    async def post(self, outlook=None) -> None:
-        return None
+    async def post(self, outlook=None, notify: bool = False):
+        if notify:
+            self.notified_posts += 1
+
+        class Chat:
+            id = CHAT_ID
+
+        class Posted:
+            chat = Chat()
+            message_id = 900
+
+        return Posted()
 
 
 def build_outlook(status: OutageScheduleStatus, day: date) -> OutageOutlook:
@@ -59,10 +75,11 @@ def build_outlook(status: OutageScheduleStatus, day: date) -> OutageOutlook:
 
 class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
     """
-    One ping when the group goes onto emergency shutdowns, and nothing more until it comes back off.
+    The group going onto emergency shutdowns reposts the board with a ping — once, until the regime comes back off.
 
-    it was keyed on the calendar day, so a spell lasting past midnight announced itself again at 00:06 — a
-    notification, at night, repeating what had been said that morning and what the board already showed.
+    it used to send a separate alert sentence as well, which said what the board's own banner said a line lower:
+    two messages, one regime. and it was keyed on the calendar day, so a spell lasting past midnight announced
+    itself again at 00:06 — a notification, at night, repeating what had been said that morning.
     """
 
     def uow_factory(self) -> UnitOfWork:
@@ -75,7 +92,7 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
             power_topic=StubForumTopic(),
             uow_factory=self.uow_factory,
             schedule_provider=StubProvider(outlook),
-            outage_schedule_board=StubBoard(),
+            outage_schedule_board=self.board,
             settings=SimpleNamespace(YASNO_PRE_OUTAGE_LEAD_MINUTES=30),
             timezone=KYIV,
         )
@@ -83,6 +100,7 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
     async def asyncSetUp(self):
         await super().asyncSetUp()
         self.bot = RecordingBot()
+        self.board = StubBoard()
         self.today = datetime.now(KYIV).date()
         self.tomorrow = date.fromordinal(self.today.toordinal() + 1)
 
@@ -90,19 +108,30 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
         async with self.uow_factory() as uow:
             return len(await uow.posted_messages.list_by_kind(OUTAGE_EMERGENCY_KIND))
 
-    async def test_the_group_going_onto_emergency_shutdowns_is_announced_once(self):
+    async def test_the_group_going_onto_emergency_shutdowns_reposts_the_board_with_a_ping(self):
         await self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.today))()
 
-        self.assertEqual(self.bot.sent, [POWER_OUTAGE_EMERGENCY])
+        self.assertEqual(self.board.notified_posts, 1)
         self.assertEqual(await self.remembered(), 1)
 
-    async def test_the_same_spell_polled_again_says_nothing(self):
+    async def test_the_group_going_onto_emergency_shutdowns_sends_no_second_message(self):
+        """The alert sentence and the board's banner carried the same fact a minute apart."""
+        await self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.today))()
+
+        self.assertEqual(self.bot.sent, [])
+
+    async def test_the_announcing_tick_does_not_also_refresh_the_board_it_just_reposted(self):
+        await self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.today))()
+
+        self.assertEqual(self.board.refreshes, 0)
+
+    async def test_the_same_spell_polled_again_refreshes_the_board_without_a_ping(self):
         job = self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.today))
         await job()
 
         await job()
 
-        self.assertEqual(self.bot.sent, [POWER_OUTAGE_EMERGENCY])
+        self.assertEqual((self.board.notified_posts, self.board.refreshes), (1, 1))
 
     async def test_a_spell_that_lasts_past_midnight_is_not_announced_again(self):
         """The 00:06 ping: the day rolled over, the regime did not."""
@@ -110,12 +139,12 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
 
         await self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.tomorrow))()
 
-        self.assertEqual(self.bot.sent, [POWER_OUTAGE_EMERGENCY])
+        self.assertEqual(self.board.notified_posts, 1)
 
-    async def test_an_ordinary_day_announces_nothing(self):
+    async def test_an_ordinary_day_announces_nothing_and_refreshes_in_place(self):
         await self.build_job(build_outlook(OutageScheduleStatus.SCHEDULE_APPLIES, self.today))()
 
-        self.assertEqual(self.bot.sent, [])
+        self.assertEqual((self.board.notified_posts, self.board.refreshes), (0, 1))
         self.assertEqual(await self.remembered(), 0)
 
     async def test_a_new_spell_after_the_regime_lifted_is_announced_again(self):
@@ -124,13 +153,13 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
 
         await self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.today))()
 
-        self.assertEqual(self.bot.sent, [POWER_OUTAGE_EMERGENCY, POWER_OUTAGE_EMERGENCY])
+        self.assertEqual(self.board.notified_posts, 2)
 
-    async def test_the_regime_lifting_leaves_the_announcement_in_the_topic(self):
-        """It is a record of what happened; forgetting it must not rewrite the history of the chat."""
+    async def test_the_regime_lifting_leaves_the_board_where_it_is(self):
+        """Forgetting the spell must not delete the card the family is reading."""
         await self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.today))()
 
         await self.build_job(build_outlook(OutageScheduleStatus.SCHEDULE_APPLIES, self.today))()
 
         self.assertEqual(await self.remembered(), 0)
-        self.assertEqual(self.bot.sent, [POWER_OUTAGE_EMERGENCY])
+        self.assertEqual(self.bot.sent, [])

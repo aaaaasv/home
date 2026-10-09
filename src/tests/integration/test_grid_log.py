@@ -76,14 +76,54 @@ class GridLogTestCase(BaseIntegrationTestCase):
 
     async def test_the_grid_returning_is_written_down_too(self):
         bot = RecordingBot()
-        job = self.build_job(bot, mains_present=False, ecoflow=on_battery())
+        job = self.build_job(bot, mains_present=True, ecoflow=on_grid())
+        await job()
+        job.pi_ups = StubUps(mains_present=False)
+        job.ecoflow_station = StubStation(on_battery())
         await job()
         job.pi_ups = StubUps(mains_present=True)
         job.ecoflow_station = StubStation(on_grid())
 
         await job()
 
-        self.assertEqual(await self.logged(), [GridState.ON_GRID.value])
+        self.assertEqual(await self.logged(), [GridState.ON_BATTERY.value, GridState.ON_GRID.value])
+
+    async def test_a_restart_inside_an_outage_already_announced_keeps_quiet_about_it(self):
+        """The record is what a restart reads its bearings from, so the push does not arrive twice."""
+        async with self.uow_factory() as uow:
+            await uow.grid_events.create({"state": GridState.ON_BATTERY.value, "at": FROZEN_NOW})
+        bot = RecordingBot()
+        job = self.build_job(bot, mains_present=False, ecoflow=on_battery())
+
+        for _ in range(3):
+            await job()
+
+        self.assertEqual(bot.sent, [])
+
+    async def test_a_restart_inside_an_outage_still_announces_the_grid_coming_back(self):
+        async with self.uow_factory() as uow:
+            await uow.grid_events.create({"state": GridState.ON_BATTERY.value, "at": FROZEN_NOW})
+        bot = RecordingBot()
+        job = self.build_job(bot, mains_present=True, ecoflow=on_grid())
+
+        await job()
+
+        self.assertEqual(bot.sent, ["💡 <b>Світло є</b>"])
+
+    async def test_an_outage_that_began_before_the_bot_could_read_anything_is_announced_on_the_first_reading(self):
+        """
+        The nine outages of 7–9 october: the hat saw every one of them and the family was told about none.
+
+        nothing had been recorded, so there was no state to resume from, and the first known reading was
+        treated as establishing a baseline rather than as the blackout it was.
+        """
+        bot = RecordingBot()
+        job = self.build_job(bot, mains_present=False, ecoflow=on_battery())
+
+        await job()
+
+        self.assertEqual(bot.sent, ["🕯 <b>Світло зникло</b>"])
+        self.assertEqual(await self.logged(), [GridState.ON_BATTERY.value])
 
     async def test_a_poll_that_changes_nothing_writes_nothing(self):
         bot = RecordingBot()

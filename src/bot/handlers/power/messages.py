@@ -76,7 +76,6 @@ POWER_SCHEDULE_REFRESHED = "Оновлено"
 POWER_SCHEDULE_REFRESHING = "🔄 оновлюю…"
 # a bare fact, no nudge — the design forbids "charge your phone" style advice
 POWER_OUTAGE_SOON = "⚡ За {minutes} хв планове відключення {start}–{end}"
-POWER_OUTAGE_EMERGENCY = "⚠️ Аварійні відключення у вашій групі — світло можуть вимкнути будь-коли"
 
 # ⚡ Світло — EcoFlow conservation regime, fires only while the station is shelved/off. silent unless action is
 # needed; the warranty line nags daily. the pure logic returns a structured advisory, mapped to these here

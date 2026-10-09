@@ -195,12 +195,50 @@ class MainsMonitorTestCase(unittest.TestCase):
 
         self.assertEqual(announcements, [None, GridState.ON_BATTERY])
 
-    def test_update_a_restart_during_an_outage_does_not_announce_the_outage_it_woke_up_inside(self):
+    def test_update_a_first_reading_off_the_grid_is_announced_rather_than_swallowed(self):
+        """
+        It used to be swallowed as "merely establishing the state", and that silenced every real outage.
+
+        the hat reports unknown while the station it sits behind is off bluetooth, so the monitor never got a
+        known reading on the grid to establish anything from — the first one it ever saw was the blackout.
+        """
         monitor = MainsMonitor()
 
         announcements = [monitor.update(None, on_battery()) for _ in range(3)]
 
+        self.assertEqual(announcements, [None, GridState.ON_BATTERY, None])
+
+    def test_update_a_first_reading_on_the_grid_is_established_silently(self):
+        """«Світло є» is worth nothing on its own, so a deploy on an ordinary day stays quiet."""
+        monitor = MainsMonitor()
+
+        announcements = [monitor.update(None, on_grid()) for _ in range(3)]
+
         self.assertEqual(announcements, [None, None, None])
+
+    def test_update_seeded_from_an_outage_it_already_announced_says_nothing_about_it_again(self):
+        monitor = MainsMonitor()
+        monitor.seed(GridState.ON_BATTERY)
+
+        announcements = [monitor.update(None, on_battery()) for _ in range(3)]
+
+        self.assertEqual(announcements, [None, None, None])
+
+    def test_update_seeded_from_an_outage_still_announces_the_grid_coming_back(self):
+        monitor = MainsMonitor()
+        monitor.seed(GridState.ON_BATTERY)
+
+        announcements = [monitor.update(None, on_grid()) for _ in range(2)]
+
+        self.assertEqual(announcements, [None, GridState.ON_GRID])
+
+    def test_update_seeded_from_the_grid_announces_an_outage_that_began_while_it_was_down(self):
+        monitor = MainsMonitor()
+        monitor.seed(GridState.ON_GRID)
+
+        announcements = [monitor.update(None, on_battery()) for _ in range(2)]
+
+        self.assertEqual(announcements, [None, GridState.ON_BATTERY])
 
     def test_update_a_restart_during_an_outage_still_announces_the_grid_coming_back(self):
         monitor = MainsMonitor()
@@ -266,11 +304,12 @@ class RenderMainsChangeTestCase(unittest.TestCase):
 
 class ClassifyGridBehindTheStationTestCase(unittest.TestCase):
     """
-    The hat plugged into the station instead of the wall, which is how this flat is actually wired.
+    A hat plugged into the station instead of the wall, which is a topology this flat does not have.
 
-    its mains line then measures the station's output, so on its own it reports an ordinary day all the way
-    through a blackout. the station's own reading is the only thing that tells those apart — and a blackout is
-    exactly when the station drops off bluetooth, which is how «світло є» once went out mid-outage.
+    its mains line would then measure the station's output, so on its own it would report an ordinary day all
+    the way through a blackout, and only the station's own reading tells those apart. switching this on where
+    it did not apply cost nine outages: the hat was reporting the city grid correctly and was overruled into
+    unknown every time the station was off bluetooth.
     """
 
     def test_classify_a_live_socket_with_no_station_reading_is_unknown(self):
