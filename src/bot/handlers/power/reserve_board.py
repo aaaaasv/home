@@ -70,7 +70,7 @@ class ReserveBoard:
         media_server = await self.media_server_battery.read_state()
         now = datetime.now(self.timezone)
 
-        grid = classify_grid(ups, station)
+        grid = classify_grid(ups)
         return build_reserve(
             grid=grid,
             station=station,

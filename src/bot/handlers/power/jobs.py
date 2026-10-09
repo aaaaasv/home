@@ -22,9 +22,9 @@ from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.domain import GridState, OutageOutlook, OutageSchedule, OutageScheduleStatus, Reserve
 from src.modules.power.mains_monitor import MainsMonitor
 from src.modules.power.outage_forecast import forecast_outage
-from src.modules.power.services.ecoflow_station import EcoFlowStation, NullEcoFlowStation
+from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
-from src.modules.power.services.pi_ups import NullPiUps, PiUps
+from src.modules.power.services.pi_ups import PiUps
 from src.modules.power.use_cases.record_grid_change import RecordGridChangeUseCase
 from src.modules.power.use_cases.track_conservation import TrackConservationUseCase
 
@@ -69,9 +69,10 @@ class MainsWatchJob:
     Watches the wall socket and speaks twice per outage: when it goes, and when it returns.
 
     this is the message the whole of layer 1 is built for, and the second half is the one the family waits for.
-    the pi's own hat answers first because its line is wired to the socket; the station is read alongside it,
-    both to fill in how much is left and to tell the city's power from the station's after the transfer switch
-    is thrown. with neither able to answer it stays silent, because a guess here reads exactly like a blackout.
+    it asks the pi's own hat and nothing else: that line is wired to the wall socket, so it measures the city
+    rather than guessing at it. with the hat unreadable it stays silent, because a guess here reads exactly
+    like a blackout — and the station's watts, which used to be that guess, cannot tell an unplugged station
+    from a blackout at all.
 
     the monitor is seeded from the recorded events on the first tick, not on construction: the job is built
     while the scheduler is being assembled, long before anything may touch the database.
@@ -82,7 +83,6 @@ class MainsWatchJob:
         bot: Bot,
         chat_id: int,
         power_topic: ForumTopicRegistry,
-        ecoflow_station: EcoFlowStation,
         pi_ups: PiUps,
         settings: Settings,
         uow_factory: Callable[[], UnitOfWork],
@@ -91,21 +91,15 @@ class MainsWatchJob:
         self.bot = bot
         self.chat_id = chat_id
         self.power_topic = power_topic
-        self.ecoflow_station = ecoflow_station
         self.pi_ups = pi_ups
         self.uow_factory = uow_factory
         self.household_calendar = household_calendar
         self._seeded = False
-        self.monitor = MainsMonitor(
-            confirmations=settings.ECOFLOW_MAINS_CONFIRMATIONS,
-            station_feeds_the_pi=settings.PI_UPS_FED_BY_STATION,
-        )
+        self.monitor = MainsMonitor(confirmations=settings.ECOFLOW_MAINS_CONFIRMATIONS)
 
     async def __call__(self) -> None:
         await self._seed_once()
-        ups = await self.pi_ups.read_state()
-        station = await self.ecoflow_station.read_state()
-        grid = self.monitor.update(ups, station)
+        grid = self.monitor.update(await self.pi_ups.read_state())
         if grid is None:
             return
 
@@ -354,22 +348,18 @@ def _register_mains_watch(scheduler: AsyncIOScheduler, context: SchedulerContext
     """
     The grid is watched on its own, far tighter cadence: this is the one message worth being early.
 
-    it registers on either source alone. the hat answers without the station, and a flat that has a station
-    but no hat is still better served by the inference than by silence — so this is deliberately not gated
-    on both.
+    it needs the hat and only the hat. a flat with a station but no hat gets no grid messages at all, which
+    is correct: the station cannot tell being unplugged from a blackout, so it has nothing to say here.
     """
     settings = context.settings
-    watches_from_hat = settings.PI_UPS_ENABLED and context.pi_ups is not None
-    watches_from_station = settings.ECOFLOW_ENABLED and context.ecoflow_station is not None
-    if context.power_topic is None or not (watches_from_hat or watches_from_station):
+    if context.power_topic is None or not settings.PI_UPS_ENABLED or context.pi_ups is None:
         return
 
     mains_watch_job = MainsWatchJob(
         bot=context.bot,
         chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
         power_topic=context.power_topic,
-        ecoflow_station=context.ecoflow_station or NullEcoFlowStation(),
-        pi_ups=context.pi_ups or NullPiUps(),
+        pi_ups=context.pi_ups,
         settings=settings,
         uow_factory=context.uow_factory,
         household_calendar=context.household_calendar,

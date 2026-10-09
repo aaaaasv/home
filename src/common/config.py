@@ -214,11 +214,6 @@ class Settings(BaseSettings):
     # watched by a host agent (home-infrastructure/pi/x728), which also halts the pi on a dying pack; the bot only
     # reads what that agent publishes, so it needs no device mounts of its own
     PI_UPS_ENABLED: bool = False
-    # whether the pi's hat is plugged into the ecoflow rather than the wall. it changes what the hat's
-    # mains line MEANS: behind the station it reports the station's output, so it cannot tell a blackout
-    # from an ordinary day without the station's own reading. it must stay false where the hat is on the
-    # wall — switched on wrongly it overrules a correct hat into unknown whenever the station is off ble
-    PI_UPS_FED_BY_STATION: bool = False
     PI_UPS_STATE_PATH: str = "/run/x728/state.json"
     # the agent republishes every few seconds — a reading older than this means it stopped, and a stale
     # "mains present" would announce the light coming back in the middle of an outage

@@ -51,10 +51,10 @@ def hat(mains_present: bool, **overrides) -> UpsState:
 
 class ClassifyGridFromStationTestCase(unittest.TestCase):
     """
-    The Delta 2 reports watts, never a "plugged in" flag, so the grid has to be inferred from them.
+    What the station says about its own supply — for its own card, never for the grid.
 
-    the whole point of the third answer is the idle full station: it draws nothing, exactly like a station
-    running on battery, and telling those apart wrongly is a false blackout alert at three in the morning.
+    the third answer is the whole point: an idle full station draws nothing, exactly like one running on
+    battery, and nothing downstream may treat the two as the same.
     """
 
     def test_classify_a_station_drawing_from_the_wall_is_on_the_grid(self):
@@ -62,7 +62,7 @@ class ClassifyGridFromStationTestCase(unittest.TestCase):
 
         self.assertEqual(grid, GridState.ON_GRID)
 
-    def test_classify_a_station_feeding_the_flat_while_drawing_nothing_is_on_battery(self):
+    def test_classify_a_station_feeding_a_load_while_drawing_nothing_is_on_battery(self):
         grid = classify_grid_from_station(on_battery())
 
         self.assertEqual(grid, GridState.ON_BATTERY)
@@ -80,44 +80,25 @@ class ClassifyGridFromStationTestCase(unittest.TestCase):
 
 class ClassifyGridTestCase(unittest.TestCase):
     """
-    The hat's line is wired to the socket, so where it can answer it outranks anything inferred from watts.
+    The grid comes from the hat and from nothing else.
 
-    the one case it cannot answer alone is the transfer switch: thrown, it puts the whole flat — this pi
-    included — on the station, and the line then reports the station's power as the city's.
+    the station used to get a vote here, from before the hat was fitted, and it cost announcements in both
+    directions: a blackout reported as calm while it was off bluetooth, then the light coming back never
+    reported at all because it sat unplugged and discharging. it has no vote now — it cannot have one.
     """
 
     def test_classify_a_hat_seeing_the_socket_alive_is_on_the_grid(self):
-        grid = classify_grid(hat(mains_present=True), None)
+        grid = classify_grid(hat(mains_present=True))
 
         self.assertEqual(grid, GridState.ON_GRID)
 
     def test_classify_a_hat_seeing_the_socket_dead_is_on_battery(self):
-        grid = classify_grid(hat(mains_present=False), None)
+        grid = classify_grid(hat(mains_present=False))
 
         self.assertEqual(grid, GridState.ON_BATTERY)
 
-    def test_classify_a_hat_answers_where_an_idle_full_station_could_not(self):
-        grid = classify_grid(hat(mains_present=True), idle_and_full())
-
-        self.assertEqual(grid, GridState.ON_GRID)
-
-    def test_classify_a_live_socket_fed_by_the_station_is_still_on_battery(self):
-        grid = classify_grid(hat(mains_present=True), on_battery())
-
-        self.assertEqual(grid, GridState.ON_BATTERY)
-
-    def test_classify_a_dead_socket_is_on_battery_even_while_the_station_charges(self):
-        grid = classify_grid(hat(mains_present=False), on_grid())
-
-        self.assertEqual(grid, GridState.ON_BATTERY)
-
-    def test_classify_without_a_hat_falls_back_to_the_station(self):
-        grid = classify_grid(None, on_battery())
-
-        self.assertEqual(grid, GridState.ON_BATTERY)
-
-    def test_classify_with_neither_source_is_unknown(self):
-        grid = classify_grid(None, None)
+    def test_classify_without_a_hat_is_unknown_rather_than_guessed(self):
+        grid = classify_grid(None)
 
         self.assertEqual(grid, GridState.UNKNOWN)
 
@@ -126,72 +107,58 @@ class MainsMonitorTestCase(unittest.TestCase):
     """
     The two messages the whole of layer 1 exists to send, and every way they could be sent wrongly.
 
-    the message pings the family, so a blip, a restart or an unreachable station must all stay silent.
+    the message pings the family, so a blip and an unreadable hat must both stay silent — while a real
+    change must get through even when it is the first thing this process ever saw.
     """
-
-    def test_update_the_first_known_reading_establishes_the_state_without_announcing_it(self):
-        monitor = MainsMonitor()
-
-        announcements = [monitor.update(None, on_grid()) for _ in range(3)]
-
-        self.assertEqual(announcements, [None, None, None])
 
     def test_update_losing_the_grid_is_announced_once_it_has_been_seen_twice(self):
         monitor = MainsMonitor()
-        monitor.update(None, on_grid())
-        monitor.update(None, on_grid())
+        monitor.update(hat(mains_present=True))
+        monitor.update(hat(mains_present=True))
 
-        announcements = [monitor.update(None, on_battery()) for _ in range(3)]
+        announcements = [monitor.update(hat(mains_present=False)) for _ in range(3)]
 
         self.assertEqual(announcements, [None, GridState.ON_BATTERY, None])
 
     def test_update_the_grid_returning_is_announced_the_same_way(self):
         monitor = MainsMonitor()
-        for state in (on_grid(), on_grid(), on_battery(), on_battery()):
-            monitor.update(None, state)
+        for present in (True, True, False, False):
+            monitor.update(hat(mains_present=present))
 
-        announcements = [monitor.update(None, on_grid()), monitor.update(None, on_grid())]
+        announcements = [monitor.update(hat(mains_present=True)) for _ in range(2)]
 
         self.assertEqual(announcements, [None, GridState.ON_GRID])
 
     def test_update_a_single_reading_off_the_grid_that_recovers_announces_nothing(self):
         monitor = MainsMonitor()
-        monitor.update(None, on_grid())
-        monitor.update(None, on_grid())
+        monitor.update(hat(mains_present=True))
+        monitor.update(hat(mains_present=True))
 
         announcements = [
-            monitor.update(None, on_battery()),
-            monitor.update(None, on_grid()),
-            monitor.update(None, on_grid()),
+            monitor.update(hat(mains_present=False)),
+            monitor.update(hat(mains_present=True)),
+            monitor.update(hat(mains_present=True)),
         ]
 
         self.assertEqual(announcements, [None, None, None])
 
-    def test_update_an_unreachable_station_never_announces_a_blackout(self):
+    def test_update_an_unreadable_hat_never_announces_a_blackout(self):
+        """A stopped host agent is not an outage, and the adapter returns nothing rather than a stale reading."""
         monitor = MainsMonitor()
-        monitor.update(None, on_grid())
-        monitor.update(None, on_grid())
+        monitor.update(hat(mains_present=True))
+        monitor.update(hat(mains_present=True))
 
-        announcements = [monitor.update(None, None) for _ in range(3)]
+        announcements = [monitor.update(None) for _ in range(3)]
 
         self.assertEqual(announcements, [None, None, None])
 
-    def test_update_a_station_going_idle_and_full_never_announces_a_blackout(self):
+    def test_update_an_outage_that_starts_while_the_hat_is_unreadable_is_still_announced(self):
         monitor = MainsMonitor()
-        monitor.update(None, on_grid())
-        monitor.update(None, on_grid())
+        monitor.update(hat(mains_present=True))
+        monitor.update(hat(mains_present=True))
+        monitor.update(None)
 
-        announcements = [monitor.update(None, idle_and_full()) for _ in range(2)]
-
-        self.assertEqual(announcements, [None, None])
-
-    def test_update_an_outage_that_starts_while_the_station_is_unreachable_is_still_announced_on_return(self):
-        monitor = MainsMonitor()
-        monitor.update(None, on_grid())
-        monitor.update(None, on_grid())
-        monitor.update(None, None)
-
-        announcements = [monitor.update(None, on_battery()) for _ in range(2)]
+        announcements = [monitor.update(hat(mains_present=False)) for _ in range(2)]
 
         self.assertEqual(announcements, [None, GridState.ON_BATTERY])
 
@@ -199,12 +166,12 @@ class MainsMonitorTestCase(unittest.TestCase):
         """
         It used to be swallowed as "merely establishing the state", and that silenced every real outage.
 
-        the hat reports unknown while the station it sits behind is off bluetooth, so the monitor never got a
-        known reading on the grid to establish anything from — the first one it ever saw was the blackout.
+        nothing had been recorded to resume from, so the first reading the monitor ever saw was the blackout
+        itself — and it was spent on establishing a baseline.
         """
         monitor = MainsMonitor()
 
-        announcements = [monitor.update(None, on_battery()) for _ in range(3)]
+        announcements = [monitor.update(hat(mains_present=False)) for _ in range(3)]
 
         self.assertEqual(announcements, [None, GridState.ON_BATTERY, None])
 
@@ -212,7 +179,7 @@ class MainsMonitorTestCase(unittest.TestCase):
         """«Світло є» is worth nothing on its own, so a deploy on an ordinary day stays quiet."""
         monitor = MainsMonitor()
 
-        announcements = [monitor.update(None, on_grid()) for _ in range(3)]
+        announcements = [monitor.update(hat(mains_present=True)) for _ in range(3)]
 
         self.assertEqual(announcements, [None, None, None])
 
@@ -220,7 +187,7 @@ class MainsMonitorTestCase(unittest.TestCase):
         monitor = MainsMonitor()
         monitor.seed(GridState.ON_BATTERY)
 
-        announcements = [monitor.update(None, on_battery()) for _ in range(3)]
+        announcements = [monitor.update(hat(mains_present=False)) for _ in range(3)]
 
         self.assertEqual(announcements, [None, None, None])
 
@@ -228,7 +195,7 @@ class MainsMonitorTestCase(unittest.TestCase):
         monitor = MainsMonitor()
         monitor.seed(GridState.ON_BATTERY)
 
-        announcements = [monitor.update(None, on_grid()) for _ in range(2)]
+        announcements = [monitor.update(hat(mains_present=True)) for _ in range(2)]
 
         self.assertEqual(announcements, [None, GridState.ON_GRID])
 
@@ -236,49 +203,16 @@ class MainsMonitorTestCase(unittest.TestCase):
         monitor = MainsMonitor()
         monitor.seed(GridState.ON_GRID)
 
-        announcements = [monitor.update(None, on_battery()) for _ in range(2)]
+        announcements = [monitor.update(hat(mains_present=False)) for _ in range(2)]
 
         self.assertEqual(announcements, [None, GridState.ON_BATTERY])
 
     def test_update_a_restart_during_an_outage_still_announces_the_grid_coming_back(self):
         monitor = MainsMonitor()
-        monitor.update(None, on_battery())
-        monitor.update(None, on_battery())
+        monitor.update(hat(mains_present=False))
+        monitor.update(hat(mains_present=False))
 
-        announcements = [monitor.update(None, on_grid()), monitor.update(None, on_grid())]
-
-        self.assertEqual(announcements, [None, GridState.ON_GRID])
-
-    def test_update_the_hat_announces_an_outage_with_no_station_in_the_flat_at_all(self):
-        monitor = MainsMonitor()
-        monitor.update(hat(mains_present=True), None)
-        monitor.update(hat(mains_present=True), None)
-
-        announcements = [monitor.update(hat(mains_present=False), None) for _ in range(2)]
-
-        self.assertEqual(announcements, [None, GridState.ON_BATTERY])
-
-    def test_update_throwing_the_transfer_switch_mid_outage_does_not_announce_the_light_returning(self):
-        """The whole flat moves onto the station, so the hat sees power again — but the city is still out."""
-        monitor = MainsMonitor()
-        monitor.update(hat(mains_present=True), on_grid())
-        monitor.update(hat(mains_present=True), on_grid())
-        monitor.update(hat(mains_present=False), on_battery())
-        monitor.update(hat(mains_present=False), on_battery())
-
-        announcements = [monitor.update(hat(mains_present=True), on_battery()) for _ in range(3)]
-
-        self.assertEqual(announcements, [None, None, None])
-
-    def test_update_switching_back_to_the_city_announces_the_light_returning(self):
-        monitor = MainsMonitor()
-        monitor.update(hat(mains_present=True), on_grid())
-        monitor.update(hat(mains_present=True), on_grid())
-        monitor.update(hat(mains_present=False), on_battery())
-        monitor.update(hat(mains_present=False), on_battery())
-        monitor.update(hat(mains_present=True), on_battery())
-
-        announcements = [monitor.update(hat(mains_present=True), on_grid()) for _ in range(2)]
+        announcements = [monitor.update(hat(mains_present=True)) for _ in range(2)]
 
         self.assertEqual(announcements, [None, GridState.ON_GRID])
 
@@ -300,56 +234,3 @@ class RenderMainsChangeTestCase(unittest.TestCase):
         text = render_mains_change(GridState.ON_GRID)
 
         self.assertEqual(text, "💡 <b>Світло є</b>")
-
-
-class ClassifyGridBehindTheStationTestCase(unittest.TestCase):
-    """
-    A hat plugged into the station instead of the wall, which is a topology this flat does not have.
-
-    its mains line would then measure the station's output, so on its own it would report an ordinary day all
-    the way through a blackout, and only the station's own reading tells those apart. switching this on where
-    it did not apply cost nine outages: the hat was reporting the city grid correctly and was overruled into
-    unknown every time the station was off bluetooth.
-    """
-
-    def test_classify_a_live_socket_with_no_station_reading_is_unknown(self):
-        grid = classify_grid(hat(mains_present=True), None, station_feeds_the_pi=True)
-
-        self.assertEqual(grid, GridState.UNKNOWN)
-
-    def test_classify_a_live_socket_with_an_idle_full_station_is_on_the_grid(self):
-        grid = classify_grid(hat(mains_present=True), idle_and_full(), station_feeds_the_pi=True)
-
-        self.assertEqual(grid, GridState.ON_GRID)
-
-    def test_classify_a_live_socket_with_a_discharging_station_is_on_battery(self):
-        grid = classify_grid(hat(mains_present=True), on_battery(), station_feeds_the_pi=True)
-
-        self.assertEqual(grid, GridState.ON_BATTERY)
-
-    def test_classify_a_dead_socket_is_on_battery_even_with_no_station_reading(self):
-        """The station's own output gone too: nothing is feeding the flat, whatever bluetooth says."""
-        grid = classify_grid(hat(mains_present=False), None, station_feeds_the_pi=True)
-
-        self.assertEqual(grid, GridState.ON_BATTERY)
-
-
-class MainsMonitorBehindTheStationTestCase(unittest.TestCase):
-    def test_update_a_station_going_unreachable_mid_outage_announces_nothing(self):
-        monitor = MainsMonitor(station_feeds_the_pi=True)
-        monitor.update(hat(mains_present=True), on_grid())
-        monitor.update(hat(mains_present=True), on_grid())
-
-        announcements = [monitor.update(hat(mains_present=True), None) for _ in range(3)]
-
-        self.assertEqual(announcements, [None, None, None])
-
-    def test_update_the_grid_returning_is_announced_once_the_station_answers_again(self):
-        monitor = MainsMonitor(station_feeds_the_pi=True)
-        monitor.update(hat(mains_present=True), on_battery())
-        monitor.update(hat(mains_present=True), on_battery())
-        monitor.update(hat(mains_present=True), None)
-
-        announcements = [monitor.update(hat(mains_present=True), on_grid()) for _ in range(2)]
-
-        self.assertEqual(announcements, [None, GridState.ON_GRID])
