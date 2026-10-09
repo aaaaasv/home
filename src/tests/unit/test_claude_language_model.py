@@ -20,6 +20,13 @@ class StubClaudeClient:
 
     async def complete(self, purpose: str, model: str, **request):
         self.requests.append({"purpose": purpose, "model": model, **request})
+        return self._answer()
+
+    async def complete_with_tools(self, purpose: str, model: str, **request):
+        self.requests.append({"purpose": purpose, "model": model, **request})
+        return self._answer()
+
+    def _answer(self):
         if self.refusal is not None:
             raise self.refusal
         if self.text is None:
@@ -90,3 +97,41 @@ class BuildTurnTestCase(unittest.TestCase):
                 {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": "AAE="}},
             ],
         )
+
+
+class StubToolbox:
+    def __init__(self):
+        self.asked: list[str] = []
+
+    @property
+    def definitions(self):
+        return [{"name": "grid_log"}]
+
+    async def run(self, name: str, arguments: dict) -> str:
+        self.asked.append(name)
+        return "світло зникло о 04:00"
+
+
+class ToolboxTestCase(unittest.IsolatedAsyncioTestCase):
+    """The assistant reaches for history instead of being handed all of it in every prompt."""
+
+    async def test_a_model_with_no_toolbox_still_gets_web_search(self):
+        client = StubClaudeClient()
+
+        await ClaudeLanguageModel(client=client, model="claude-sonnet-5-5", effort="medium").generate(
+            [ConversationTurn(role=USER_ROLE, text="питання")], "факти"
+        )
+
+        self.assertEqual(client.requests[0]["tools"], [WEB_SEARCH_TOOL])
+
+    async def test_a_model_with_a_toolbox_offers_both_its_tools_and_web_search(self):
+        client = StubClaudeClient()
+        toolbox = StubToolbox()
+
+        await ClaudeLanguageModel(client=client, model="claude-sonnet-5-5", effort="medium", tools=toolbox).generate(
+            [ConversationTurn(role=USER_ROLE, text="коли не було світла?")], "факти"
+        )
+
+        self.assertEqual(client.requests[0]["tools"], [{"name": "grid_log"}, WEB_SEARCH_TOOL])
+        # a bound method is equal to itself but never identical, so compare rather than assert identity
+        self.assertEqual(client.requests[0]["run_tool"], toolbox.run)
