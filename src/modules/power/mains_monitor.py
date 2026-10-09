@@ -2,39 +2,30 @@
 from src.modules.power.domain import EcoFlowState, GridState, UpsState
 
 
-def classify_grid(ups: UpsState | None, station: EcoFlowState | None, station_feeds_the_pi: bool = False) -> GridState:
+def classify_grid(ups: UpsState | None) -> GridState:
     """
-    Answer from the pi's own hat where it can, from the station's watts where it cannot, and refuse otherwise.
+    Answer from the pi's own hat, which is wired to the wall socket, and refuse to answer without it.
 
-    the hat's line is wired to whatever socket the pi is plugged into, so it is a measurement rather than an
-    inference — but only of that socket. plugged into the station, it reports the station's output as if it
-    were the city's, and then only the station's own reading tells those two apart.
+    the station used to get a vote here, from the days before the hat existed. it never could have one: its
+    firmware exposes watts and no "plugged in" flag, so a station sitting unplugged and running a load is
+    indistinguishable from one carrying the flat through a blackout. that ambiguity was known and written
+    down before the hat was fitted, and keeping the inference afterwards cost real announcements in both
+    directions — a blackout reported as calm, and the light coming back never reported at all.
+
+    the hat is a measurement. it needs no second opinion, and there is no second opinion worth having.
     """
-    if ups is not None:
-        if not ups.mains_present:
-            return GridState.ON_BATTERY
-        # a hat living behind the station cannot be read alone, and an outage is exactly when the station tends
-        # to drop off bluetooth — so this answered "світло є" in the middle of a blackout. silence is the honest
-        # answer: the docstring below already says a guess here reads exactly like a blackout
-        if station_feeds_the_pi and station is None:
-            return GridState.UNKNOWN
-        # only a discharging station is evidence of the switch: one drawing from the wall while it feeds the
-        # flat is proof of the opposite, and a readable idle one is a full station sitting on mains
-        if classify_grid_from_station(station) is GridState.ON_BATTERY:
-            return GridState.ON_BATTERY
-        return GridState.ON_GRID
-
-    return classify_grid_from_station(station)
+    if ups is None:
+        return GridState.UNKNOWN
+    return GridState.ON_GRID if ups.mains_present else GridState.ON_BATTERY
 
 
 def classify_grid_from_station(state: EcoFlowState | None) -> GridState:
     """
-    Read the grid off the station alone, and refuse to answer when the reading cannot carry the question.
+    What the station alone says about its own supply — for the station's own card, never for the grid.
 
-    the delta 2 has no "plugged in" flag — its firmware exposes only watts, and the newer stations' explicit
-    flag does not exist here — so mains presence has to be inferred. drawing from the wall is proof the grid
-    is up. drawing nothing while feeding the flat is proof it is down. but a full station idling on mains
-    also draws nothing, and that looks identical to an outage: hence the third answer.
+    the delta 2 has no "plugged in" flag, so this is an inference: drawing from the wall means its input is
+    live, drawing nothing while feeding a load means it is on battery. but a full station idling on mains
+    also draws nothing, and that looks identical — hence the third answer.
     """
     if state is None:
         return GridState.UNKNOWN
@@ -49,19 +40,18 @@ class MainsMonitor:
     """
     Reports the moment the grid goes and the moment it comes back, and says nothing in between.
 
-    unknown readings are skipped rather than treated as a change, so a station that is unreachable, shelved or
-    simply idle never announces a blackout. a change must be seen twice before it is announced, because one
-    reading is a blip and this message wakes the family.
+    a reading the hat cannot give is skipped rather than treated as a change, so a stopped agent never
+    announces a blackout. a change must be seen twice before it is announced, because one reading is a blip
+    and this message wakes the family.
 
-    where the grid stood last is read back from the recorded events through `seed`, because the process restarts
-    on every deploy and in-memory state alone made the first change after a restart indistinguishable from the
-    reading that merely established a baseline. it was swallowed, every time: the hat logged nine outages over
-    three days and the family heard about none of them.
+    where the grid stood last is read back from the recorded events through `seed`, because the process
+    restarts on every deploy and in-memory state alone made the first change after a restart indistinguishable
+    from the reading that merely established a baseline. it was swallowed, every time: the hat logged nine
+    outages over three days and the family heard about none of them.
     """
 
-    def __init__(self, confirmations: int = 2, station_feeds_the_pi: bool = False):
+    def __init__(self, confirmations: int = 2):
         self.confirmations = confirmations
-        self.station_feeds_the_pi = station_feeds_the_pi
         self._announced: GridState | None = None
         self._pending: GridState | None = None
         self._seen = 0
@@ -70,9 +60,9 @@ class MainsMonitor:
         """Where the grid stood when this house last said something about it, so a restart repeats nothing."""
         self._announced = announced
 
-    def update(self, ups: UpsState | None, station: EcoFlowState | None) -> GridState | None:
+    def update(self, ups: UpsState | None) -> GridState | None:
         """Return the new grid state at the moment it is confirmed, and None every other time."""
-        grid = classify_grid(ups, station, self.station_feeds_the_pi)
+        grid = classify_grid(ups)
         if grid is GridState.UNKNOWN:
             return None
 
