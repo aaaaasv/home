@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-10-09
+
 ### Додано
 
 - **Асистент більше не отримує всі факти одразу — він сам ходить по базі.** Досьє п'яти модулів зшивалось
