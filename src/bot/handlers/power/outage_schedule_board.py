@@ -4,6 +4,7 @@ from datetime import datetime, tzinfo
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import Message
 
 from src.bot.handlers.power.formatting import render_outage_outlook
 from src.bot.handlers.power.keyboards import build_outage_schedule_keyboard
@@ -27,6 +28,10 @@ class OutageScheduleBoard:
 
     it carries both published days, because yasno may publish a day's intervals at any hour: on 7 october they
     landed at 21:10, and a board about today alone had nothing left to tell anybody.
+
+    `notify` exists for exactly one event: the group turning to emergency shutdowns. that used to be a separate
+    push, which meant two messages a minute apart saying the same sentence — the board already carries the
+    banner. so the regime announces itself by reposting the board with a ping instead.
     """
 
     def __init__(
@@ -46,13 +51,13 @@ class OutageScheduleBoard:
         self.timezone = timezone
         self.tracker = PostedMessageTracker(bot=bot, uow_factory=uow_factory)
 
-    async def post(self, outlook: OutageOutlook | None = None) -> None:
+    async def post(self, outlook: OutageOutlook | None = None, notify: bool = False) -> Message | None:
         outlook = outlook if outlook is not None else await self.schedule_provider.fetch()
         now = datetime.now(self.timezone)
         # nothing left to say → make sure no stale board lingers from earlier, then stay silent
         if outlook is None or not outlook.has_anything_ahead(now):
             await self.tracker.clear(OUTAGE_SCHEDULE_KIND)
-            return
+            return None
 
         await self.tracker.clear(OUTAGE_SCHEDULE_KIND)
         message = await self.bot.send_message(
@@ -60,11 +65,12 @@ class OutageScheduleBoard:
             message_thread_id=await self.power_topic.resolve(),
             text=render_outage_outlook(outlook, now),
             reply_markup=build_outage_schedule_keyboard(),
-            # a glance, not a call to action — the pushes are separate; deliver and refresh this without a ping
-            disable_notification=True,
+            # a glance, not a call to action — the daily board is delivered and refreshed without a ping
+            disable_notification=not notify,
         )
         await self.tracker.remember(OUTAGE_SCHEDULE_KIND, message)
         logger.info("Posted the outage schedule for %s and the day after", outlook.today.day.isoformat())
+        return message
 
     async def refresh(self, outlook: OutageOutlook | None = None) -> bool:
         message_id = await self._remembered_message_id()

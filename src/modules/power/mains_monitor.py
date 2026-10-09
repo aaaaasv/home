@@ -51,8 +51,12 @@ class MainsMonitor:
 
     unknown readings are skipped rather than treated as a change, so a station that is unreachable, shelved or
     simply idle never announces a blackout. a change must be seen twice before it is announced, because one
-    reading is a blip and this message wakes the family. state is in memory and re-seeds from the first known
-    reading after a restart, so a deploy cannot fire a spurious "світло зникло".
+    reading is a blip and this message wakes the family.
+
+    where the grid stood last is read back from the recorded events through `seed`, because the process restarts
+    on every deploy and in-memory state alone made the first change after a restart indistinguishable from the
+    reading that merely established a baseline. it was swallowed, every time: the hat logged nine outages over
+    three days and the family heard about none of them.
     """
 
     def __init__(self, confirmations: int = 2, station_feeds_the_pi: bool = False):
@@ -61,6 +65,10 @@ class MainsMonitor:
         self._announced: GridState | None = None
         self._pending: GridState | None = None
         self._seen = 0
+
+    def seed(self, announced: GridState | None) -> None:
+        """Where the grid stood when this house last said something about it, so a restart repeats nothing."""
+        self._announced = announced
 
     def update(self, ups: UpsState | None, station: EcoFlowState | None) -> GridState | None:
         """Return the new grid state at the moment it is confirmed, and None every other time."""
@@ -77,8 +85,11 @@ class MainsMonitor:
         if self._seen < self.confirmations or grid == self._announced:
             return None
 
-        first_reading = self._announced is None
+        # "світло є" is worth nothing on its own, so a house that has never said anything stays quiet about it;
+        # "світло зникло" is the message this whole layer exists for and is said even as the very first word
+        if self._announced is None and grid is GridState.ON_GRID:
+            self._announced = grid
+            return None
+
         self._announced = grid
-        # the first known reading only establishes where we started; announcing it would greet every deploy
-        # with a blackout report
-        return None if first_reading else grid
+        return grid
