@@ -5,6 +5,7 @@ from typing import Any
 from aiogram import Bot
 
 from src.bot.handlers.air_alert import facts as air_alert_facts
+from src.bot.handlers.assistant.household_tools import HouseholdTools
 from src.bot.handlers.chores import facts as chores_facts
 from src.bot.handlers.chores.board import ChoresBoard
 from src.bot.handlers.newspaper.claude_word_source import ClaudeWordSource
@@ -409,7 +410,17 @@ def build_language_model(settings: Settings) -> LanguageModel | None:
 
     client = build_claude_client(settings)
     if client is not None:
-        return ClaudeLanguageModel(client=client, model=settings.CLAUDE_MODEL, effort=settings.CLAUDE_EFFORT)
+        return ClaudeLanguageModel(
+            client=client,
+            model=settings.CLAUDE_MODEL,
+            effort=settings.CLAUDE_EFFORT,
+            # the history the facts dump cannot carry: a year of sensor days will never fit in a prompt
+            tools=HouseholdTools(
+                uow_factory=UnitOfWork,
+                household_calendar=HouseholdCalendar(timezone=settings.timezone),
+                settings=settings,
+            ),
+        )
     if settings.GEMINI_API_KEY:
         return GeminiLanguageModel(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
     return None
