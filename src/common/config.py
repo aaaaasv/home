@@ -309,6 +309,13 @@ class Settings(BaseSettings):
     YASNO_DIGEST_TIME: str = "07:00"
     # a planned outage gets one heads-up this many minutes before it starts — a bare fact, no advice
     YASNO_PRE_OUTAGE_LEAD_MINUTES: int = 30
+    # during emergency shutdowns yasno publishes the regime and drops the hours, while the grid operator keeps
+    # publishing its daily table — the one the city's own app shows. the operator's site refuses headless
+    # browsers, so this reads a mirror of it and fills in only the days yasno left with no hours at all
+    DTEK_OUTAGE_MIRROR_URL: str = ""
+    # the table is written once overnight, so "fresh" is a day-ish window; past it the mirror has frozen and
+    # would answer 200 with yesterday's hours
+    DTEK_OUTAGE_MIRROR_STALE_AFTER_HOURS: int = 30
 
     # the weekly paper: a half-page crossword the lan printer prints on its own. the printing is the point as much
     # as the puzzle — an inkjet that fires no ink for a week starts to clog. the queue is the cups container that
