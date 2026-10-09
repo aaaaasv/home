@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from src.bot.handlers.power.jobs import YasnoScheduleJob
 from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.power.domain import OutageOutlook, OutageSchedule, OutageScheduleStatus
+from src.modules.power.domain import OutageInterval, OutageOutlook, OutageSchedule, OutageScheduleStatus
 from src.tests.fakes import StubForumTopic
 from src.tests.integration.base import BaseIntegrationTestCase
 
@@ -67,6 +67,11 @@ class StubBoard:
             message_id = 900
 
         return Posted()
+
+
+def _minute_of_day_in(minutes_from_now: int) -> int:
+    now = datetime.now(KYIV)
+    return now.hour * 60 + now.minute + minutes_from_now
 
 
 def build_outlook(status: OutageScheduleStatus, day: date) -> OutageOutlook:
@@ -154,6 +159,33 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
         await self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.today))()
 
         self.assertEqual(self.board.notified_posts, 2)
+
+    def build_outlook_with_an_outage_due_soon(self, status: OutageScheduleStatus) -> OutageOutlook:
+        """An hour starting twenty minutes from now, which is inside the thirty-minute heads-up window."""
+        starting_soon = OutageInterval(start_minute=_minute_of_day_in(20), end_minute=_minute_of_day_in(200))
+        return OutageOutlook(
+            today=OutageSchedule(day=self.today, status=status, off_intervals=(starting_soon,), updated_on=None),
+            tomorrow=None,
+        )
+
+    async def test_an_outage_due_soon_under_an_applying_schedule_is_pinged(self):
+        await self.build_job(self.build_outlook_with_an_outage_due_soon(OutageScheduleStatus.SCHEDULE_APPLIES))()
+
+        self.assertEqual(len(self.bot.sent), 1)
+
+    async def test_the_hours_shown_during_emergency_shutdowns_earn_no_pre_outage_ping(self):
+        """
+        They are the operator's plan, which the operator itself says is not in force in this regime.
+
+        a heads-up for one of them would be wrong about as often as it was right, and that is the surest way
+        to get the topic muted. the pair with the test above is the point: the same hour, pinged under one
+        regime and silent under the other.
+        """
+        outlook = self.build_outlook_with_an_outage_due_soon(OutageScheduleStatus.EMERGENCY_SHUTDOWNS)
+
+        await self.build_job(outlook)()
+
+        self.assertEqual(self.bot.sent, [])
 
     async def test_the_regime_lifting_leaves_the_board_where_it_is(self):
         """Forgetting the spell must not delete the card the family is reading."""
