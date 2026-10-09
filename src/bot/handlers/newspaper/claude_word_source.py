@@ -11,8 +11,6 @@ from src.modules.newspaper.domain import CrosswordClue, normalize_answer
 logger = logging.getLogger(__name__)
 
 MAX_TOKENS = 4000
-# forty words that should not resemble each other, so the model is given room to wander
-TEMPERATURE = 0.9
 CLUES_SCHEMA = {
     "type": "object",
     "properties": {
@@ -53,7 +51,6 @@ class ClaudeWordSource:
                 purpose="Crossword words",
                 model=self.model,
                 max_tokens=MAX_TOKENS,
-                temperature=TEMPERATURE,
                 messages=[{"role": "user", "content": PROMPT.format(count=REQUESTED_WORDS, excluded=excluded)}],
                 output_config={"effort": self.effort, "format": {"type": "json_schema", "schema": CLUES_SCHEMA}},
             )
