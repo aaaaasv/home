@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.43.2] - 2026-10-09
+
 ### Виправлено
 
 - **Бот не казав, що зникло світло.** Хат на Pi бачив кожне відключення — за 7–9 жовтня їх було дев'ять, —
