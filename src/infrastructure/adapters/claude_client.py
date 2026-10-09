@@ -95,6 +95,10 @@ class ClaudeClient:
         return results
 
     async def _ask(self, purpose: str, model: str, **request: Any) -> Message | None:
+        # `temperature` is deprecated on the 5.x models and the api answers 400 to it. the error arrived as a
+        # plain APIError, was logged and turned into None, so the assistant simply stopped answering and
+        # nothing said why. effort is the knob now
+        assert "temperature" not in request, "the 5.x models refuse `temperature`; set effort instead"
         await self.ledger.refuse_if_spent()
         try:
             response = await self.client.messages.create(model=model, **request)

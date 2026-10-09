@@ -12,8 +12,6 @@ from src.modules.plant_care.domain import PlantIdentification
 logger = logging.getLogger(__name__)
 
 MAX_TOKENS = 1000
-# identification, not invention
-TEMPERATURE = 0.1
 IDENTIFICATION_SCHEMA = {
     "type": "object",
     "properties": {
@@ -56,7 +54,6 @@ class ClaudePlantIdentifier:
                 purpose="Plant identification",
                 model=self.model,
                 max_tokens=MAX_TOKENS,
-                temperature=TEMPERATURE,
                 messages=[{"role": "user", "content": content}],
                 output_config={
                     "effort": self.effort,
