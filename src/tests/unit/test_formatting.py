@@ -115,6 +115,15 @@ class RenderPlantCardTestCase(unittest.TestCase):
         self.assertIn("<blockquote expandable>½ — 1 мл на 0.5 л.</blockquote>", rendered)
         self.assertEqual(rendered.count("<blockquote expandable>"), 2)
 
+    def test_render_plant_card_collapses_the_notes_into_an_expandable_blockquote(self):
+        card = self.build_card(with_history=False).model_copy(
+            update={"notes": "Каудекс тримай над рівнем ґрунту й не засипай."}
+        )
+
+        rendered = render_plant_card(card, HouseholdCalendar(timezone=ZoneInfo("Europe/Kyiv")))
+
+        self.assertIn("<blockquote expandable>📝 Каудекс тримай над рівнем ґрунту й не засипай.</blockquote>", rendered)
+
     def test_render_plant_card_omits_the_block_for_a_schedule_without_instructions(self):
         card = self.build_card(with_history=False).model_copy(
             update={
