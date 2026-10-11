@@ -149,7 +149,8 @@ def render_plant_card(card: PlantCard, calendar: HouseholdCalendar) -> str:
     if card.location:
         lines.append(f"📍 {escape(card.location)}")
     if card.notes:
-        lines.append(f"📝 {escape(card.notes)}")
+        # notes are reference too, and the longest prose on the card — collapse them for the same reason
+        lines.append(f"<blockquote expandable>📝 {escape(card.notes)}</blockquote>")
 
     ideal_climate = _render_ideal_climate_line(card)
     if ideal_climate:
