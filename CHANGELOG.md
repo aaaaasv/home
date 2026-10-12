@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.3] - 2026-10-12
+
 ### Виправлено
 
 - **Бот знову впізнає рослину з фото.** На «додай рослину» він відповідав «не впізнаю за цим фото —
