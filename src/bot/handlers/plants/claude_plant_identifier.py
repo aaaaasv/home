@@ -18,8 +18,9 @@ IDENTIFICATION_SCHEMA = {
         "common_name": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "species": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "watering_interval_days": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "care_notes": {"anyOf": [{"type": "string"}, {"type": "null"}]},
     },
-    "required": ["common_name", "species", "watering_interval_days"],
+    "required": ["common_name", "species", "watering_interval_days", "care_notes"],
     "additionalProperties": False,
 }
 
