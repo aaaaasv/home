@@ -1,5 +1,6 @@
 import unittest
 
+from src.bot.handlers.plants.claude_plant_identifier import IDENTIFICATION_SCHEMA
 from src.bot.handlers.plants.gemini_plant_identifier import parse_identification
 from src.modules.plant_care.domain import PlantIdentification
 
@@ -57,3 +58,19 @@ class ParseIdentificationTestCase(unittest.TestCase):
 
     def test_parse_identification_without_candidates_returns_none(self):
         self.assertIsNone(parse_identification({"candidates": []}))
+
+
+class IdentificationSchemaTestCase(unittest.TestCase):
+    """
+    The shape asked of claude, checked against the shape it is parsed into.
+
+    these two drifted apart for seven weeks and every identification was silently discarded: the schema
+    forbids keys it does not list, so a field missing from it can never come back, and the reply then fails
+    validation whole — the family saw "не впізнаю за цим фото" for plants the model had named correctly.
+    """
+
+    def test_the_schema_asks_for_every_field_the_identification_is_parsed_into(self):
+        parsed_fields = set(PlantIdentification.model_fields)
+
+        self.assertEqual(set(IDENTIFICATION_SCHEMA["properties"]), parsed_fields)
+        self.assertEqual(set(IDENTIFICATION_SCHEMA["required"]), parsed_fields)
