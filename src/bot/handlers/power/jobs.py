@@ -28,7 +28,7 @@ from src.modules.power.domain import (
     OutageScheduleStatus,
     Reserve,
 )
-from src.modules.power.mains_monitor import MainsMonitor
+from src.modules.power.mains_monitor import MainsMonitor, classify_grid
 from src.modules.power.outage_forecast import forecast_outage
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
@@ -192,6 +192,7 @@ class OutageForecastJob:
         ecoflow_station: EcoFlowStation,
         schedule_provider: OutageScheduleProvider,
         household_calendar: HouseholdCalendar,
+        pi_ups: PiUps,
         confirmations: int = 2,
     ):
         self.bot = bot
@@ -200,6 +201,7 @@ class OutageForecastJob:
         self.ecoflow_station = ecoflow_station
         self.schedule_provider = schedule_provider
         self.household_calendar = household_calendar
+        self.pi_ups = pi_ups
         self.confirmations = confirmations
         self._last_schedule: OutageSchedule | None = None
         self._warned = False
@@ -211,7 +213,8 @@ class OutageForecastJob:
         calendar = self.household_calendar
         moment = calendar.now().astimezone(calendar.timezone)
         state = await self.ecoflow_station.read_state()
-        forecast = forecast_outage(state, await self._schedule(moment), moment)
+        grid = classify_grid(await self.pi_ups.read_state())
+        forecast = forecast_outage(state, await self._schedule(moment), moment, grid)
 
         if forecast is None:
             # the grid is back, or the question cannot be answered — either way the next outage is a fresh one
@@ -456,8 +459,9 @@ def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContex
         id="ecoflow_poll",
         replace_existing=True,
     )
-    # the forecast needs both the station and the schedule, so it registers only where the schedule exists too
-    if context.power_topic is not None and context.schedule_provider is not None:
+    # the forecast needs the schedule to know when the light is due and the hat to know the light is still out,
+    # so it registers only where both exist
+    if context.power_topic is not None and context.schedule_provider is not None and context.pi_ups is not None:
         outage_forecast_job = OutageForecastJob(
             bot=context.bot,
             chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
@@ -465,6 +469,7 @@ def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContex
             ecoflow_station=context.ecoflow_station,
             schedule_provider=context.schedule_provider,
             household_calendar=context.household_calendar,
+            pi_ups=context.pi_ups,
         )
         scheduler.add_job(
             outage_forecast_job.__call__,
