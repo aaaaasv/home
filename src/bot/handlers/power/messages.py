@@ -44,6 +44,9 @@ POWER_OUTAGE_SHORTFALL = (
     "Батарея сяде о {runs_out}, а світло за графіком о {returns}.\n"
     "Бракує {shortfall} — варто зняти зайве навантаження."
 )
+# the same message, written over once the draw drops: a warning the load has since made untrue keeps standing
+# there being read as if it were still true, and the family has no way to tell which it is
+POWER_OUTAGE_SHORTFALL_OVER = "🔋 <b>Дотягне до світла</b>\n\nНавантаження впало — заряду вистачає до {returns}."
 
 # /conserve — the storage-regime control card. a rare, once-in-months action, so it earns its own command rather
 # than a button that hangs on every /eco card

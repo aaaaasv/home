@@ -4,11 +4,12 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, tzinfo
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from src.bot.handlers.power.formatting import render_mains_change, render_outage_forecast
+from src.bot.handlers.power.formatting import render_mains_change, render_outage_forecast, render_outage_recovery
 from src.bot.handlers.power.messages import POWER_OUTAGE_SOON
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.handlers.power.reserve_board import ReserveBoard
@@ -19,7 +20,14 @@ from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.power.domain import GridState, OutageOutlook, OutageSchedule, OutageScheduleStatus, Reserve
+from src.modules.power.domain import (
+    GridState,
+    OutageForecast,
+    OutageOutlook,
+    OutageSchedule,
+    OutageScheduleStatus,
+    Reserve,
+)
 from src.modules.power.mains_monitor import MainsMonitor
 from src.modules.power.outage_forecast import forecast_outage
 from src.modules.power.services.ecoflow_station import EcoFlowStation
@@ -164,8 +172,13 @@ class OutageForecastJob:
     """
     Says one thing, once per outage: that the battery will not last until the light is scheduled to return.
 
-    it never announces good news. "you reach" is a fact worth nothing at the moment it is true and worth
-    less every minute after, and a push that speaks on every outage is a push the family mutes.
+    it never announces good news unprompted. "you reach" is a fact worth nothing at the moment it is true and
+    worth less every minute after, and a push that speaks on every outage is a push the family mutes. the one
+    exception is taking its own warning back: that message is already on screen being read.
+
+    the shortfall must survive two readings, because the station's runtime estimate follows the instantaneous
+    draw — boiling a kettle collapses it from hours to minutes, and the first version of this job woke the
+    family over three minutes of tea.
 
     the schedule is remembered rather than re-fetched, because the moment this question matters is the moment
     the internet may be gone too — and a forecast that only works while the grid is up forecasts nothing.
@@ -179,6 +192,7 @@ class OutageForecastJob:
         ecoflow_station: EcoFlowStation,
         schedule_provider: OutageScheduleProvider,
         household_calendar: HouseholdCalendar,
+        confirmations: int = 2,
     ):
         self.bot = bot
         self.chat_id = chat_id
@@ -186,8 +200,11 @@ class OutageForecastJob:
         self.ecoflow_station = ecoflow_station
         self.schedule_provider = schedule_provider
         self.household_calendar = household_calendar
+        self.confirmations = confirmations
         self._last_schedule: OutageSchedule | None = None
         self._warned = False
+        self._seen_short = 0
+        self._warning_message_id: int | None = None
 
     async def __call__(self) -> None:
         # the schedule counts minutes from local midnight, so the comparison has to happen in local time
@@ -199,19 +216,47 @@ class OutageForecastJob:
         if forecast is None:
             # the grid is back, or the question cannot be answered — either way the next outage is a fresh one
             self._warned = False
+            self._seen_short = 0
+            self._warning_message_id = None
             return
-        if forecast.reaches or self._warned:
+
+        if forecast.reaches:
+            self._seen_short = 0
+            await self._take_the_warning_back(forecast)
+            return
+
+        self._seen_short += 1
+        if self._warned or self._seen_short < self.confirmations:
             return
 
         self._warned = True
-        await self.bot.send_message(
+        sent = await self.bot.send_message(
             chat_id=self.chat_id,
             message_thread_id=await self.power_topic.resolve(),
             text=render_outage_forecast(forecast),
             # there is a deadline in this message, so it is worth interrupting for
             disable_notification=False,
         )
+        self._warning_message_id = sent.message_id
         logger.info("Warned that the battery falls %s short of the scheduled return", forecast.shortfall)
+
+    async def _take_the_warning_back(self, forecast: OutageForecast) -> None:
+        """Rewrites the warning where it stands — a second push to say "never mind" is how a topic gets muted."""
+        if self._warning_message_id is None:
+            return
+
+        message_id = self._warning_message_id
+        self._warning_message_id = None
+        # the load may rise again, and a second genuine shortfall has to be allowed to speak
+        self._warned = False
+        try:
+            await self.bot.edit_message_text(
+                chat_id=self.chat_id, message_id=message_id, text=render_outage_recovery(forecast)
+            )
+        except TelegramBadRequest as error:
+            logger.info("Could not take the shortfall warning back: %s", error)
+        else:
+            logger.info("Took the shortfall warning back — the station reaches %s again", forecast.power_returns_at)
 
     async def _schedule(self, moment: datetime) -> OutageSchedule | None:
         schedule = await self.schedule_provider.fetch_today()
