@@ -26,6 +26,7 @@ from src.bot.handlers.power.messages import (
     POWER_MAINS_RESTORED,
     POWER_MAINS_RESTORED_AFTER,
     POWER_OUTAGE_SHORTFALL,
+    POWER_OUTAGE_SHORTFALL_OVER,
     POWER_RESERVE_ALIVE,
     POWER_RESERVE_AS_OF,
     POWER_RESERVE_CHARGING,
@@ -214,6 +215,11 @@ def render_outage_forecast(forecast: OutageForecast) -> str:
         returns=forecast.power_returns_at.strftime("%H:%M"),
         shortfall=_format_runtime(round(forecast.shortfall.total_seconds() / 60)),
     )
+
+
+def render_outage_recovery(forecast: OutageForecast) -> str:
+    """Written over the warning once the draw drops, so the message on screen stops contradicting the station."""
+    return POWER_OUTAGE_SHORTFALL_OVER.format(returns=forecast.power_returns_at.strftime("%H:%M"))
 
 
 def render_outage_outlook(outlook: OutageOutlook, generated_at: datetime) -> str:

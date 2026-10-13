@@ -2,7 +2,7 @@ import unittest
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from src.bot.handlers.power.formatting import render_outage_forecast
+from src.bot.handlers.power.formatting import render_outage_forecast, render_outage_recovery
 from src.bot.handlers.power.jobs import OutageForecastJob
 from src.modules.power.domain import EcoFlowState, OutageInterval, OutageSchedule, OutageScheduleStatus
 from src.modules.power.outage_forecast import forecast_outage
@@ -117,6 +117,13 @@ class RenderOutageForecastTestCase(unittest.TestCase):
             "Бракує 1 год 20 хв — варто зняти зайве навантаження.",
         )
 
+    def test_the_retraction_names_the_hour_the_station_now_reaches(self):
+        forecast = forecast_outage(build_state(remaining_minutes=300), build_schedule((12, 16)), at(13, 0))
+
+        text = render_outage_recovery(forecast)
+
+        self.assertEqual(text, "🔋 <b>Дотягне до світла</b>\n\nНавантаження впало — заряду вистачає до 16:00.")
+
 
 class StubEcoFlowStation:
     def __init__(self, states: list[EcoFlowState | None]):
@@ -175,18 +182,20 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_warning_pings_because_it_carries_a_deadline(self):
         bot = RecordingBot()
-        job = build_job([build_state(remaining_minutes=100)], build_schedule((12, 16)), bot=bot)
+        short = build_state(remaining_minutes=100)
+        job = build_job([short, short], build_schedule((12, 16)), bot=bot)
 
-        await job()
+        for _ in range(2):
+            await job()
 
         self.assertEqual(bot.sent[0]["silent"], False)
 
     async def test_a_new_outage_after_the_light_returns_is_warned_about_again(self):
         bot = RecordingBot()
         short = build_state(remaining_minutes=100)
-        job = build_job([short, on_grid(), short], build_schedule((12, 16)), bot=bot)
+        job = build_job([short, short, on_grid(), short, short], build_schedule((12, 16)), bot=bot)
 
-        for _ in range(3):
+        for _ in range(5):
             await job()
 
         self.assertEqual(len(bot.sent), 2)
@@ -195,11 +204,69 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
         """The hour this question matters is the hour the internet may be gone too."""
         bot = RecordingBot()
         short = build_state(remaining_minutes=100)
-        job = build_job([short, short], build_schedule((12, 16)), bot=bot)
+        job = build_job([short, short, short, short], build_schedule((12, 16)), bot=bot)
+        await job()
         await job()
         job.schedule_provider.schedule = None
         job._warned = False
 
         await job()
+        await job()
 
         self.assertEqual(len(bot.sent), 2)
+
+    async def test_a_shortfall_seen_once_is_the_kettle_and_is_not_announced(self):
+        """The station's runtime estimate follows the instantaneous draw, and boiling water collapses it."""
+        bot = RecordingBot()
+        job = build_job(
+            [build_state(remaining_minutes=100), build_state(remaining_minutes=300)],
+            build_schedule((12, 16)),
+            bot=bot,
+        )
+
+        for _ in range(2):
+            await job()
+
+        self.assertEqual(bot.sent, [])
+        self.assertEqual(bot.edited, [])
+
+    async def test_a_warning_already_sent_is_written_over_once_the_station_reaches_again(self):
+        bot = RecordingBot()
+        short = build_state(remaining_minutes=100)
+        job = build_job([short, short, build_state(remaining_minutes=300)], build_schedule((12, 16)), bot=bot)
+
+        for _ in range(3):
+            await job()
+
+        self.assertEqual(len(bot.sent), 1)
+        self.assertEqual(
+            bot.edited,
+            [
+                {
+                    "chat_id": -100,
+                    "message_id": bot.sent[0]["message_id"],
+                    "text": "🔋 <b>Дотягне до світла</b>\n\nНавантаження впало — заряду вистачає до 16:00.",
+                }
+            ],
+        )
+
+    async def test_a_station_that_reaches_without_a_warning_on_screen_edits_nothing(self):
+        bot = RecordingBot()
+        job = build_job([build_state(remaining_minutes=300)], build_schedule((12, 16)), bot=bot)
+
+        await job()
+
+        self.assertEqual(bot.edited, [])
+
+    async def test_the_load_coming_back_after_a_retraction_warns_again(self):
+        """A kettle is taken back; an oven switched on an hour later is a different, real shortfall."""
+        bot = RecordingBot()
+        short = build_state(remaining_minutes=100)
+        job = build_job([short, short, build_state(remaining_minutes=300), short, short], build_schedule((12, 16)))
+        job.bot = bot
+
+        for _ in range(5):
+            await job()
+
+        self.assertEqual(len(bot.sent), 2)
+        self.assertEqual(len(bot.edited), 1)
