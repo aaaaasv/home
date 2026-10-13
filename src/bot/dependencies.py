@@ -16,6 +16,7 @@ from src.bot.handlers.plants.claude_photo_analyst import ClaudePhotoAnalyst
 from src.bot.handlers.plants.claude_plant_identifier import ClaudePlantIdentifier
 from src.bot.handlers.plants.gemini_photo_analyst import GeminiPhotoAnalyst
 from src.bot.handlers.plants.gemini_plant_identifier import GeminiPlantIdentifier
+from src.bot.handlers.plants.tools import PlantTools
 from src.bot.handlers.power.conservation_board import ConservationBoard
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.handlers.power.reserve_board import ReserveBoard
@@ -24,6 +25,7 @@ from src.bot.handlers.shopping import facts as shopping_facts
 from src.bot.handlers.shopping.board import ShoppingListBoard
 from src.bot.handlers.transit.board import TransitBoard
 from src.bot.handlers.weather.board import WeatherDigestBoard
+from src.bot.services.composite_tools import CompositeTools
 from src.bot.services.household_facts import HouseholdFacts
 from src.bot.services.posted_message_tracker import PostedMessageTracker
 from src.bot.services.telegram_photo_storage import TelegramPhotoStorage
@@ -429,11 +431,17 @@ def build_language_model(settings: Settings) -> LanguageModel | None:
             client=client,
             model=settings.CLAUDE_MODEL,
             effort=settings.CLAUDE_EFFORT,
-            # the history the facts dump cannot carry: a year of sensor days will never fit in a prompt
-            tools=HouseholdTools(
-                uow_factory=UnitOfWork,
-                household_calendar=HouseholdCalendar(timezone=settings.timezone),
-                settings=settings,
+            # the history the facts dump cannot carry: a year of sensor days will never fit in a prompt, plus
+            # the modules' own tools — the plants let the assistant write the card it is being asked about
+            tools=CompositeTools(
+                [
+                    HouseholdTools(
+                        uow_factory=UnitOfWork,
+                        household_calendar=HouseholdCalendar(timezone=settings.timezone),
+                        settings=settings,
+                    ),
+                    PlantTools(uow_factory=UnitOfWork, settings=settings),
+                ]
             ),
         )
     if settings.GEMINI_API_KEY:
