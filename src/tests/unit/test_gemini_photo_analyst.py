@@ -176,3 +176,7 @@ class ReviewPromptRulesTestCase(unittest.TestCase):
 
     def test_the_prompt_asks_for_the_singular_imperative_the_rest_of_the_bot_speaks(self):
         self.assertIn("Звертайся на «ти» в однині й у наказовому способі", SYSTEM_PROMPT)
+
+    def test_the_prompt_refuses_to_read_the_plants_surroundings_off_the_photo(self):
+        """A plant is carried to the window to be photographed, so the frame says nothing about where it lives."""
+        self.assertIn("Фон теж не доказ", SYSTEM_PROMPT)

@@ -2,6 +2,7 @@ import unittest
 
 from src.bot.handlers.plants.claude_plant_identifier import IDENTIFICATION_SCHEMA
 from src.bot.handlers.plants.gemini_plant_identifier import parse_identification
+from src.bot.handlers.plants.plant_identification_prompt import SYSTEM_PROMPT as IDENTIFICATION_PROMPT
 from src.modules.plant_care.domain import PlantIdentification
 
 
@@ -74,3 +75,19 @@ class IdentificationSchemaTestCase(unittest.TestCase):
 
         self.assertEqual(set(IDENTIFICATION_SCHEMA["properties"]), parsed_fields)
         self.assertEqual(set(IDENTIFICATION_SCHEMA["required"]), parsed_fields)
+
+
+class IdentificationPromptRulesTestCase(unittest.TestCase):
+    """
+    The two rules the written care text kept breaking before they were spelled out.
+
+    the model read the room off the photo — «не ставте біля батареї (на фото радіатор поруч з рослиною)» —
+    for a plant that had merely been carried there to be photographed, and it addressed the family as «ви»
+    while every other line the bot writes says «ти».
+    """
+
+    def test_the_prompt_refuses_to_read_the_plants_surroundings_off_the_photo(self):
+        self.assertIn("Фон у кадрі нічого не каже про рослину", IDENTIFICATION_PROMPT)
+
+    def test_the_prompt_asks_for_the_singular_imperative_the_rest_of_the_bot_speaks(self):
+        self.assertIn("Звертайся на «ти» в однині й у наказовому способі", IDENTIFICATION_PROMPT)
