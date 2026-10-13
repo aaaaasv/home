@@ -4,7 +4,14 @@ from zoneinfo import ZoneInfo
 
 from src.bot.handlers.power.formatting import render_outage_forecast, render_outage_recovery
 from src.bot.handlers.power.jobs import OutageForecastJob
-from src.modules.power.domain import EcoFlowState, OutageInterval, OutageSchedule, OutageScheduleStatus
+from src.modules.power.domain import (
+    EcoFlowState,
+    GridState,
+    OutageInterval,
+    OutageSchedule,
+    OutageScheduleStatus,
+    UpsState,
+)
 from src.modules.power.outage_forecast import forecast_outage
 from src.tests.fakes import FrozenHouseholdCalendar, RecordingBot, StubForumTopic
 
@@ -59,54 +66,83 @@ class ForecastOutageTestCase(unittest.TestCase):
 
     def test_a_battery_that_runs_out_before_the_light_returns_reports_the_gap(self):
         # 13:00, 100 minutes left, the light is scheduled back at 16:00
-        forecast = forecast_outage(build_state(remaining_minutes=100), build_schedule((12, 16)), at(13, 0))
+        forecast = forecast_outage(
+            build_state(remaining_minutes=100), build_schedule((12, 16)), at(13, 0), GridState.ON_BATTERY
+        )
 
         self.assertEqual((forecast.runs_out_at, forecast.power_returns_at), (at(14, 40), at(16, 0)))
         self.assertEqual((forecast.reaches, forecast.shortfall), (False, timedelta(hours=1, minutes=20)))
 
     def test_a_battery_that_lasts_past_the_return_reports_that_it_reaches(self):
-        forecast = forecast_outage(build_state(remaining_minutes=300), build_schedule((12, 16)), at(13, 0))
+        forecast = forecast_outage(
+            build_state(remaining_minutes=300), build_schedule((12, 16)), at(13, 0), GridState.ON_BATTERY
+        )
 
         self.assertTrue(forecast.reaches)
 
-    def test_a_station_on_mains_is_not_forecast_at_all(self):
-        forecast = forecast_outage(on_grid(), build_schedule((12, 16)), at(13, 0))
+    def test_a_flat_the_hat_says_is_on_mains_is_not_forecast_at_all(self):
+        forecast = forecast_outage(build_state(), build_schedule((12, 16)), at(13, 0), GridState.ON_GRID)
 
         self.assertIsNone(forecast)
 
+    def test_the_hat_outranks_a_station_that_still_believes_it_is_carrying_the_flat(self):
+        """On 13 october this warned nine minutes after the light was back, off the station's own guess."""
+        forecast = forecast_outage(
+            build_state(remaining_minutes=100), build_schedule((12, 16)), at(13, 0), GridState.ON_GRID
+        )
+
+        self.assertIsNone(forecast)
+
+    def test_a_station_on_mains_is_not_forecast_when_the_hat_cannot_answer(self):
+        forecast = forecast_outage(on_grid(), build_schedule((12, 16)), at(13, 0), GridState.UNKNOWN)
+
+        self.assertIsNone(forecast)
+
+    def test_a_station_on_battery_is_forecast_when_the_hat_cannot_answer(self):
+        """A hat that is switched off or unreadable leaves the station as the only opinion there is."""
+        forecast = forecast_outage(
+            build_state(remaining_minutes=100), build_schedule((12, 16)), at(13, 0), GridState.UNKNOWN
+        )
+
+        self.assertEqual(forecast.power_returns_at, at(16, 0))
+
     def test_an_unreachable_station_is_not_forecast(self):
-        forecast = forecast_outage(None, build_schedule((12, 16)), at(13, 0))
+        forecast = forecast_outage(None, build_schedule((12, 16)), at(13, 0), GridState.ON_BATTERY)
 
         self.assertIsNone(forecast)
 
     def test_a_station_that_reports_no_runtime_estimate_is_not_forecast(self):
-        forecast = forecast_outage(build_state(remaining_minutes=None), build_schedule((12, 16)), at(13, 0))
+        forecast = forecast_outage(
+            build_state(remaining_minutes=None), build_schedule((12, 16)), at(13, 0), GridState.ON_BATTERY
+        )
 
         self.assertIsNone(forecast)
 
     def test_a_blackout_outside_the_published_schedule_is_not_forecast(self):
         """An emergency shutdown has no promised end, and inventing one is worse than saying nothing."""
-        forecast = forecast_outage(build_state(), build_schedule((18, 20)), at(13, 0))
+        forecast = forecast_outage(build_state(), build_schedule((18, 20)), at(13, 0), GridState.ON_BATTERY)
 
         self.assertIsNone(forecast)
 
     def test_yesterdays_schedule_is_not_used_for_todays_outage(self):
         stale = build_schedule((12, 16), day=date(2026, 12, 3))
 
-        forecast = forecast_outage(build_state(), stale, at(13, 0))
+        forecast = forecast_outage(build_state(), stale, at(13, 0), GridState.ON_BATTERY)
 
         self.assertIsNone(forecast)
 
     def test_the_return_is_read_from_the_interval_the_outage_is_actually_in(self):
         # two outages today; the one running at 13:00 ends at 16:00, not the later one at 20:00
-        forecast = forecast_outage(build_state(), build_schedule((12, 16), (18, 20)), at(13, 0))
+        forecast = forecast_outage(build_state(), build_schedule((12, 16), (18, 20)), at(13, 0), GridState.ON_BATTERY)
 
         self.assertEqual(forecast.power_returns_at, at(16, 0))
 
 
 class RenderOutageForecastTestCase(unittest.TestCase):
     def test_the_warning_names_both_hours_and_the_gap_between_them(self):
-        forecast = forecast_outage(build_state(remaining_minutes=100), build_schedule((12, 16)), at(13, 0))
+        forecast = forecast_outage(
+            build_state(remaining_minutes=100), build_schedule((12, 16)), at(13, 0), GridState.ON_BATTERY
+        )
 
         text = render_outage_forecast(forecast)
 
@@ -118,7 +154,9 @@ class RenderOutageForecastTestCase(unittest.TestCase):
         )
 
     def test_the_retraction_names_the_hour_the_station_now_reaches(self):
-        forecast = forecast_outage(build_state(remaining_minutes=300), build_schedule((12, 16)), at(13, 0))
+        forecast = forecast_outage(
+            build_state(remaining_minutes=300), build_schedule((12, 16)), at(13, 0), GridState.ON_BATTERY
+        )
 
         text = render_outage_recovery(forecast)
 
@@ -143,7 +181,15 @@ class StubScheduleProvider:
         return self.schedule
 
 
-def build_job(states, schedule, bot=None) -> OutageForecastJob:
+class StubUps:
+    def __init__(self, mains_present: bool):
+        self.mains_present = mains_present
+
+    async def read_state(self) -> UpsState:
+        return UpsState(mains_present=self.mains_present, battery_volts=4.17, battery_percent=98.0, as_of=at(13, 0))
+
+
+def build_job(states, schedule, bot=None, mains_present: bool = False) -> OutageForecastJob:
     return OutageForecastJob(
         bot=bot or RecordingBot(),
         chat_id=-100,
@@ -151,6 +197,7 @@ def build_job(states, schedule, bot=None) -> OutageForecastJob:
         ecoflow_station=StubEcoFlowStation(states),
         schedule_provider=StubScheduleProvider(schedule),
         household_calendar=FrozenHouseholdCalendar(KYIV, frozen_now=at(13, 0)),
+        pi_ups=StubUps(mains_present),
     )
 
 
@@ -193,10 +240,15 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_a_new_outage_after_the_light_returns_is_warned_about_again(self):
         bot = RecordingBot()
         short = build_state(remaining_minutes=100)
-        job = build_job([short, short, on_grid(), short, short], build_schedule((12, 16)), bot=bot)
+        job = build_job([short] * 5, build_schedule((12, 16)), bot=bot)
+        await job()
+        await job()
+        job.pi_ups.mains_present = True
+        await job()
+        job.pi_ups.mains_present = False
 
-        for _ in range(5):
-            await job()
+        await job()
+        await job()
 
         self.assertEqual(len(bot.sent), 2)
 
