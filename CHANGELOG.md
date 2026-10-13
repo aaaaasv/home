@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.4] - 2026-10-13
+
 ### Виправлено
 
 - **Бот більше не вигадує, де стоїть рослина, дивлячись на фото.** Рослину підносять до вікна або ставлять
