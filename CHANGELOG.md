@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.2] - 2026-10-13
+
 ### Виправлено
 
 - **«Не дотягне до світла» більше не приходить, коли світло вже є.** 13 жовтня воно прийшло через девʼять
