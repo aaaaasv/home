@@ -9,38 +9,25 @@ the morning the person may have switched it on themselves, or left it at a level
 because a feed changed state is the behaviour that gets an automation disabled for good.
 """
 import logging
-from collections.abc import Callable
 from datetime import timedelta
 
 from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
-from src.infrastructure.db.uow import UnitOfWork
-from src.modules.air_alert.domain import AlertTransition
-from src.modules.air_alert.services.air_alert_source import AirAlertSource
-from src.modules.air_alert.use_cases.follow_air_alert import FollowAirAlertUseCase
+from src.modules.air_alert.domain import AirAlert, AlertTransition
 from src.modules.lighting.services.panel_light import PanelLight
 
 logger = logging.getLogger(__name__)
 
 
-class AlertLightWatcher:
+class AlertLight:
     """
-    One decision, taken twice: bring the light up when a red alert begins, and put it out when it ends.
+    One decision, taken twice: bring the light up when a red alert begins, and put it out a while later.
 
     it is driven by the socket rather than a clock, because the whole point is the seconds. the poll behind
     the source is only there for the case the socket is quietly dead.
     """
 
-    def __init__(
-        self,
-        uow_factory: Callable[[], UnitOfWork],
-        source: AirAlertSource,
-        panel_light: PanelLight,
-        settings: Settings,
-        household_calendar: HouseholdCalendar,
-    ):
-        self.uow_factory = uow_factory
-        self.source = source
+    def __init__(self, panel_light: PanelLight, settings: Settings, household_calendar: HouseholdCalendar):
         self.panel_light = panel_light
         self.settings = settings
         self.household_calendar = household_calendar
@@ -48,16 +35,14 @@ class AlertLightWatcher:
         # before the bot started is deliberately not claimed, so we never put out something we did not turn on
         self._raised_at = None
 
-    async def __call__(self) -> None:
-        transition, alert = await FollowAirAlertUseCase(
-            uow=self.uow_factory(), source=self.source, household_calendar=self.household_calendar
-        )()
-
+    async def handle(self, transition: AlertTransition, alert: AirAlert | None) -> bool:
+        """Whether the strip is standing at the alert level by our hand — which is what the card's button needs."""
         if transition == AlertTransition.RAISED:
             await self._raise(alert)
         await self._sweep()
+        return self._raised_at is not None
 
-    async def _raise(self, alert) -> None:
+    async def _raise(self, alert: AirAlert | None) -> None:
         standing = await self.panel_light.read()
         if standing is None:
             logger.warning("Red alert, but the light service is not answering")

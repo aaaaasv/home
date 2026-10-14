@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from src.bot.handlers.air_alert.light import AlertLightWatcher
+from src.bot.handlers.air_alert.light import AlertLight
+from src.bot.handlers.air_alert.watcher import AirAlertWatcher
 from src.common.config import Settings
 from src.modules.air_alert.domain import AirAlert, AlertLevel
 from src.modules.lighting.domain import PanelLightState
@@ -47,15 +48,18 @@ class AlertLightTestCase(BaseIntegrationTestCase):
     is already using gets switched off for good, and then it is not there on the night it matters.
     """
 
-    def build_watcher(self, source, light) -> AlertLightWatcher:
-        return AlertLightWatcher(
+    def build_watcher(self, source, light) -> AirAlertWatcher:
+        return AirAlertWatcher(
             uow_factory=lambda: self.uow,
             source=source,
-            panel_light=light,
-            settings=Settings(
-                TELEGRAM_BOT_TOKEN="123:abc", ALERT_LIGHT_PERCENT=ALERT_PERCENT, ALERT_LIGHT_MINUTES=ALERT_MINUTES
-            ),
             household_calendar=self.household_calendar,
+            light=AlertLight(
+                panel_light=light,
+                settings=Settings(
+                    TELEGRAM_BOT_TOKEN="123:abc", ALERT_LIGHT_PERCENT=ALERT_PERCENT, ALERT_LIGHT_MINUTES=ALERT_MINUTES
+                ),
+                household_calendar=self.household_calendar,
+            ),
         )
 
     async def test_a_red_alert_raises_the_light(self):

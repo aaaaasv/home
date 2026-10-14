@@ -19,6 +19,9 @@ CONSERVATION_CARD_KIND = "conservation_card"
 RESERVE_BOARD_KIND = "reserve_board"
 # the strip's control card: only the newest one may stand, because its buttons name levels
 STRIP_CARD_KIND = "strip_card"
+# one card per red alert: pinged at the raise, written over when it is lifted, and then left standing as the
+# record of that night — so this lane is forgotten rather than cleared
+AIR_ALERT_CARD_KIND = "air_alert_card"
 WEATHER_DIGEST_KIND = "weather_digest"
 CLIMATE_CARD_KIND = "climate_card"
 # one standing card per uncomfortable plant, referenced by plant id, deleted the moment the plant is comfortable
@@ -60,6 +63,11 @@ class PostedMessageTracker:
                     continue
                 await self._delete_quietly(posted.chat_id, posted.message_id)
             await uow.posted_messages.delete_by_reference(kind, reference, keep_message_id=keep_message_id)
+
+    async def forget(self, kind: str) -> None:
+        """Stop tracking a lane without deleting what is in it — for a card that stays as a record."""
+        async with self.uow_factory() as uow:
+            await uow.posted_messages.delete_by_kind(kind)
 
     async def remember(self, kind: str, message: Message, reference: str | None = None) -> None:
         async with self.uow_factory() as uow:

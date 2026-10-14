@@ -1,7 +1,7 @@
 """How the EcoFlow card, the reserve board, the outage schedule and the conservation card render."""
 from datetime import date, datetime, timedelta
 
-from src.bot.formatting import GENITIVE_MONTH_NAMES
+from src.bot.formatting import GENITIVE_MONTH_NAMES, format_duration, format_runtime, format_span
 from src.bot.handlers.power.messages import (
     POWER_CONSERVATION_CYCLE_DUE,
     POWER_CONSERVATION_CYCLE_SOON,
@@ -81,11 +81,11 @@ def render_ecoflow(state: EcoFlowState) -> str:
             else POWER_ECOFLOW_ON_MAINS
         )
         if state.remaining_minutes:
-            source += " · " + POWER_ECOFLOW_TIME_TO_FULL.format(duration=_format_runtime(state.remaining_minutes))
+            source += " · " + POWER_ECOFLOW_TIME_TO_FULL.format(duration=format_runtime(state.remaining_minutes))
     else:
         source = POWER_ECOFLOW_ON_BATTERY
         if state.remaining_minutes:
-            source += " · " + POWER_ECOFLOW_TIME_LEFT.format(duration=_format_runtime(state.remaining_minutes))
+            source += " · " + POWER_ECOFLOW_TIME_LEFT.format(duration=format_runtime(state.remaining_minutes))
     lines.append(source)
 
     if state.ac_output_power:
@@ -93,15 +93,6 @@ def render_ecoflow(state: EcoFlowState) -> str:
 
     lines.extend(["", POWER_ECOFLOW_AS_OF.format(time=f"{state.as_of:%H:%M}")])
     return "\n".join(lines)
-
-
-def _format_runtime(minutes: int) -> str:
-    hours, remaining_minutes = divmod(minutes, 60)
-    if hours and remaining_minutes:
-        return f"{hours} год {remaining_minutes} хв"
-    if hours:
-        return f"{hours} год"
-    return f"{remaining_minutes} хв"
 
 
 def render_mains_change(grid: GridState, lasted: timedelta | None = None) -> str:
@@ -121,30 +112,6 @@ def render_mains_change(grid: GridState, lasted: timedelta | None = None) -> str
     if grid is GridState.ON_GRID:
         return POWER_MAINS_RESTORED_AFTER.format(duration=duration)
     return POWER_MAINS_LOST_AFTER.format(duration=duration)
-
-
-def format_span(span: timedelta) -> str:
-    """
-    A stretch of time as the family would say it out loud, up to days.
-
-    this is not `_format_runtime`: a station's runtime is hours at most, while the light is routinely on for
-    days between outages, and "76 год 15 хв" is not an answer anybody reads.
-    """
-    minutes = max(round(span.total_seconds() / 60), 0)
-    days, minutes_of_day = divmod(minutes, 24 * 60)
-    hours, remaining_minutes = divmod(minutes_of_day, 60)
-    if days:
-        return f"{days} {_days_word(days)} {hours} год" if hours else f"{days} {_days_word(days)}"
-    return _format_runtime(minutes_of_day) if (hours or remaining_minutes) else "менше хвилини"
-
-
-def _days_word(days: int) -> str:
-    # 1 день, 2-4 дні, 5-20 днів, 21 день, 22-24 дні — the teens are all "днів"
-    if days % 10 == 1 and days % 100 != 11:
-        return "день"
-    if days % 10 in (2, 3, 4) and days % 100 not in (12, 13, 14):
-        return "дні"
-    return "днів"
 
 
 RESERVE_LAYER_LABELS = {
@@ -175,7 +142,7 @@ def _render_reserve_title(reserve: Reserve) -> str:
         return POWER_RESERVE_TITLE_UNKNOWN
     if reserve.on_battery_for is None:
         return POWER_RESERVE_TITLE_ON_BATTERY_UNTIMED
-    return POWER_RESERVE_TITLE_ON_BATTERY.format(duration=_format_duration(reserve.on_battery_for))
+    return POWER_RESERVE_TITLE_ON_BATTERY.format(duration=format_duration(reserve.on_battery_for))
 
 
 def _render_reserve_row(row: ReserveRow) -> str:
@@ -188,11 +155,11 @@ def _render_reserve_row(row: ReserveRow) -> str:
 
 def _render_reserve_standing(row: ReserveRow) -> str:
     if row.standing is ReserveStanding.HOLDING and row.remaining is not None:
-        return POWER_RESERVE_HOLDING.format(duration=_format_duration(row.remaining))
+        return POWER_RESERVE_HOLDING.format(duration=format_duration(row.remaining))
     if row.standing is ReserveStanding.CHARGING and row.remaining is not None:
-        return POWER_RESERVE_CHARGING.format(duration=_format_duration(row.remaining))
+        return POWER_RESERVE_CHARGING.format(duration=format_duration(row.remaining))
     if row.standing is ReserveStanding.HOLDING_UNMEASURED and row.holding_for is not None:
-        return POWER_RESERVE_HOLDING_UNMEASURED.format(duration=_format_duration(row.holding_for))
+        return POWER_RESERVE_HOLDING_UNMEASURED.format(duration=format_duration(row.holding_for))
     # a layer that cannot say how long falls back to the bare state, which is still worth a line
     return {
         ReserveStanding.HOLDING: POWER_RESERVE_HOLDING_UNMEASURED_UNTIMED,
@@ -204,16 +171,12 @@ def _render_reserve_standing(row: ReserveRow) -> str:
     }[row.standing]
 
 
-def _format_duration(duration: timedelta) -> str:
-    return _format_runtime(round(duration.total_seconds() / 60))
-
-
 def render_outage_forecast(forecast: OutageForecast) -> str:
     """The one sentence this feature exists for: the deadline, and the gap the family has to close."""
     return POWER_OUTAGE_SHORTFALL.format(
         runs_out=forecast.runs_out_at.strftime("%H:%M"),
         returns=forecast.power_returns_at.strftime("%H:%M"),
-        shortfall=_format_runtime(round(forecast.shortfall.total_seconds() / 60)),
+        shortfall=format_runtime(round(forecast.shortfall.total_seconds() / 60)),
     )
 
 

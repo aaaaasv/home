@@ -8,6 +8,7 @@ from src.bot import errors
 from src.bot.dependencies import build_workflow_data
 from src.bot.filters import HasAccessibleMessage, InModuleTopic
 from src.bot.handlers import (
+    air_alert,
     assistant,
     chores,
     climate,
@@ -126,6 +127,11 @@ def build_dispatcher(
         lighting.router.message.filter(InModuleTopic(power_topic))
         lighting.router.callback_query.filter(HasAccessibleMessage())
         module_routers.append(lighting.router)
+    # the alert card has one button and no commands, so there is nothing here to filter by topic: the card
+    # stands in 🚨 тривога while the strip it puts out belongs to ⚡ світло
+    if panel_light is not None:
+        air_alert.router.callback_query.filter(HasAccessibleMessage())
+        module_routers.append(air_alert.router)
     if transit_topic is not None:
         transit.router.message.filter(InModuleTopic(transit_topic))
         transit.router.callback_query.filter(HasAccessibleMessage())
