@@ -73,7 +73,7 @@ class SchedulerContext:
     # both light watchers are built by the composition root and handed over whole, never rebuilt here: each
     # one remembers what it raised and when, and a second copy of it remembers nothing
     arrival_light_watcher: object | None = None
-    alert_light_watcher: object | None = None
+    air_alert_watcher: object | None = None
 
     def build_posted_message_tracker(self) -> PostedMessageTracker:
         return PostedMessageTracker(bot=self.bot, uow_factory=self.uow_factory)

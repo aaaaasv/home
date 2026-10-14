@@ -405,7 +405,7 @@ class YasnoScheduleJob:
         if not is_emergency:
             if announced:
                 # forgotten, not deleted: the board stays where it is and goes back to refreshing silently
-                await self._forget_posted(OUTAGE_EMERGENCY_KIND)
+                await self.tracker.forget(OUTAGE_EMERGENCY_KIND)
                 logger.info("Emergency shutdowns are over; the next spell will announce itself again")
             return False
         if announced:
@@ -421,10 +421,6 @@ class YasnoScheduleJob:
     async def _list_posted(self, kind: str) -> list:
         async with self.uow_factory() as uow:
             return await uow.posted_messages.list_by_kind(kind)
-
-    async def _forget_posted(self, kind: str) -> None:
-        async with self.uow_factory() as uow:
-            await uow.posted_messages.delete_by_kind(kind)
 
     async def _ping_upcoming_outage(self, today: OutageSchedule) -> None:
         # the hours shown during emergency shutdowns are the operator's plan, which the operator itself says is
