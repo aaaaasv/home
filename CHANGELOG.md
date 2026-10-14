@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.3] - 2026-10-14
+
 ### Виправлено
 
 - **Попередження про планове відключення не приходить, коли світла вже немає.** 14 жовтня світло зникло
