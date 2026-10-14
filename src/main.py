@@ -30,7 +30,10 @@ from src.bot.dependencies import (
     build_weather_provider,
     build_yasno_schedule_provider,
 )
-from src.bot.handlers.air_alert.light import AlertLightWatcher
+from src.bot.handlers.air_alert import AIR_ALERT_MODULE_NAME
+from src.bot.handlers.air_alert.announcement import AlertAnnouncement
+from src.bot.handlers.air_alert.light import AlertLight
+from src.bot.handlers.air_alert.watcher import AirAlertWatcher
 from src.bot.handlers.air_threats.watch import AirThreatWatcher
 from src.bot.handlers.assistant import ASSISTANT_MODULE_NAME
 from src.bot.handlers.chores.board import CHORES_MODULE_NAME, ChoresBoard
@@ -38,9 +41,9 @@ from src.bot.handlers.places.board import PLACES_MODULE_NAME, PlacesBoard
 from src.bot.handlers.plants import PLANTS_MODULE_NAME
 from src.bot.handlers.plants.soil import build_watering_recorder
 from src.bot.handlers.power import POWER_MODULE_NAME
+from src.bot.handlers.power.board import PowerBoard
 from src.bot.handlers.power.conservation_board import ConservationBoard
-from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
-from src.bot.handlers.power.reserve_board import ReserveBoard
+from src.bot.handlers.power.reserve_readout import ReserveReadout
 from src.bot.handlers.presence.arrival import ArrivalLightWatcher
 from src.bot.handlers.sensors.recording import build_sensor_recorder
 from src.bot.handlers.shopping.board import SHOPPING_MODULE_NAME, ShoppingListBoard
@@ -74,7 +77,7 @@ GROUP_COMMANDS = [
     BotCommand(command="ac", description="❄️ кондиціонер"),
     BotCommand(command="climate", description="🏠 клімат удома по кімнатах"),
     BotCommand(command="eco", description="⚡ EcoFlow Delta 2"),
-    BotCommand(command="reserve", description="⚡ резерв живлення"),
+    BotCommand(command="reserve", description="⚡ дошка світла: резерв і графік"),
     BotCommand(command="conserve", description="⚡ зберігання EcoFlow"),
     BotCommand(command="light", description="⚡ стрічка на полиці"),
     BotCommand(command="pi", description="🩺 стан Raspberry Pi"),
@@ -191,18 +194,41 @@ async def run() -> None:
             settings=settings,
             household_calendar=HouseholdCalendar(timezone=settings.timezone),
         )
-    # one watcher for both the socket that raises the strip and the clock that puts it back out. two of them
-    # is what kept it burning: the socket's copy remembered the raise, the scheduler's copy knew of none, and
-    # the quarter of an hour never ran out for either — so the strip went out at the next change of level
-    # instead, one to two hours later, twice in the night of 13/14.10
-    alert_light_watcher = None
-    if settings.ALERT_LIGHT_ENABLED and panel_light is not None:
-        alert_light_watcher = AlertLightWatcher(
+    # 🚨 тривога: its own topic, because this is the one push that has to beat the siren and in ⚡ світлі it
+    # would queue behind the outage schedule. the card is pushed and then written over in place
+    alert_topic = None
+    alert_announcement = None
+    if settings.ALERT_LIGHT_ENABLED and settings.ALERT_PUSH_ENABLED:
+        alert_topic = build_forum_topic(
+            bot, settings, AIR_ALERT_MODULE_NAME, settings.ALERT_TOPIC_TITLE, settings.alert_topic_id
+        )
+        alert_announcement = AlertAnnouncement(
+            bot=bot,
+            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+            alert_topic=alert_topic,
+            uow_factory=UnitOfWork,
+            household_calendar=HouseholdCalendar(timezone=settings.timezone),
+        )
+    # one watcher for both the socket that raises the strip and the clock that puts it back out, and the card
+    # hangs off the same one reading. two of them is what kept the strip burning: the socket's copy remembered
+    # the raise, the scheduler's copy knew of none, and the quarter of an hour never ran out for either — so
+    # the strip went out at the next change of level instead, one to two hours later, on the night of 13/14.10
+    air_alert_watcher = None
+    if settings.ALERT_LIGHT_ENABLED and (panel_light is not None or alert_announcement is not None):
+        air_alert_watcher = AirAlertWatcher(
             uow_factory=UnitOfWork,
             source=air_alert_source,
-            panel_light=panel_light,
-            settings=settings,
             household_calendar=HouseholdCalendar(timezone=settings.timezone),
+            light=(
+                AlertLight(
+                    panel_light=panel_light,
+                    settings=settings,
+                    household_calendar=HouseholdCalendar(timezone=settings.timezone),
+                )
+                if panel_light is not None
+                else None
+            ),
+            announcement=alert_announcement,
         )
     # the unit serves one client at a time, so the button handlers and the runtime poll must share one instance —
     # its lock only serialises binds that go through the same object
@@ -213,16 +239,6 @@ async def run() -> None:
             bot, settings, POWER_MODULE_NAME, settings.POWER_TOPIC_TITLE, settings.power_topic_id
         )
     schedule_provider = build_yasno_schedule_provider(settings)
-    outage_schedule_board = None
-    if schedule_provider is not None and power_topic is not None:
-        outage_schedule_board = OutageScheduleBoard(
-            bot=bot,
-            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
-            power_topic=power_topic,
-            uow_factory=UnitOfWork,
-            schedule_provider=schedule_provider,
-            timezone=settings.timezone,
-        )
     # the conservation card belongs to the ecoflow station; shared by the /eco toggle and the 4-hourly refresh
     conservation_board = None
     if settings.ECOFLOW_ENABLED and power_topic is not None:
@@ -234,30 +250,38 @@ async def run() -> None:
             timezone=settings.timezone,
         )
 
-    # the reserve board: every backup layer on one screen, charge then time, the same shape on every row. it
-    # draws no row it cannot read, so it stands up only where all four sources are configured at once
+    # ⚡ світло has one board: every backup layer on one screen — charge then time, the same shape on every
+    # row — and the outage schedule under it. the reserve half draws no row it cannot read, so it joins only
+    # where all four sources are configured at once; the schedule half joins wherever yasno is on
     pi_ups = build_pi_ups(settings)
     router_link = build_router_link(settings)
     media_server_battery = build_media_server_battery(settings)
-    reserve_board = None
+    reserve_readout = None
     if (
         settings.RESERVE_ENABLED
         and settings.ECOFLOW_ENABLED
         and settings.PI_UPS_ENABLED
         and router_link is not None
         and media_server_battery is not None
-        and power_topic is not None
     ):
-        reserve_board = ReserveBoard(
-            bot=bot,
-            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
-            power_topic=power_topic,
+        reserve_readout = ReserveReadout(
             uow_factory=UnitOfWork,
             ecoflow_station=ecoflow_station,
             pi_ups=pi_ups,
             router_link=router_link,
             media_server_battery=media_server_battery,
             timezone=settings.timezone,
+        )
+    power_board = None
+    if power_topic is not None and (reserve_readout is not None or schedule_provider is not None):
+        power_board = PowerBoard(
+            bot=bot,
+            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+            power_topic=power_topic,
+            uow_factory=UnitOfWork,
+            timezone=settings.timezone,
+            reserve_readout=reserve_readout,
+            schedule_provider=schedule_provider,
         )
 
     # transit: an on-demand arrival card in its own topic — built only when on. the shape catalog is shared by
@@ -306,9 +330,8 @@ async def run() -> None:
         tech_topic=tech_topic,
         ecoflow_station=ecoflow_station,
         power_topic=power_topic,
-        outage_schedule_board=outage_schedule_board,
         conservation_board=conservation_board,
-        reserve_board=reserve_board,
+        power_board=power_board,
         panel_light=panel_light,
         transit_topic=transit_topic,
         transit_board=transit_board,
@@ -327,7 +350,7 @@ async def run() -> None:
             room_climate_sensor=room_climate_sensor,
             air_threat_source=air_threat_source,
             arrival_light_watcher=arrival_light_watcher,
-            alert_light_watcher=alert_light_watcher,
+            air_alert_watcher=air_alert_watcher,
             price_source=build_price_source(settings),
             weather_topic=weather_topic,
             weather_digest_board=weather_digest_board,
@@ -341,9 +364,8 @@ async def run() -> None:
             pi_ups=pi_ups,
             power_topic=power_topic,
             schedule_provider=schedule_provider,
-            outage_schedule_board=outage_schedule_board,
             conservation_board=conservation_board,
-            reserve_board=reserve_board,
+            power_board=power_board,
             shape_catalog=shape_catalog,
             newspaper_print_queue=build_newspaper_print_queue(settings),
             newspaper_word_sources=build_newspaper_word_sources(settings),
@@ -366,6 +388,8 @@ async def run() -> None:
         logger.info("Tech topic: %s", await tech_topic.resolve())
     if power_topic is not None:
         logger.info("Power topic: %s", await power_topic.resolve())
+    if alert_topic is not None:
+        logger.info("Alert topic: %s", await alert_topic.resolve())
     if transit_topic is not None:
         logger.info("Transit topic: %s", await transit_topic.resolve())
     if assistant_topic is not None:
@@ -423,8 +447,8 @@ async def run() -> None:
     # the alert socket: the light must answer in seconds, and the job behind it only covers the case where
     # this connection is open, subscribed and silently dead
     alert_socket_task = None
-    if alert_light_watcher is not None and isinstance(air_alert_source, UkraineAlarmSource):
-        alert_socket_task = asyncio.create_task(air_alert_source.run(on_change=alert_light_watcher))
+    if air_alert_watcher is not None and isinstance(air_alert_source, UkraineAlarmSource):
+        alert_socket_task = asyncio.create_task(air_alert_source.run(on_change=air_alert_watcher))
 
     # the specimen sheets share this loop with polling and the scheduler, the way everything else here does
     web_runner = None

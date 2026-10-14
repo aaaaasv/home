@@ -16,11 +16,11 @@ from src.bot.scheduling import SchedulerContext
 def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
     """Nothing to watch without the watcher the composition root builds for the socket."""
     settings = context.settings
-    if not settings.ALERT_LIGHT_ENABLED or context.alert_light_watcher is None:
+    if not settings.ALERT_LIGHT_ENABLED or context.air_alert_watcher is None:
         return
 
     scheduler.add_job(
-        context.alert_light_watcher.__call__,
+        context.air_alert_watcher.__call__,
         trigger=IntervalTrigger(seconds=settings.ALERT_LIGHT_CHECK_SECONDS),
         id="alert_light_check",
         replace_existing=True,

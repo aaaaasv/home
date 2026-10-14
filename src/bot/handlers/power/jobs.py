@@ -9,11 +9,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from src.bot.handlers.power.board import PowerBoard
 from src.bot.handlers.power.formatting import render_mains_change, render_outage_forecast, render_outage_recovery
 from src.bot.handlers.power.keyboards import build_supply_keyboard
 from src.bot.handlers.power.messages import POWER_OUTAGE_SOON, POWER_SUPPLY_QUESTION
-from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
-from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND, OUTAGE_PING_KIND, PostedMessageTracker
@@ -204,9 +203,9 @@ class MainsWatchJob:
         self.monitor.seed(GridState(latest.state) if latest is not None else None)
 
 
-class ReserveBoardJob:
+class PowerBoardJob:
     """
-    Keeps the reserve board current, on the cadence the moment deserves.
+    Keeps the board current, on the cadence the moment deserves.
 
     every tick while the flat is on battery — that is the hour anyone opens it, and a board an hour stale then
     is worse than none. on the grid the picture does not move minute to minute, so it is rewritten every few.
@@ -214,25 +213,25 @@ class ReserveBoardJob:
     and it is three local calls rather than a fetch.
     """
 
-    def __init__(self, reserve_board: ReserveBoard, on_grid_interval: timedelta, timezone: tzinfo):
-        self.reserve_board = reserve_board
+    def __init__(self, power_board: PowerBoard, on_grid_interval: timedelta, timezone: tzinfo):
+        self.power_board = power_board
         self.on_grid_interval = on_grid_interval
         self.timezone = timezone
         self._drawn_at: datetime | None = None
 
     async def __call__(self) -> None:
-        reserve = await self.reserve_board.compose()
+        reserve = await self.power_board.read_reserve()
         now = datetime.now(self.timezone)
         if not self._is_due(reserve, now):
             return
 
         self._drawn_at = now
-        # the first draw of all has no board to edit, so it publishes one
-        if not await self.reserve_board.refresh(reserve):
-            await self.reserve_board.post(reserve)
+        await self.power_board.draw(reserve)
 
-    def _is_due(self, reserve: Reserve, now: datetime) -> bool:
-        if reserve.grid is GridState.ON_BATTERY or self._drawn_at is None:
+    def _is_due(self, reserve: Reserve | None, now: datetime) -> bool:
+        if self._drawn_at is None:
+            return True
+        if reserve is not None and reserve.grid is GridState.ON_BATTERY:
             return True
         return now - self._drawn_at >= self.on_grid_interval
 
@@ -358,8 +357,7 @@ class YasnoScheduleJob:
         chat_id: int,
         power_topic: ForumTopicRegistry,
         uow_factory: Callable[[], UnitOfWork],
-        schedule_provider: OutageScheduleProvider,
-        outage_schedule_board: OutageScheduleBoard,
+        power_board: PowerBoard,
         pi_ups: PiUps | None,
         settings: Settings,
         timezone: tzinfo,
@@ -368,24 +366,22 @@ class YasnoScheduleJob:
         self.chat_id = chat_id
         self.power_topic = power_topic
         self.uow_factory = uow_factory
-        self.schedule_provider = schedule_provider
-        self.outage_schedule_board = outage_schedule_board
+        self.power_board = power_board
         self.pi_ups = pi_ups
         self.settings = settings
         self.timezone = timezone
         self.tracker = PostedMessageTracker(bot=bot, uow_factory=uow_factory)
 
     async def __call__(self) -> None:
-        outlook = await self.schedule_provider.fetch()
+        # the board holds the provider and remembers what it last heard, so this is the only place that asks
+        outlook = await self.power_board.read_outlook()
         if outlook is None:
             logger.info("Yasno schedule fetch failed; leaving the board as it is")
             return
 
         # the regime turning announces itself by reposting the board, so it speaks before the silent refresh
         if not await self._announce_emergency_regime(outlook):
-            # keep the board current: edit in place, or post the first one once something is planned and ahead
-            if not await self.outage_schedule_board.refresh(outlook):
-                await self.outage_schedule_board.post(outlook)
+            await self.power_board.draw()
 
         await self._ping_upcoming_outage(outlook.today)
 
@@ -405,13 +401,13 @@ class YasnoScheduleJob:
         if not is_emergency:
             if announced:
                 # forgotten, not deleted: the board stays where it is and goes back to refreshing silently
-                await self._forget_posted(OUTAGE_EMERGENCY_KIND)
+                await self.tracker.forget(OUTAGE_EMERGENCY_KIND)
                 logger.info("Emergency shutdowns are over; the next spell will announce itself again")
             return False
         if announced:
             return False
 
-        message = await self.outage_schedule_board.post(outlook, notify=True)
+        message = await self.power_board.post(notify=True)
         if message is None:
             return False
         await self.tracker.remember(OUTAGE_EMERGENCY_KIND, message, reference=today.day.isoformat())
@@ -421,10 +417,6 @@ class YasnoScheduleJob:
     async def _list_posted(self, kind: str) -> list:
         async with self.uow_factory() as uow:
             return await uow.posted_messages.list_by_kind(kind)
-
-    async def _forget_posted(self, kind: str) -> None:
-        async with self.uow_factory() as uow:
-            await uow.posted_messages.delete_by_kind(kind)
 
     async def _ping_upcoming_outage(self, today: OutageSchedule) -> None:
         # the hours shown during emergency shutdowns are the operator's plan, which the operator itself says is
@@ -483,7 +475,7 @@ def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> Non
     """Poll the station on its own cadence and follow the outage schedule on its — each switched on separately."""
     _register_station_jobs(scheduler, context)
     _register_mains_watch(scheduler, context)
-    _register_reserve_board(scheduler, context)
+    _register_power_board(scheduler, context)
     _register_outage_schedule_jobs(scheduler, context)
 
 
@@ -516,22 +508,39 @@ def _register_mains_watch(scheduler: AsyncIOScheduler, context: SchedulerContext
     )
 
 
-def _register_reserve_board(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
-    """The board is built only where every layer it names can be read, so here it is enough to check it exists."""
+def _register_power_board(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """
+    A fresh board each morning, and the cadence that keeps it current while the flat is on battery.
+
+    the morning repost is what keeps the card inside the 48 hours a bot may edit its own message for, and it
+    is also why nothing has to repost the reserve separately — the two halves are one card now.
+    """
     settings = context.settings
-    if not settings.RESERVE_ENABLED or context.reserve_board is None:
+    if context.power_board is None:
         return
 
-    reserve_board_job = ReserveBoardJob(
-        reserve_board=context.reserve_board,
+    # kept at the hour yasno usually publishes the day, because that is when the schedule half changes
+    morning = settings.yasno_digest_time
+    scheduler.add_job(
+        context.power_board.post,
+        trigger=CronTrigger(hour=morning.hour, minute=morning.minute),
+        id="power_board_post",
+        replace_existing=True,
+    )
+    # only the reserve half moves minute to minute; a schedule-only board has nothing to redraw that often
+    if not settings.RESERVE_ENABLED or not context.power_board.draws_the_reserve:
+        return
+
+    power_board_job = PowerBoardJob(
+        power_board=context.power_board,
         on_grid_interval=timedelta(minutes=settings.RESERVE_ON_GRID_REFRESH_MINUTES),
         timezone=settings.timezone,
     )
     # no boot run: the held-open ble link needs a moment to come up, and the first tick lands after it has
     scheduler.add_job(
-        reserve_board_job.__call__,
+        power_board_job.__call__,
         trigger=IntervalTrigger(minutes=settings.RESERVE_CHECK_MINUTES),
-        id="reserve_board",
+        id="power_board",
         replace_existing=True,
     )
 
@@ -590,29 +599,15 @@ def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContex
 
 def _register_outage_schedule_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
     settings = context.settings
-    if (
-        not settings.YASNO_ENABLED
-        or context.power_topic is None
-        or context.schedule_provider is None
-        or context.outage_schedule_board is None
-    ):
+    if not settings.YASNO_ENABLED or context.power_topic is None or context.power_board is None:
         return
 
-    # a fresh board each morning — silent when nothing is planned
-    yasno_digest_time = settings.yasno_digest_time
-    scheduler.add_job(
-        context.outage_schedule_board.post,
-        trigger=CronTrigger(hour=yasno_digest_time.hour, minute=yasno_digest_time.minute),
-        id="outage_schedule_post",
-        replace_existing=True,
-    )
     yasno_job = YasnoScheduleJob(
         bot=context.bot,
         chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
         power_topic=context.power_topic,
         uow_factory=context.uow_factory,
-        schedule_provider=context.schedule_provider,
-        outage_schedule_board=context.outage_schedule_board,
+        power_board=context.power_board,
         pi_ups=context.pi_ups,
         settings=settings,
         timezone=settings.timezone,

@@ -11,7 +11,7 @@ from src.tests.fakes import ScriptedPriceSource
 from src.tests.integration.base import KYIV
 
 
-class StubAlertLightWatcher:
+class StubAirAlertWatcher:
     async def __call__(self) -> None:
         return None
 
@@ -39,13 +39,13 @@ class AlertLightRegistrationTestCase(unittest.TestCase):
                 chores_topic=None,
                 room_climate_sensor=NullRoomClimateSensor(),
                 price_source=ScriptedPriceSource({}),
-                alert_light_watcher=watcher,
+                air_alert_watcher=watcher,
             ),
         )
         return scheduler
 
     def test_register_jobs_schedules_the_sweep_on_the_watcher_it_was_given(self):
-        watcher = StubAlertLightWatcher()
+        watcher = StubAirAlertWatcher()
 
         scheduler = self.build_scheduler(watcher)
 
@@ -57,6 +57,6 @@ class AlertLightRegistrationTestCase(unittest.TestCase):
         self.assertEqual(scheduler.get_jobs(), [])
 
     def test_register_jobs_with_the_module_switched_off_schedules_nothing(self):
-        scheduler = self.build_scheduler(StubAlertLightWatcher(), enabled=False)
+        scheduler = self.build_scheduler(StubAirAlertWatcher(), enabled=False)
 
         self.assertEqual(scheduler.get_jobs(), [])

@@ -271,6 +271,13 @@ class Settings(BaseSettings):
     # getting out, and an alert can run for hours after that is done
     ALERT_LIGHT_MINUTES: int = 15
     ALERT_LIGHT_CHECK_SECONDS: int = 30
+    # 🚨 тривога: одна картка на кожну червону тривогу, з пушем у момент підйому і дописана на місці, коли
+    # червону знято. власний топік, бо це єдиний пуш у хаті, який має прийти швидше за сирену — а в ⚡ світлі
+    # він стояв би в черзі за графіком відключень. вимикається окремо від стрічки: світло на щитку і
+    # повідомлення в телефоні — дві різні згоди
+    ALERT_PUSH_ENABLED: bool = True
+    TELEGRAM_ALERT_TOPIC_ID: int = 0
+    ALERT_TOPIC_TITLE: str = "🚨 тривога"
     PANEL_LIGHT_ENABLED: bool = False
     PANEL_LIGHT_STATE_PATH: str = "/run/panel-light/state.json"
     PANEL_LIGHT_COMMAND_PATH: str = "/run/panel-light/command.json"
@@ -424,6 +431,10 @@ class Settings(BaseSettings):
     @property
     def power_topic_id(self) -> int | None:
         return self.TELEGRAM_POWER_TOPIC_ID or None
+
+    @property
+    def alert_topic_id(self) -> int | None:
+        return self.TELEGRAM_ALERT_TOPIC_ID or None
 
     @property
     def transit_topic_id(self) -> int | None:

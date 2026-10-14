@@ -59,8 +59,16 @@ services:
       TZ: ${TIMEZONE:-Europe/Kyiv}
       PUID: ${HOST_UID:-1000}
       PGID: ${HOST_GID:-1000}
+      # one mdns responder on this machine, and it is the host's. the image starts a dbus+avahi pair of its
+      # own inside every container, and on host networking those sat on the same multicast group as the pi's
+      # own avahi — all three claiming raspberrypi.local, two of them stuck in "registering" for weeks
+      ENABLE_AVAHI: 0
       HOMEBRIDGE_CONFIG_UI_PORT: 8581
     volumes:
+      # the host's system bus, which is how `advertiser: avahi` in config.json reaches that one responder.
+      # without it homebridge falls back to its own javascript mdns stack, and that is the half that goes
+      # quiet: on the night of 13/14.10 the home app could not be reached from either wi-fi band
+      - /var/run/dbus:/var/run/dbus
       - ./data/homebridge:/homebridge
     restart: unless-stopped
   # a second bridge carrying the same accessories, so the flat's other phone can pair a home of its
@@ -75,8 +83,16 @@ services:
       TZ: ${TIMEZONE:-Europe/Kyiv}
       PUID: ${HOST_UID:-1000}
       PGID: ${HOST_GID:-1000}
+      # one mdns responder on this machine, and it is the host's. the image starts a dbus+avahi pair of its
+      # own inside every container, and on host networking those sat on the same multicast group as the pi's
+      # own avahi — all three claiming raspberrypi.local, two of them stuck in "registering" for weeks
+      ENABLE_AVAHI: 0
       HOMEBRIDGE_CONFIG_UI_PORT: 8582
     volumes:
+      # the host's system bus, which is how `advertiser: avahi` in config.json reaches that one responder.
+      # without it homebridge falls back to its own javascript mdns stack, and that is the half that goes
+      # quiet: on the night of 13/14.10 the home app could not be reached from either wi-fi band
+      - /var/run/dbus:/var/run/dbus
       - ./data/homebridge-guest:/homebridge
       # the plugins are code, and code can be read twice: copying them onto the sd card would be tens
       # of thousands of small files for nothing

@@ -92,6 +92,8 @@ class RecordingBot:
         # have to name every option the bot has ever grown
         if link_preview_options is not None:
             call["link_preview_options"] = link_preview_options
+        if reply_markup is not None:
+            call["reply_markup"] = reply_markup
         self.sent.append(call)
         return SimpleNamespace(message_id=message_id, chat=SimpleNamespace(id=chat_id))
 

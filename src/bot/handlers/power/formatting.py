@@ -1,8 +1,9 @@
 """How the EcoFlow card, the reserve board, the outage schedule and the conservation card render."""
 from datetime import date, datetime, timedelta
 
-from src.bot.formatting import GENITIVE_MONTH_NAMES
+from src.bot.formatting import GENITIVE_MONTH_NAMES, format_duration, format_runtime, format_span
 from src.bot.handlers.power.messages import (
+    POWER_BOARD_AS_OF,
     POWER_CONSERVATION_CYCLE_DUE,
     POWER_CONSERVATION_CYCLE_SOON,
     POWER_CONSERVATION_IN_USE,
@@ -28,7 +29,6 @@ from src.bot.handlers.power.messages import (
     POWER_OUTAGE_SHORTFALL,
     POWER_OUTAGE_SHORTFALL_OVER,
     POWER_RESERVE_ALIVE,
-    POWER_RESERVE_AS_OF,
     POWER_RESERVE_CHARGING,
     POWER_RESERVE_CHARGING_UNTIMED,
     POWER_RESERVE_FULL,
@@ -46,7 +46,6 @@ from src.bot.handlers.power.messages import (
     POWER_RESERVE_TITLE_ON_GRID,
     POWER_RESERVE_TITLE_UNKNOWN,
     POWER_RESERVE_UNREACHABLE,
-    POWER_SCHEDULE_AS_OF,
     POWER_SCHEDULE_DAY_DATE,
     POWER_SCHEDULE_DAY_TODAY,
     POWER_SCHEDULE_DAY_TOMORROW,
@@ -81,11 +80,11 @@ def render_ecoflow(state: EcoFlowState) -> str:
             else POWER_ECOFLOW_ON_MAINS
         )
         if state.remaining_minutes:
-            source += " · " + POWER_ECOFLOW_TIME_TO_FULL.format(duration=_format_runtime(state.remaining_minutes))
+            source += " · " + POWER_ECOFLOW_TIME_TO_FULL.format(duration=format_runtime(state.remaining_minutes))
     else:
         source = POWER_ECOFLOW_ON_BATTERY
         if state.remaining_minutes:
-            source += " · " + POWER_ECOFLOW_TIME_LEFT.format(duration=_format_runtime(state.remaining_minutes))
+            source += " · " + POWER_ECOFLOW_TIME_LEFT.format(duration=format_runtime(state.remaining_minutes))
     lines.append(source)
 
     if state.ac_output_power:
@@ -93,15 +92,6 @@ def render_ecoflow(state: EcoFlowState) -> str:
 
     lines.extend(["", POWER_ECOFLOW_AS_OF.format(time=f"{state.as_of:%H:%M}")])
     return "\n".join(lines)
-
-
-def _format_runtime(minutes: int) -> str:
-    hours, remaining_minutes = divmod(minutes, 60)
-    if hours and remaining_minutes:
-        return f"{hours} год {remaining_minutes} хв"
-    if hours:
-        return f"{hours} год"
-    return f"{remaining_minutes} хв"
 
 
 def render_mains_change(grid: GridState, lasted: timedelta | None = None) -> str:
@@ -123,30 +113,6 @@ def render_mains_change(grid: GridState, lasted: timedelta | None = None) -> str
     return POWER_MAINS_LOST_AFTER.format(duration=duration)
 
 
-def format_span(span: timedelta) -> str:
-    """
-    A stretch of time as the family would say it out loud, up to days.
-
-    this is not `_format_runtime`: a station's runtime is hours at most, while the light is routinely on for
-    days between outages, and "76 год 15 хв" is not an answer anybody reads.
-    """
-    minutes = max(round(span.total_seconds() / 60), 0)
-    days, minutes_of_day = divmod(minutes, 24 * 60)
-    hours, remaining_minutes = divmod(minutes_of_day, 60)
-    if days:
-        return f"{days} {_days_word(days)} {hours} год" if hours else f"{days} {_days_word(days)}"
-    return _format_runtime(minutes_of_day) if (hours or remaining_minutes) else "менше хвилини"
-
-
-def _days_word(days: int) -> str:
-    # 1 день, 2-4 дні, 5-20 днів, 21 день, 22-24 дні — the teens are all "днів"
-    if days % 10 == 1 and days % 100 != 11:
-        return "день"
-    if days % 10 in (2, 3, 4) and days % 100 not in (12, 13, 14):
-        return "дні"
-    return "днів"
-
-
 RESERVE_LAYER_LABELS = {
     ReserveLayer.STATION: POWER_RESERVE_LAYER_STATION,
     ReserveLayer.PI: POWER_RESERVE_LAYER_PI,
@@ -155,17 +121,39 @@ RESERVE_LAYER_LABELS = {
 }
 
 
-def render_reserve_board(reserve: Reserve, generated_at: datetime) -> str:
+def render_power_board(reserve: Reserve | None, outlook: OutageOutlook | None, generated_at: datetime) -> str:
     """
-    The whole reserve on one screen: one heading for the grid, then one line per layer, all in the same unit.
+    The two questions this topic is opened with, on one card: what we run on, and when the light comes back.
+
+    they were two self-editing boards standing one above the other, which meant two «станом на», two cards
+    to find and a reposting rule each. the reserve goes on top because its heading is the one fact about the
+    flat — and because it is the half that moves minute by minute, so it is the half worth reading first.
+
+    either half may be missing: a flat with no hat has no reserve to draw, and a clear day has no hours to
+    publish. with both gone there is no card at all, which is the caller's cue to clear it away.
+    """
+    sections = []
+    if reserve is not None:
+        sections.append(_render_reserve_section(reserve))
+    if outlook is not None and outlook.has_anything_ahead(generated_at):
+        sections.append(_render_schedule_section(outlook, generated_at))
+    if not sections:
+        return ""
+
+    sections.append([POWER_BOARD_AS_OF.format(time=f"{generated_at:%H:%M}")])
+    return "\n\n".join("\n".join(section) for section in sections)
+
+
+def _render_reserve_section(reserve: Reserve) -> list[str]:
+    """
+    The whole reserve: one heading for the grid, then one line per layer, all in the same unit.
 
     the heading carries the grid because it is one fact about the flat rather than four about the devices —
     which is what lets every row below it be about time and nothing else.
     """
     lines = [_render_reserve_title(reserve), ""]
     lines.extend(_render_reserve_row(row) for row in reserve.rows)
-    lines.extend(["", POWER_RESERVE_AS_OF.format(time=f"{generated_at:%H:%M}")])
-    return "\n".join(lines)
+    return lines
 
 
 def _render_reserve_title(reserve: Reserve) -> str:
@@ -175,7 +163,7 @@ def _render_reserve_title(reserve: Reserve) -> str:
         return POWER_RESERVE_TITLE_UNKNOWN
     if reserve.on_battery_for is None:
         return POWER_RESERVE_TITLE_ON_BATTERY_UNTIMED
-    return POWER_RESERVE_TITLE_ON_BATTERY.format(duration=_format_duration(reserve.on_battery_for))
+    return POWER_RESERVE_TITLE_ON_BATTERY.format(duration=format_duration(reserve.on_battery_for))
 
 
 def _render_reserve_row(row: ReserveRow) -> str:
@@ -188,11 +176,11 @@ def _render_reserve_row(row: ReserveRow) -> str:
 
 def _render_reserve_standing(row: ReserveRow) -> str:
     if row.standing is ReserveStanding.HOLDING and row.remaining is not None:
-        return POWER_RESERVE_HOLDING.format(duration=_format_duration(row.remaining))
+        return POWER_RESERVE_HOLDING.format(duration=format_duration(row.remaining))
     if row.standing is ReserveStanding.CHARGING and row.remaining is not None:
-        return POWER_RESERVE_CHARGING.format(duration=_format_duration(row.remaining))
+        return POWER_RESERVE_CHARGING.format(duration=format_duration(row.remaining))
     if row.standing is ReserveStanding.HOLDING_UNMEASURED and row.holding_for is not None:
-        return POWER_RESERVE_HOLDING_UNMEASURED.format(duration=_format_duration(row.holding_for))
+        return POWER_RESERVE_HOLDING_UNMEASURED.format(duration=format_duration(row.holding_for))
     # a layer that cannot say how long falls back to the bare state, which is still worth a line
     return {
         ReserveStanding.HOLDING: POWER_RESERVE_HOLDING_UNMEASURED_UNTIMED,
@@ -204,16 +192,12 @@ def _render_reserve_standing(row: ReserveRow) -> str:
     }[row.standing]
 
 
-def _format_duration(duration: timedelta) -> str:
-    return _format_runtime(round(duration.total_seconds() / 60))
-
-
 def render_outage_forecast(forecast: OutageForecast) -> str:
     """The one sentence this feature exists for: the deadline, and the gap the family has to close."""
     return POWER_OUTAGE_SHORTFALL.format(
         runs_out=forecast.runs_out_at.strftime("%H:%M"),
         returns=forecast.power_returns_at.strftime("%H:%M"),
-        shortfall=_format_runtime(round(forecast.shortfall.total_seconds() / 60)),
+        shortfall=format_runtime(round(forecast.shortfall.total_seconds() / 60)),
     )
 
 
@@ -222,9 +206,9 @@ def render_outage_recovery(forecast: OutageForecast) -> str:
     return POWER_OUTAGE_SHORTFALL_OVER.format(returns=forecast.power_returns_at.strftime("%H:%M"))
 
 
-def render_outage_outlook(outlook: OutageOutlook, generated_at: datetime) -> str:
+def _render_schedule_section(outlook: OutageOutlook, generated_at: datetime) -> list[str]:
     """
-    Both published days on one board, each interval marked for where the clock already is.
+    Both published days, each interval marked for where the clock already is.
 
     an hour that has already passed must not read like a forecast — on 7 october yasno published the day's
     intervals at 21:10 and the board announced two outages that were over, which is worse than saying nothing
@@ -239,8 +223,7 @@ def render_outage_outlook(outlook: OutageOutlook, generated_at: datetime) -> str
         if section:
             lines.append("")
             lines.extend(section)
-    lines.extend(["", POWER_SCHEDULE_AS_OF.format(time=f"{generated_at:%H:%M}")])
-    return "\n".join(lines)
+    return lines
 
 
 def _render_day_section(schedule: OutageSchedule, generated_at: datetime) -> list[str]:

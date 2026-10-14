@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from src.bot.handlers.power.formatting import render_reserve_board
+from src.bot.handlers.power.formatting import render_power_board
 from src.modules.power.domain import EcoFlowState, GridState, MediaServerState, ReserveLayer, ReserveStanding, UpsState
 from src.modules.power.reserve import ElapsedClock, build_reserve
 
@@ -473,7 +473,7 @@ class ReserveChargePercentTestCase(unittest.TestCase):
         self.assertIsNone(row.charge_percent)
 
 
-class RenderReserveBoardTestCase(unittest.TestCase):
+class RenderTheReserveHalfTestCase(unittest.TestCase):
     """One heading for the grid, then every layer in the same shape: what it holds, then how long that lasts."""
 
     def test_render_on_battery_reports_the_charge_and_the_time_left_for_every_layer_that_has_them(self):
@@ -487,7 +487,7 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             socket_dead_for=timedelta(minutes=40),
         )
 
-        text = render_reserve_board(reserve, NOW)
+        text = render_power_board(reserve, None, NOW)
 
         self.assertEqual(
             text,
@@ -512,7 +512,7 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             socket_dead_for=None,
         )
 
-        text = render_reserve_board(reserve, NOW)
+        text = render_power_board(reserve, None, NOW)
 
         self.assertEqual(
             text,
@@ -537,7 +537,7 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             socket_dead_for=None,
         )
 
-        text = render_reserve_board(reserve, NOW)
+        text = render_power_board(reserve, None, NOW)
 
         self.assertEqual(
             text,
@@ -562,7 +562,7 @@ class RenderReserveBoardTestCase(unittest.TestCase):
             socket_dead_for=None,
         )
 
-        text = render_reserve_board(reserve, NOW)
+        text = render_power_board(reserve, None, NOW)
 
         self.assertEqual(
             text,

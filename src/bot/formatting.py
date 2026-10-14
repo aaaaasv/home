@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from src.common.constants import TELEGRAM_CAPTION_MAX_LENGTH
 from src.common.household_calendar import HouseholdCalendar
@@ -28,6 +28,44 @@ def shorten_for_button(value: str | None) -> str:
     if len(value) <= BUTTON_VALUE_MAX_LENGTH:
         return value
     return value[: BUTTON_VALUE_MAX_LENGTH - 1].rstrip() + "…"
+
+
+def format_runtime(minutes: int) -> str:
+    """Hours and minutes the way the family says them — the shape every battery, outage and alert span uses."""
+    hours, remaining_minutes = divmod(minutes, 60)
+    if hours and remaining_minutes:
+        return f"{hours} год {remaining_minutes} хв"
+    if hours:
+        return f"{hours} год"
+    return f"{remaining_minutes} хв"
+
+
+def format_duration(duration: timedelta) -> str:
+    return format_runtime(round(duration.total_seconds() / 60))
+
+
+def format_span(span: timedelta) -> str:
+    """
+    A stretch of time as the family would say it out loud, up to days.
+
+    this is not `format_runtime`: a station's runtime is hours at most, while the light is routinely on for
+    days between outages, and "76 год 15 хв" is not an answer anybody reads.
+    """
+    minutes = max(round(span.total_seconds() / 60), 0)
+    days, minutes_of_day = divmod(minutes, 24 * 60)
+    hours, remaining_minutes = divmod(minutes_of_day, 60)
+    if days:
+        return f"{days} {_days_word(days)} {hours} год" if hours else f"{days} {_days_word(days)}"
+    return format_runtime(minutes_of_day) if (hours or remaining_minutes) else "менше хвилини"
+
+
+def _days_word(days: int) -> str:
+    # 1 день, 2-4 дні, 5-20 днів, 21 день, 22-24 дні — the teens are all "днів"
+    if days % 10 == 1 and days % 100 != 11:
+        return "день"
+    if days % 10 in (2, 3, 4) and days % 100 not in (12, 13, 14):
+        return "дні"
+    return "днів"
 
 
 def pluralize_days(count: int) -> str:
