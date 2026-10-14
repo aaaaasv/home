@@ -17,6 +17,8 @@ OUTAGE_EMERGENCY_KIND = "outage_emergency"
 CONSERVATION_CARD_KIND = "conservation_card"
 # the standing reserve board — every backup layer on one screen, edited in place and never notifying
 RESERVE_BOARD_KIND = "reserve_board"
+# the strip's control card: only the newest one may stand, because its buttons name levels
+STRIP_CARD_KIND = "strip_card"
 WEATHER_DIGEST_KIND = "weather_digest"
 CLIMATE_CARD_KIND = "climate_card"
 # one standing card per uncomfortable plant, referenced by plant id, deleted the moment the plant is comfortable
