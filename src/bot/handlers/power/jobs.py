@@ -10,7 +10,8 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.handlers.power.formatting import render_mains_change, render_outage_forecast, render_outage_recovery
-from src.bot.handlers.power.messages import POWER_OUTAGE_SOON
+from src.bot.handlers.power.keyboards import build_supply_keyboard
+from src.bot.handlers.power.messages import POWER_OUTAGE_SOON, POWER_SUPPLY_QUESTION
 from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
 from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.scheduling import SchedulerContext
@@ -21,6 +22,9 @@ from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.domain import (
+    DeclaredSupply,
+    EcoFlowState,
+    GridChange,
     GridState,
     OutageForecast,
     OutageOutlook,
@@ -33,7 +37,9 @@ from src.modules.power.outage_forecast import forecast_outage
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.power.services.pi_ups import PiUps
+from src.modules.power.use_cases.declare_supply import DeclareSupplyUseCase
 from src.modules.power.use_cases.record_grid_change import RecordGridChangeUseCase
+from src.modules.power.use_cases.retrieve_declared_supply import RetrieveDeclaredSupplyUseCase
 from src.modules.power.use_cases.track_conservation import TrackConservationUseCase
 
 logger = logging.getLogger(__name__)
@@ -51,11 +57,13 @@ class EcoFlowPollJob:
         self,
         ecoflow_station: EcoFlowStation,
         uow_factory: Callable[[], UnitOfWork],
+        household_calendar: HouseholdCalendar,
         timezone: tzinfo,
         conserved_after: timedelta,
     ):
         self.ecoflow_station = ecoflow_station
         self.uow_factory = uow_factory
+        self.household_calendar = household_calendar
         self.timezone = timezone
         self.conserved_after = conserved_after
 
@@ -70,6 +78,24 @@ class EcoFlowPollJob:
         await TrackConservationUseCase(
             uow=self.uow_factory(), now=datetime.now(self.timezone), conserved_after=self.conserved_after
         )(state)
+        await self._release_the_declaration(state)
+
+    async def _release_the_declaration(self, state: EcoFlowState | None) -> None:
+        """
+        A station drawing from the wall proves that wall is live, which ends any claim that it is feeding us.
+
+        without this the declaration would be a trap: «ні, це Delta 2» silences «світло є» until somebody
+        remembers to take it back, and that is the one message the family actually waits for.
+        """
+        if state is None or state.ac_input_power <= 0:
+            return
+        if await RetrieveDeclaredSupplyUseCase(uow=self.uow_factory())() is DeclaredSupply.GRID:
+            return
+
+        await DeclareSupplyUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(
+            DeclaredSupply.GRID
+        )
+        logger.info("The station is charging from the wall, so the declaration that it feeds us is released")
 
 
 class MainsWatchJob:
@@ -92,6 +118,7 @@ class MainsWatchJob:
         chat_id: int,
         power_topic: ForumTopicRegistry,
         pi_ups: PiUps,
+        ecoflow_station: EcoFlowStation | None,
         settings: Settings,
         uow_factory: Callable[[], UnitOfWork],
         household_calendar: HouseholdCalendar,
@@ -100,39 +127,81 @@ class MainsWatchJob:
         self.chat_id = chat_id
         self.power_topic = power_topic
         self.pi_ups = pi_ups
+        self.ecoflow_station = ecoflow_station
         self.uow_factory = uow_factory
         self.household_calendar = household_calendar
-        self._seeded = False
         self.monitor = MainsMonitor(confirmations=settings.ECOFLOW_MAINS_CONFIRMATIONS)
+        self._declared_supply: DeclaredSupply | None = None
 
     async def __call__(self) -> None:
-        await self._seed_once()
-        grid = self.monitor.update(await self.pi_ups.read_state())
+        declared_supply = await RetrieveDeclaredSupplyUseCase(uow=self.uow_factory())()
+        # «світло вже є» tapped on the station's card is already the answer to the question below, so the
+        # announcement it brings about must not turn around and ask it
+        answered_by_hand = self._declared_supply is DeclaredSupply.STATION and declared_supply is DeclaredSupply.GRID
+        self._declared_supply = declared_supply
+        await self._seed_from_the_journal()
+        grid = self.monitor.update(await self.pi_ups.read_state(), declared_supply)
         if grid is None:
             return
 
         # written before the message is sent: a telegram outage must not cost the record of what happened,
         # and the record is also where the span in the message comes from
-        lasted = await RecordGridChangeUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(grid)
+        change = await RecordGridChangeUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(grid)
+        text, keyboard = await self._compose(grid, change, may_ask=not answered_by_hand)
 
         await self.bot.send_message(
             chat_id=self.chat_id,
             message_thread_id=await self.power_topic.resolve(),
-            text=render_mains_change(grid, lasted),
+            text=text,
+            reply_markup=keyboard,
             # the one push in this house that must arrive the moment it is sent
             disable_notification=False,
         )
         logger.info("Announced the grid going %s", grid.value)
 
-    async def _seed_once(self) -> None:
-        if self._seeded:
-            return
-        self._seeded = True
+    async def _compose(self, grid: GridState, change: GridChange, may_ask: bool = True):
+        """
+        The announcement, and the buttons that let a person correct the one thing the hat cannot measure.
+
+        «світло зникло» carries the single button for saying the pi has been moved onto the station, because
+        that is when somebody does it. «світло є» carries the pair only when the station contradicts it —
+        asking under every restored light would teach the family to ignore the question.
+        """
+        text = render_mains_change(grid, change.lasted)
+        if grid is GridState.ON_BATTERY:
+            return text, build_supply_keyboard(DeclaredSupply.GRID)
+
+        contradicting = await self._station_contradicting() if may_ask else None
+        if contradicting is None:
+            return text, None
+        question = POWER_SUPPLY_QUESTION.format(watts=contradicting.ac_output_power)
+        return f"{text}\n\n{question}", build_supply_keyboard(DeclaredSupply.GRID, change.event_id)
+
+    async def _station_contradicting(self) -> EcoFlowState | None:
+        """
+        The station discharging into something while the hat sees mains — the one arrangement worth a question.
+
+        a station drawing from the wall proves the wall is live and ends the matter; one that is neither
+        charging nor feeding anything knows nothing worth asking about.
+        """
+        if self.ecoflow_station is None:
+            return None
+        state = await self.ecoflow_station.read_state()
+        if state is None or state.ac_input_power > 0 or state.ac_output_power <= 0:
+            return None
+        return state
+
+    async def _seed_from_the_journal(self) -> None:
+        """
+        Where the grid stood when this house last said something, read fresh every tick rather than once.
+
+        the journal is the truth and this is only its cache: an announcement can be taken back by hand —
+        «ні, це Delta 2» deletes the row it wrote — and a copy kept in memory would go on believing the
+        light was back and never announce the real return.
+        """
         async with self.uow_factory() as uow:
             latest = await uow.grid_events.retrieve_latest()
-        if latest is not None:
-            self.monitor.seed(GridState(latest.state))
-            logger.info("Resuming the grid watch from the last recorded state: %s", latest.state)
+        self.monitor.seed(GridState(latest.state) if latest is not None else None)
 
 
 class ReserveBoardJob:
@@ -193,6 +262,7 @@ class OutageForecastJob:
         schedule_provider: OutageScheduleProvider,
         household_calendar: HouseholdCalendar,
         pi_ups: PiUps,
+        uow_factory: Callable[[], UnitOfWork],
         confirmations: int = 2,
     ):
         self.bot = bot
@@ -202,6 +272,7 @@ class OutageForecastJob:
         self.schedule_provider = schedule_provider
         self.household_calendar = household_calendar
         self.pi_ups = pi_ups
+        self.uow_factory = uow_factory
         self.confirmations = confirmations
         self._last_schedule: OutageSchedule | None = None
         self._warned = False
@@ -213,7 +284,8 @@ class OutageForecastJob:
         calendar = self.household_calendar
         moment = calendar.now().astimezone(calendar.timezone)
         state = await self.ecoflow_station.read_state()
-        grid = classify_grid(await self.pi_ups.read_state())
+        declared_supply = await RetrieveDeclaredSupplyUseCase(uow=self.uow_factory())()
+        grid = classify_grid(await self.pi_ups.read_state(), declared_supply)
         forecast = forecast_outage(state, await self._schedule(moment), moment, grid)
 
         if forecast is None:
@@ -399,7 +471,8 @@ class YasnoScheduleJob:
         """
         if self.pi_ups is None:
             return False
-        return classify_grid(await self.pi_ups.read_state()) is GridState.ON_BATTERY
+        declared_supply = await RetrieveDeclaredSupplyUseCase(uow=self.uow_factory())()
+        return classify_grid(await self.pi_ups.read_state(), declared_supply) is GridState.ON_BATTERY
 
     async def _already_posted(self, kind: str, reference: str) -> bool:
         async with self.uow_factory() as uow:
@@ -430,6 +503,7 @@ def _register_mains_watch(scheduler: AsyncIOScheduler, context: SchedulerContext
         chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
         power_topic=context.power_topic,
         pi_ups=context.pi_ups,
+        ecoflow_station=context.ecoflow_station,
         settings=settings,
         uow_factory=context.uow_factory,
         household_calendar=context.household_calendar,
@@ -470,6 +544,7 @@ def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContex
     ecoflow_poll_job = EcoFlowPollJob(
         ecoflow_station=context.ecoflow_station,
         uow_factory=context.uow_factory,
+        household_calendar=context.household_calendar,
         timezone=settings.timezone,
         conserved_after=timedelta(minutes=settings.ECOFLOW_CONSERVED_AFTER_MINUTES),
     )
@@ -492,6 +567,7 @@ def _register_station_jobs(scheduler: AsyncIOScheduler, context: SchedulerContex
             schedule_provider=context.schedule_provider,
             household_calendar=context.household_calendar,
             pi_ups=context.pi_ups,
+            uow_factory=context.uow_factory,
         )
         scheduler.add_job(
             outage_forecast_job.__call__,

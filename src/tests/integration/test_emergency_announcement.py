@@ -5,7 +5,15 @@ from zoneinfo import ZoneInfo
 from src.bot.handlers.power.jobs import YasnoScheduleJob
 from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.power.domain import OutageInterval, OutageOutlook, OutageSchedule, OutageScheduleStatus, UpsState
+from src.modules.power.domain import (
+    DeclaredSupply,
+    OutageInterval,
+    OutageOutlook,
+    OutageSchedule,
+    OutageScheduleStatus,
+    UpsState,
+)
+from src.modules.power.use_cases.declare_supply import DeclareSupplyUseCase
 from src.tests.fakes import StubForumTopic
 from src.tests.integration.base import BaseIntegrationTestCase
 
@@ -222,6 +230,17 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
         await self.build_job(outlook, pi_ups=StubUps(mains_present=True))()
 
         self.assertEqual(len(self.bot.sent), 1)
+
+    async def test_an_outage_due_soon_while_the_station_is_declared_to_feed_us_earns_no_ping(self):
+        """The hat reads mains off the station's own output, and there is no light left to lose."""
+        await DeclareSupplyUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(
+            DeclaredSupply.STATION
+        )
+        outlook = self.build_outlook_with_an_outage_due_soon(OutageScheduleStatus.SCHEDULE_APPLIES)
+
+        await self.build_job(outlook, pi_ups=StubUps(mains_present=True))()
+
+        self.assertEqual(self.bot.sent, [])
 
     async def test_an_outage_due_soon_is_pinged_when_there_is_no_hat_to_ask(self):
         """A flat without the hat keeps the heads-up it always had — a missing reading is not an outage."""

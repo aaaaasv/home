@@ -457,6 +457,23 @@ class AirAlertState(Base):
     changed_at = Column(UtcDateTime, nullable=False)
 
 
+class SupplyDeclaration(Base):
+    """
+    What the family last said is feeding the socket the hat measures — one row, rewritten.
+
+    the hat measures voltage, not where the voltage comes from, and the difference only exists when somebody
+    moves the pi onto the station mid-outage. on disk rather than in memory for the same reason the alert
+    level is: a deploy in the middle of that arrangement must not go back to believing the city is on.
+    """
+
+    __tablename__ = "supply_declaration"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # "grid" or "station", in the DeclaredSupply the family last chose
+    supply = Column(String(16), nullable=False)
+    declared_at = Column(UtcDateTime, nullable=False)
+
+
 class PresenceEvent(Base):
     """
     Every phone that joined or left the Wi-Fi, and what the welcome light decided about it.

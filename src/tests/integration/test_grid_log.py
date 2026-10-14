@@ -39,12 +39,13 @@ class GridLogTestCase(BaseIntegrationTestCase):
     def uow_factory(self) -> UnitOfWork:
         return UnitOfWork(session_factory=self.session_factory)
 
-    def build_job(self, bot, mains_present: bool) -> MainsWatchJob:
+    def build_job(self, bot, mains_present: bool, ecoflow_station=None) -> MainsWatchJob:
         return MainsWatchJob(
             bot=bot,
             chat_id=CHAT_ID,
             power_topic=StubForumTopic(),
             pi_ups=StubUps(mains_present),
+            ecoflow_station=ecoflow_station,
             settings=SimpleNamespace(ECOFLOW_MAINS_CONFIRMATIONS=1),
             uow_factory=self.uow_factory,
             household_calendar=self.household_calendar,
