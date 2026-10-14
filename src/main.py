@@ -41,9 +41,9 @@ from src.bot.handlers.places.board import PLACES_MODULE_NAME, PlacesBoard
 from src.bot.handlers.plants import PLANTS_MODULE_NAME
 from src.bot.handlers.plants.soil import build_watering_recorder
 from src.bot.handlers.power import POWER_MODULE_NAME
+from src.bot.handlers.power.board import PowerBoard
 from src.bot.handlers.power.conservation_board import ConservationBoard
-from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
-from src.bot.handlers.power.reserve_board import ReserveBoard
+from src.bot.handlers.power.reserve_readout import ReserveReadout
 from src.bot.handlers.presence.arrival import ArrivalLightWatcher
 from src.bot.handlers.sensors.recording import build_sensor_recorder
 from src.bot.handlers.shopping.board import SHOPPING_MODULE_NAME, ShoppingListBoard
@@ -77,7 +77,7 @@ GROUP_COMMANDS = [
     BotCommand(command="ac", description="❄️ кондиціонер"),
     BotCommand(command="climate", description="🏠 клімат удома по кімнатах"),
     BotCommand(command="eco", description="⚡ EcoFlow Delta 2"),
-    BotCommand(command="reserve", description="⚡ резерв живлення"),
+    BotCommand(command="reserve", description="⚡ дошка світла: резерв і графік"),
     BotCommand(command="conserve", description="⚡ зберігання EcoFlow"),
     BotCommand(command="light", description="⚡ стрічка на полиці"),
     BotCommand(command="pi", description="🩺 стан Raspberry Pi"),
@@ -239,16 +239,6 @@ async def run() -> None:
             bot, settings, POWER_MODULE_NAME, settings.POWER_TOPIC_TITLE, settings.power_topic_id
         )
     schedule_provider = build_yasno_schedule_provider(settings)
-    outage_schedule_board = None
-    if schedule_provider is not None and power_topic is not None:
-        outage_schedule_board = OutageScheduleBoard(
-            bot=bot,
-            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
-            power_topic=power_topic,
-            uow_factory=UnitOfWork,
-            schedule_provider=schedule_provider,
-            timezone=settings.timezone,
-        )
     # the conservation card belongs to the ecoflow station; shared by the /eco toggle and the 4-hourly refresh
     conservation_board = None
     if settings.ECOFLOW_ENABLED and power_topic is not None:
@@ -260,30 +250,38 @@ async def run() -> None:
             timezone=settings.timezone,
         )
 
-    # the reserve board: every backup layer on one screen, charge then time, the same shape on every row. it
-    # draws no row it cannot read, so it stands up only where all four sources are configured at once
+    # ⚡ світло has one board: every backup layer on one screen — charge then time, the same shape on every
+    # row — and the outage schedule under it. the reserve half draws no row it cannot read, so it joins only
+    # where all four sources are configured at once; the schedule half joins wherever yasno is on
     pi_ups = build_pi_ups(settings)
     router_link = build_router_link(settings)
     media_server_battery = build_media_server_battery(settings)
-    reserve_board = None
+    reserve_readout = None
     if (
         settings.RESERVE_ENABLED
         and settings.ECOFLOW_ENABLED
         and settings.PI_UPS_ENABLED
         and router_link is not None
         and media_server_battery is not None
-        and power_topic is not None
     ):
-        reserve_board = ReserveBoard(
-            bot=bot,
-            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
-            power_topic=power_topic,
+        reserve_readout = ReserveReadout(
             uow_factory=UnitOfWork,
             ecoflow_station=ecoflow_station,
             pi_ups=pi_ups,
             router_link=router_link,
             media_server_battery=media_server_battery,
             timezone=settings.timezone,
+        )
+    power_board = None
+    if power_topic is not None and (reserve_readout is not None or schedule_provider is not None):
+        power_board = PowerBoard(
+            bot=bot,
+            chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+            power_topic=power_topic,
+            uow_factory=UnitOfWork,
+            timezone=settings.timezone,
+            reserve_readout=reserve_readout,
+            schedule_provider=schedule_provider,
         )
 
     # transit: an on-demand arrival card in its own topic — built only when on. the shape catalog is shared by
@@ -332,9 +330,8 @@ async def run() -> None:
         tech_topic=tech_topic,
         ecoflow_station=ecoflow_station,
         power_topic=power_topic,
-        outage_schedule_board=outage_schedule_board,
         conservation_board=conservation_board,
-        reserve_board=reserve_board,
+        power_board=power_board,
         panel_light=panel_light,
         transit_topic=transit_topic,
         transit_board=transit_board,
@@ -367,9 +364,8 @@ async def run() -> None:
             pi_ups=pi_ups,
             power_topic=power_topic,
             schedule_provider=schedule_provider,
-            outage_schedule_board=outage_schedule_board,
             conservation_board=conservation_board,
-            reserve_board=reserve_board,
+            power_board=power_board,
             shape_catalog=shape_catalog,
             newspaper_print_queue=build_newspaper_print_queue(settings),
             newspaper_word_sources=build_newspaper_word_sources(settings),

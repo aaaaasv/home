@@ -44,26 +44,21 @@ class RecordingBot:
         return None
 
 
-class StubProvider:
-    def __init__(self, outlook):
-        self.outlook = outlook
-
-    async def fetch(self):
-        return self.outlook
-
-
 class StubBoard:
-    """Records how the board was drawn: silently refreshed in place, or reposted with a ping."""
+    """Stands in for the one board in ⚡ світло: it is told the schedule, then drawn or reposted with a ping."""
 
     def __init__(self):
-        self.refreshes = 0
+        self.outlook = None
+        self.draws = 0
         self.notified_posts = 0
 
-    async def refresh(self, outlook=None) -> bool:
-        self.refreshes += 1
-        return True
+    async def read_outlook(self):
+        return self.outlook
 
-    async def post(self, outlook=None, notify: bool = False):
+    async def draw(self, reserve=None) -> None:
+        self.draws += 1
+
+    async def post(self, reserve=None, notify: bool = False):
         if notify:
             self.notified_posts += 1
 
@@ -112,13 +107,13 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
         return UnitOfWork(session_factory=self.session_factory)
 
     def build_job(self, outlook, pi_ups=None) -> YasnoScheduleJob:
+        self.board.outlook = outlook
         return YasnoScheduleJob(
             bot=self.bot,
             chat_id=CHAT_ID,
             power_topic=StubForumTopic(),
             uow_factory=self.uow_factory,
-            schedule_provider=StubProvider(outlook),
-            outage_schedule_board=self.board,
+            power_board=self.board,
             pi_ups=pi_ups if pi_ups is not None else StubUps(mains_present=True),
             settings=SimpleNamespace(YASNO_PRE_OUTAGE_LEAD_MINUTES=30),
             timezone=KYIV,
@@ -147,18 +142,18 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
 
         self.assertEqual(self.bot.sent, [])
 
-    async def test_the_announcing_tick_does_not_also_refresh_the_board_it_just_reposted(self):
+    async def test_the_announcing_tick_does_not_also_draw_the_board_it_just_reposted(self):
         await self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.today))()
 
-        self.assertEqual(self.board.refreshes, 0)
+        self.assertEqual(self.board.draws, 0)
 
-    async def test_the_same_spell_polled_again_refreshes_the_board_without_a_ping(self):
+    async def test_the_same_spell_polled_again_draws_the_board_without_a_ping(self):
         job = self.build_job(build_outlook(OutageScheduleStatus.EMERGENCY_SHUTDOWNS, self.today))
         await job()
 
         await job()
 
-        self.assertEqual((self.board.notified_posts, self.board.refreshes), (1, 1))
+        self.assertEqual((self.board.notified_posts, self.board.draws), (1, 1))
 
     async def test_a_spell_that_lasts_past_midnight_is_not_announced_again(self):
         """The 00:06 ping: the day rolled over, the regime did not."""
@@ -168,10 +163,10 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
 
         self.assertEqual(self.board.notified_posts, 1)
 
-    async def test_an_ordinary_day_announces_nothing_and_refreshes_in_place(self):
+    async def test_an_ordinary_day_announces_nothing_and_draws_the_board_in_place(self):
         await self.build_job(build_outlook(OutageScheduleStatus.SCHEDULE_APPLIES, self.today))()
 
-        self.assertEqual((self.board.notified_posts, self.board.refreshes), (0, 1))
+        self.assertEqual((self.board.notified_posts, self.board.draws), (0, 1))
         self.assertEqual(await self.remembered(), 0)
 
     async def test_a_new_spell_after_the_regime_lifted_is_announced_again(self):

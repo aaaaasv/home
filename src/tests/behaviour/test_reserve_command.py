@@ -3,7 +3,7 @@ from src.tests.behaviour.base import BaseBehaviourTestCase
 from src.tests.telegram import POWER_TOPIC, message_update
 
 
-class RecordingReserveBoard:
+class RecordingPowerBoard:
     """Counts what the command asked of the board; how the board itself draws has its own tests"""
 
     def __init__(self) -> None:
@@ -22,13 +22,13 @@ class ReserveCommandTestCase(BaseBehaviourTestCase):
     """
 
     async def test_reserve_in_the_power_topic_moves_the_board_to_the_bottom(self):
-        reserve_board = RecordingReserveBoard()
+        power_board = RecordingPowerBoard()
 
-        await self.feed(message_update("/reserve", topic=POWER_TOPIC), reserve_board=reserve_board)
+        await self.feed(message_update("/reserve", topic=POWER_TOPIC), power_board=power_board)
 
-        self.assertEqual(reserve_board.posts, 1)
+        self.assertEqual(power_board.posts, 1)
 
     async def test_reserve_without_a_board_configured_says_so_instead_of_going_silent(self):
-        await self.feed(message_update("/reserve", topic=POWER_TOPIC), reserve_board=None)
+        await self.feed(message_update("/reserve", topic=POWER_TOPIC), power_board=None)
 
         self.assertEqual(self.session.sent_texts(), [POWER_RESERVE_UNAVAILABLE])
