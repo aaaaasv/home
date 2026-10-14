@@ -11,6 +11,7 @@ from src.bot.handlers import (
     assistant,
     chores,
     climate,
+    lighting,
     places,
     plants,
     power,
@@ -33,6 +34,7 @@ from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.common.config import Settings
 from src.modules.air_conditioner.services.air_conditioner import AirConditioner
 from src.modules.assistant.use_cases.answer_question import AnswerQuestionUseCase
+from src.modules.lighting.services.panel_light import PanelLight
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 
 
@@ -65,6 +67,7 @@ def build_dispatcher(
     outage_schedule_board: OutageScheduleBoard | None = None,
     conservation_board: ConservationBoard | None = None,
     reserve_board: ReserveBoard | None = None,
+    panel_light: PanelLight | None = None,
     transit_topic: ForumTopicRegistry | None = None,
     transit_board: TransitBoard | None = None,
     assistant_topic: ForumTopicRegistry | None = None,
@@ -86,6 +89,7 @@ def build_dispatcher(
             outage_schedule_board=outage_schedule_board,
             conservation_board=conservation_board,
             reserve_board=reserve_board,
+            panel_light=panel_light,
             transit_board=transit_board,
             answer_question=answer_question,
         ),
@@ -117,6 +121,11 @@ def build_dispatcher(
         power.router.message.filter(InModuleTopic(power_topic))
         power.router.callback_query.filter(HasAccessibleMessage())
         module_routers.append(power.router)
+    # the strip has no topic of its own: it is one lamp, and ⚡ світло is where the rest of the hardware answers
+    if power_topic is not None and panel_light is not None:
+        lighting.router.message.filter(InModuleTopic(power_topic))
+        lighting.router.callback_query.filter(HasAccessibleMessage())
+        module_routers.append(lighting.router)
     if transit_topic is not None:
         transit.router.message.filter(InModuleTopic(transit_topic))
         transit.router.callback_query.filter(HasAccessibleMessage())

@@ -76,6 +76,7 @@ def shared_dispatcher() -> tuple[Dispatcher, Bot]:
             ecoflow_station=SimpleNamespace(),
             air_conditioner=SimpleNamespace(),
             power_topic=StubForumTopic(thread_id=POWER_TOPIC),
+            panel_light=SimpleNamespace(),
             assistant_topic=StubForumTopic(thread_id=ASSISTANT_TOPIC),
             weather_topic=StubForumTopic(thread_id=CLIMATE_TOPIC),
         )
