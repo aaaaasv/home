@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from src.bot.handlers.power.jobs import YasnoScheduleJob
 from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.power.domain import OutageInterval, OutageOutlook, OutageSchedule, OutageScheduleStatus
+from src.modules.power.domain import OutageInterval, OutageOutlook, OutageSchedule, OutageScheduleStatus, UpsState
 from src.tests.fakes import StubForumTopic
 from src.tests.integration.base import BaseIntegrationTestCase
 
@@ -69,6 +69,19 @@ class StubBoard:
         return Posted()
 
 
+class StubUps:
+    def __init__(self, mains_present: bool):
+        self.mains_present = mains_present
+
+    async def read_state(self) -> UpsState:
+        return UpsState(
+            mains_present=self.mains_present,
+            battery_volts=4.17,
+            battery_percent=98.0,
+            as_of=datetime.now(KYIV),
+        )
+
+
 def _minute_of_day_in(minutes_from_now: int) -> int:
     now = datetime.now(KYIV)
     return now.hour * 60 + now.minute + minutes_from_now
@@ -90,7 +103,7 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
     def uow_factory(self) -> UnitOfWork:
         return UnitOfWork(session_factory=self.session_factory)
 
-    def build_job(self, outlook) -> YasnoScheduleJob:
+    def build_job(self, outlook, pi_ups=None) -> YasnoScheduleJob:
         return YasnoScheduleJob(
             bot=self.bot,
             chat_id=CHAT_ID,
@@ -98,6 +111,7 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
             uow_factory=self.uow_factory,
             schedule_provider=StubProvider(outlook),
             outage_schedule_board=self.board,
+            pi_ups=pi_ups if pi_ups is not None else StubUps(mains_present=True),
             settings=SimpleNamespace(YASNO_PRE_OUTAGE_LEAD_MINUTES=30),
             timezone=KYIV,
         )
@@ -186,6 +200,37 @@ class EmergencyAnnouncementTestCase(BaseIntegrationTestCase):
         await self.build_job(outlook)()
 
         self.assertEqual(self.bot.sent, [])
+
+    async def test_an_outage_due_soon_while_the_flat_is_already_dark_earns_no_ping(self):
+        """
+        14.10: the light was cut at 12:19, unscheduled, and at 12:40 the bot announced the 13:00 outage.
+
+        «за 20 хв планове відключення» carries one unspoken fact — that there is light to lose — and reading
+        it in the dark is reading a message that is wrong about the present.
+        """
+        outlook = self.build_outlook_with_an_outage_due_soon(OutageScheduleStatus.SCHEDULE_APPLIES)
+
+        await self.build_job(outlook, pi_ups=StubUps(mains_present=False))()
+
+        self.assertEqual(self.bot.sent, [])
+
+    async def test_an_outage_due_soon_is_pinged_when_the_light_comes_back_before_it_starts(self):
+        """Skipping is not remembering: the hour is still ahead, so the next tick owes the heads-up."""
+        outlook = self.build_outlook_with_an_outage_due_soon(OutageScheduleStatus.SCHEDULE_APPLIES)
+        await self.build_job(outlook, pi_ups=StubUps(mains_present=False))()
+
+        await self.build_job(outlook, pi_ups=StubUps(mains_present=True))()
+
+        self.assertEqual(len(self.bot.sent), 1)
+
+    async def test_an_outage_due_soon_is_pinged_when_there_is_no_hat_to_ask(self):
+        """A flat without the hat keeps the heads-up it always had — a missing reading is not an outage."""
+        job = self.build_job(self.build_outlook_with_an_outage_due_soon(OutageScheduleStatus.SCHEDULE_APPLIES))
+        job.pi_ups = None
+
+        await job()
+
+        self.assertEqual(len(self.bot.sent), 1)
 
     async def test_the_regime_lifting_leaves_the_board_where_it_is(self):
         """Forgetting the spell must not delete the card the family is reading."""

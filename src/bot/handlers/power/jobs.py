@@ -275,6 +275,9 @@ class YasnoScheduleJob:
     Every ~20 min: re-read the outage schedule, keep the daily board current (silent), and fire the only two pushes
     this topic allows — one heads-up ~30 min before each planned outage, and one when the group turns to emergency
     shutdowns. facts only, no advice; quiet whenever nothing is planned.
+
+    the heads-up also asks the hat whether there is anything to warn about: an outage that arrived early makes
+    the announcement of the planned one read as though the light were still on.
     """
 
     def __init__(
@@ -285,6 +288,7 @@ class YasnoScheduleJob:
         uow_factory: Callable[[], UnitOfWork],
         schedule_provider: OutageScheduleProvider,
         outage_schedule_board: OutageScheduleBoard,
+        pi_ups: PiUps | None,
         settings: Settings,
         timezone: tzinfo,
     ):
@@ -294,6 +298,7 @@ class YasnoScheduleJob:
         self.uow_factory = uow_factory
         self.schedule_provider = schedule_provider
         self.outage_schedule_board = outage_schedule_board
+        self.pi_ups = pi_ups
         self.settings = settings
         self.timezone = timezone
         self.tracker = PostedMessageTracker(bot=bot, uow_factory=uow_factory)
@@ -363,6 +368,12 @@ class YasnoScheduleJob:
         if not 0 < minutes_until <= self.settings.YASNO_PRE_OUTAGE_LEAD_MINUTES:
             return
 
+        # «за 20 хв відключення» reads as a promise that the light is on now. on 14.10 it was cut at 12:19,
+        # unscheduled, and this went off at 12:40 about the hour that was planned for 13:00
+        if await self._the_light_is_already_out():
+            logger.info("Skipped the heads-up for the %s outage: the light is already out", f"{upcoming.start:%H:%M}")
+            return
+
         # one ping per interval per day, so a 20-min poll cannot announce the same outage twice
         reference = f"{today.day.isoformat()}:{upcoming.start_minute}"
         if await self._already_posted(OUTAGE_PING_KIND, reference):
@@ -378,6 +389,17 @@ class YasnoScheduleJob:
         )
         await self.tracker.remember(OUTAGE_PING_KIND, message, reference=reference)
         logger.info("Pinged upcoming outage %s", reference)
+
+    async def _the_light_is_already_out(self) -> bool:
+        """
+        Whether the flat is on battery at this moment, measured rather than inferred.
+
+        nothing is read into a hat that cannot answer: a flat without one keeps the heads-up it always had,
+        because a missing reading is not an outage.
+        """
+        if self.pi_ups is None:
+            return False
+        return classify_grid(await self.pi_ups.read_state()) is GridState.ON_BATTERY
 
     async def _already_posted(self, kind: str, reference: str) -> bool:
         async with self.uow_factory() as uow:
@@ -515,6 +537,7 @@ def _register_outage_schedule_jobs(scheduler: AsyncIOScheduler, context: Schedul
         uow_factory=context.uow_factory,
         schedule_provider=context.schedule_provider,
         outage_schedule_board=context.outage_schedule_board,
+        pi_ups=context.pi_ups,
         settings=settings,
         timezone=settings.timezone,
     )
