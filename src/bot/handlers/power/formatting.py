@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 
 from src.bot.formatting import GENITIVE_MONTH_NAMES, format_duration, format_runtime, format_span
 from src.bot.handlers.power.messages import (
+    POWER_BOARD_AS_OF,
     POWER_CONSERVATION_CYCLE_DUE,
     POWER_CONSERVATION_CYCLE_SOON,
     POWER_CONSERVATION_IN_USE,
@@ -28,7 +29,6 @@ from src.bot.handlers.power.messages import (
     POWER_OUTAGE_SHORTFALL,
     POWER_OUTAGE_SHORTFALL_OVER,
     POWER_RESERVE_ALIVE,
-    POWER_RESERVE_AS_OF,
     POWER_RESERVE_CHARGING,
     POWER_RESERVE_CHARGING_UNTIMED,
     POWER_RESERVE_FULL,
@@ -46,7 +46,6 @@ from src.bot.handlers.power.messages import (
     POWER_RESERVE_TITLE_ON_GRID,
     POWER_RESERVE_TITLE_UNKNOWN,
     POWER_RESERVE_UNREACHABLE,
-    POWER_SCHEDULE_AS_OF,
     POWER_SCHEDULE_DAY_DATE,
     POWER_SCHEDULE_DAY_TODAY,
     POWER_SCHEDULE_DAY_TOMORROW,
@@ -122,17 +121,39 @@ RESERVE_LAYER_LABELS = {
 }
 
 
-def render_reserve_board(reserve: Reserve, generated_at: datetime) -> str:
+def render_power_board(reserve: Reserve | None, outlook: OutageOutlook | None, generated_at: datetime) -> str:
     """
-    The whole reserve on one screen: one heading for the grid, then one line per layer, all in the same unit.
+    The two questions this topic is opened with, on one card: what we run on, and when the light comes back.
+
+    they were two self-editing boards standing one above the other, which meant two «станом на», two cards
+    to find and a reposting rule each. the reserve goes on top because its heading is the one fact about the
+    flat — and because it is the half that moves minute by minute, so it is the half worth reading first.
+
+    either half may be missing: a flat with no hat has no reserve to draw, and a clear day has no hours to
+    publish. with both gone there is no card at all, which is the caller's cue to clear it away.
+    """
+    sections = []
+    if reserve is not None:
+        sections.append(_render_reserve_section(reserve))
+    if outlook is not None and outlook.has_anything_ahead(generated_at):
+        sections.append(_render_schedule_section(outlook, generated_at))
+    if not sections:
+        return ""
+
+    sections.append([POWER_BOARD_AS_OF.format(time=f"{generated_at:%H:%M}")])
+    return "\n\n".join("\n".join(section) for section in sections)
+
+
+def _render_reserve_section(reserve: Reserve) -> list[str]:
+    """
+    The whole reserve: one heading for the grid, then one line per layer, all in the same unit.
 
     the heading carries the grid because it is one fact about the flat rather than four about the devices —
     which is what lets every row below it be about time and nothing else.
     """
     lines = [_render_reserve_title(reserve), ""]
     lines.extend(_render_reserve_row(row) for row in reserve.rows)
-    lines.extend(["", POWER_RESERVE_AS_OF.format(time=f"{generated_at:%H:%M}")])
-    return "\n".join(lines)
+    return lines
 
 
 def _render_reserve_title(reserve: Reserve) -> str:
@@ -185,9 +206,9 @@ def render_outage_recovery(forecast: OutageForecast) -> str:
     return POWER_OUTAGE_SHORTFALL_OVER.format(returns=forecast.power_returns_at.strftime("%H:%M"))
 
 
-def render_outage_outlook(outlook: OutageOutlook, generated_at: datetime) -> str:
+def _render_schedule_section(outlook: OutageOutlook, generated_at: datetime) -> list[str]:
     """
-    Both published days on one board, each interval marked for where the clock already is.
+    Both published days, each interval marked for where the clock already is.
 
     an hour that has already passed must not read like a forecast — on 7 october yasno published the day's
     intervals at 21:10 and the board announced two outages that were over, which is worse than saying nothing
@@ -202,8 +223,7 @@ def render_outage_outlook(outlook: OutageOutlook, generated_at: datetime) -> str
         if section:
             lines.append("")
             lines.extend(section)
-    lines.extend(["", POWER_SCHEDULE_AS_OF.format(time=f"{generated_at:%H:%M}")])
-    return "\n".join(lines)
+    return lines
 
 
 def _render_day_section(schedule: OutageSchedule, generated_at: datetime) -> list[str]:

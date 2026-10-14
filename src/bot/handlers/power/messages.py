@@ -89,10 +89,6 @@ POWER_SCHEDULE_EMERGENCY_NOTE = (
     "<blockquote>🚨 <b>Аварійні відключення</b>\n"
     "Графік не діє — світло можуть вимкнути будь-коли й повернути без попередження.</blockquote>"
 )
-# when the bot last ASKED yasno, not when yasno last published. hanging it on the publish time was clever and
-# wrong: tapping «Оновити» then changed nothing on screen, so the button read as broken. this is also the more
-# useful of the two — a time that has stopped moving means the bot has stopped checking
-POWER_SCHEDULE_AS_OF = "<i>станом на {time}</i>"
 POWER_SCHEDULE_BUTTON_REFRESH = "Оновити"
 POWER_SCHEDULE_REFRESHED = "Оновлено"
 POWER_SCHEDULE_REFRESHING = "🔄 оновлюю…"
@@ -109,10 +105,11 @@ POWER_CONSERVATION_CYCLE_SOON = "🟢 <b>Delta 2</b> — калібруваль�
 POWER_CONSERVATION_CYCLE_DUE = "🟡 <b>Delta 2</b> — час калібрувального циклу (60→0→100→60)"
 POWER_CONSERVATION_WARRANTY = "🔴 <b>Delta 2</b> — {days} дн до втрати гарантії без циклу (60→0→100→60)"
 
-# ⚡ Світло — the reserve board: every backup layer on one screen, reposted each morning and edited in place
-# between. always silent — the two pushes that wake anyone are the mains ones above, and this is the glance
-# you take afterwards. one column, and that column is time: the question people arrive with is "чи буде
-# інтернет об 11-й", which has the dimension of hours, and a percent only makes the reader do the division
+# ⚡ Світло — the top half of the one board in this topic: every backup layer on one screen, with the outage
+# schedule under it. posted fresh each morning and edited in place between — always silent, because the two
+# pushes that wake anyone are the mains ones above and this is the glance you take afterwards. one column, and
+# that column is time: the question people arrive with is "чи буде інтернет об 11-й", which has the dimension
+# of hours, and a percent only makes the reader do the division
 POWER_RESERVE_TITLE_ON_BATTERY = "🕯 <b>Резерв</b> — на батареї {duration}"
 POWER_RESERVE_TITLE_ON_BATTERY_UNTIMED = "🕯 <b>Резерв</b> — на батареї"
 POWER_RESERVE_TITLE_ON_GRID = "🔌 <b>Резерв</b> — від мережі"
@@ -136,5 +133,8 @@ POWER_RESERVE_CHARGING_UNTIMED = "заряджається"
 POWER_RESERVE_FULL = "повний"
 POWER_RESERVE_ALIVE = "живий"
 POWER_RESERVE_UNREACHABLE = "не відповідає"
-POWER_RESERVE_AS_OF = "<i>станом на {time}</i>"
+# when the bot last ASKED, not when yasno last published. hanging it on the publish time was clever and
+# wrong: tapping «Оновити» then changed nothing on screen, so the button read as broken. this is also the more
+# useful of the two — a time that has stopped moving means the bot has stopped checking
+POWER_BOARD_AS_OF = "<i>станом на {time}</i>"
 POWER_RESERVE_UNAVAILABLE = "🔌 Дошка резерву не налаштована"

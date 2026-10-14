@@ -9,14 +9,14 @@ from src.infrastructure.db.uow import UnitOfWork
 CARE_DIGEST_KIND = "care_digest"
 AIR_CONDITIONER_CARD_KIND = "ac_card"
 ECOFLOW_CARD_KIND = "ecoflow_card"
-# the self-editing daily outage-schedule digest, plus the two lanes its pushes dedupe through
-OUTAGE_SCHEDULE_KIND = "outage_schedule"
+# the two lanes the outage pushes dedupe through
 OUTAGE_PING_KIND = "outage_ping"
 OUTAGE_EMERGENCY_KIND = "outage_emergency"
 # one standing card for the shelved station's storage regime, deleted the moment it goes back into use
 CONSERVATION_CARD_KIND = "conservation_card"
-# the standing reserve board — every backup layer on one screen, edited in place and never notifying
-RESERVE_BOARD_KIND = "reserve_board"
+# the one standing board in ⚡ світло: every backup layer and the outage schedule on one screen, posted fresh
+# each morning, edited in place between, and never notifying
+POWER_BOARD_KIND = "power_board"
 # the strip's control card: only the newest one may stand, because its buttons name levels
 STRIP_CARD_KIND = "strip_card"
 # one card per red alert: pinged at the raise, written over when it is lifted, and then left standing as the

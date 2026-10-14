@@ -6,9 +6,8 @@ from typing import Protocol
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from src.bot.handlers.power.board import PowerBoard
 from src.bot.handlers.power.conservation_board import ConservationBoard
-from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
-from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.handlers.weather.board import WeatherDigestBoard
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import PostedMessageTracker
@@ -63,9 +62,9 @@ class SchedulerContext:
     pi_ups: PiUps | None = None
     power_topic: ForumTopicRegistry | None = None
     schedule_provider: OutageScheduleProvider | None = None
-    outage_schedule_board: OutageScheduleBoard | None = None
     conservation_board: ConservationBoard | None = None
-    reserve_board: ReserveBoard | None = None
+    # ⚡ світло has one board: the reserve on top, the outage schedule under it, either half possibly absent
+    power_board: PowerBoard | None = None
     shape_catalog: RouteShapeCatalog | None = None
     newspaper_print_queue: PrintQueue | None = None
     newspaper_word_sources: tuple[WordSource, ...] = ()

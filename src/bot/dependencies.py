@@ -17,9 +17,8 @@ from src.bot.handlers.plants.claude_plant_identifier import ClaudePlantIdentifie
 from src.bot.handlers.plants.gemini_photo_analyst import GeminiPhotoAnalyst
 from src.bot.handlers.plants.gemini_plant_identifier import GeminiPlantIdentifier
 from src.bot.handlers.plants.tools import PlantTools
+from src.bot.handlers.power.board import PowerBoard
 from src.bot.handlers.power.conservation_board import ConservationBoard
-from src.bot.handlers.power.outage_schedule_board import OutageScheduleBoard
-from src.bot.handlers.power.reserve_board import ReserveBoard
 from src.bot.handlers.presence import facts as presence_facts
 from src.bot.handlers.shopping import facts as shopping_facts
 from src.bot.handlers.shopping.board import ShoppingListBoard
@@ -471,9 +470,8 @@ def build_workflow_data(
     ecoflow_station: EcoFlowStation,
     air_conditioner: AirConditioner,
     weather_digest_board: WeatherDigestBoard | None = None,
-    outage_schedule_board: OutageScheduleBoard | None = None,
     conservation_board: ConservationBoard | None = None,
-    reserve_board: ReserveBoard | None = None,
+    power_board: PowerBoard | None = None,
     panel_light: PanelLight | None = None,
     transit_board: TransitBoard | None = None,
     answer_question: AnswerQuestionUseCase | None = None,
@@ -491,9 +489,8 @@ def build_workflow_data(
         "places_board": places_board,
         "chores_board": chores_board,
         "weather_digest_board": weather_digest_board,
-        "outage_schedule_board": outage_schedule_board,
         "conservation_board": conservation_board,
-        "reserve_board": reserve_board,
+        "power_board": power_board,
         "panel_light": panel_light,
         "transit_board": transit_board,
         "answer_question": answer_question,
