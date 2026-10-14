@@ -4,7 +4,9 @@ from zoneinfo import ZoneInfo
 
 from src.bot.handlers.power.formatting import render_outage_forecast, render_outage_recovery
 from src.bot.handlers.power.jobs import OutageForecastJob
+from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.domain import (
+    DeclaredSupply,
     EcoFlowState,
     GridState,
     OutageInterval,
@@ -13,7 +15,9 @@ from src.modules.power.domain import (
     UpsState,
 )
 from src.modules.power.outage_forecast import forecast_outage
+from src.modules.power.use_cases.declare_supply import DeclareSupplyUseCase
 from src.tests.fakes import FrozenHouseholdCalendar, RecordingBot, StubForumTopic
+from src.tests.integration.base import BaseIntegrationTestCase
 
 KYIV = ZoneInfo("Europe/Kyiv")
 TODAY = date(2026, 12, 4)
@@ -189,19 +193,7 @@ class StubUps:
         return UpsState(mains_present=self.mains_present, battery_volts=4.17, battery_percent=98.0, as_of=at(13, 0))
 
 
-def build_job(states, schedule, bot=None, mains_present: bool = False) -> OutageForecastJob:
-    return OutageForecastJob(
-        bot=bot or RecordingBot(),
-        chat_id=-100,
-        power_topic=StubForumTopic(),
-        ecoflow_station=StubEcoFlowStation(states),
-        schedule_provider=StubScheduleProvider(schedule),
-        household_calendar=FrozenHouseholdCalendar(KYIV, frozen_now=at(13, 0)),
-        pi_ups=StubUps(mains_present),
-    )
-
-
-class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
+class OutageForecastJobTestCase(BaseIntegrationTestCase):
     """
     The push that must normally be empty.
 
@@ -209,10 +201,44 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
     muted topic takes the plant digest down with it.
     """
 
+    def uow_factory(self) -> UnitOfWork:
+        return UnitOfWork(session_factory=self.session_factory)
+
+    def build_job(self, states, schedule, bot=None, mains_present: bool = False) -> OutageForecastJob:
+        return OutageForecastJob(
+            bot=bot or RecordingBot(),
+            chat_id=-100,
+            power_topic=StubForumTopic(),
+            ecoflow_station=StubEcoFlowStation(states),
+            schedule_provider=StubScheduleProvider(schedule),
+            household_calendar=FrozenHouseholdCalendar(KYIV, frozen_now=at(13, 0)),
+            pi_ups=StubUps(mains_present),
+            uow_factory=self.uow_factory,
+        )
+
+    async def test_a_flat_declared_onto_the_station_is_warned_although_the_hat_sees_mains(self):
+        """
+        The hour the station is carrying the flat is the hour this warning exists for.
+
+        move the pi onto the station and its hat reads mains, which used to silence the forecast exactly
+        where it was needed: the flat on battery, the published hours still ahead, and nobody warned.
+        """
+        await DeclareSupplyUseCase(uow=self.uow_factory(), household_calendar=self.household_calendar)(
+            DeclaredSupply.STATION
+        )
+        bot = RecordingBot()
+        short = build_state(remaining_minutes=100)
+        job = self.build_job([short, short], build_schedule((12, 16)), bot=bot, mains_present=True)
+
+        for _ in range(2):
+            await job()
+
+        self.assertEqual(len(bot.sent), 1)
+
     async def test_a_shortfall_is_announced_once_however_long_the_outage_lasts(self):
         bot = RecordingBot()
         short = build_state(remaining_minutes=100)
-        job = build_job([short, short, short], build_schedule((12, 16)), bot=bot)
+        job = self.build_job([short, short, short], build_schedule((12, 16)), bot=bot)
 
         for _ in range(3):
             await job()
@@ -221,7 +247,7 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_battery_that_reaches_says_nothing_at_all(self):
         bot = RecordingBot()
-        job = build_job([build_state(remaining_minutes=300)], build_schedule((12, 16)), bot=bot)
+        job = self.build_job([build_state(remaining_minutes=300)], build_schedule((12, 16)), bot=bot)
 
         await job()
 
@@ -230,7 +256,7 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_the_warning_pings_because_it_carries_a_deadline(self):
         bot = RecordingBot()
         short = build_state(remaining_minutes=100)
-        job = build_job([short, short], build_schedule((12, 16)), bot=bot)
+        job = self.build_job([short, short], build_schedule((12, 16)), bot=bot)
 
         for _ in range(2):
             await job()
@@ -240,7 +266,7 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_a_new_outage_after_the_light_returns_is_warned_about_again(self):
         bot = RecordingBot()
         short = build_state(remaining_minutes=100)
-        job = build_job([short] * 5, build_schedule((12, 16)), bot=bot)
+        job = self.build_job([short] * 5, build_schedule((12, 16)), bot=bot)
         await job()
         await job()
         job.pi_ups.mains_present = True
@@ -256,7 +282,7 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
         """The hour this question matters is the hour the internet may be gone too."""
         bot = RecordingBot()
         short = build_state(remaining_minutes=100)
-        job = build_job([short, short, short, short], build_schedule((12, 16)), bot=bot)
+        job = self.build_job([short, short, short, short], build_schedule((12, 16)), bot=bot)
         await job()
         await job()
         job.schedule_provider.schedule = None
@@ -270,7 +296,7 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_a_shortfall_seen_once_is_the_kettle_and_is_not_announced(self):
         """The station's runtime estimate follows the instantaneous draw, and boiling water collapses it."""
         bot = RecordingBot()
-        job = build_job(
+        job = self.build_job(
             [build_state(remaining_minutes=100), build_state(remaining_minutes=300)],
             build_schedule((12, 16)),
             bot=bot,
@@ -285,7 +311,7 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_a_warning_already_sent_is_written_over_once_the_station_reaches_again(self):
         bot = RecordingBot()
         short = build_state(remaining_minutes=100)
-        job = build_job([short, short, build_state(remaining_minutes=300)], build_schedule((12, 16)), bot=bot)
+        job = self.build_job([short, short, build_state(remaining_minutes=300)], build_schedule((12, 16)), bot=bot)
 
         for _ in range(3):
             await job()
@@ -304,7 +330,7 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_station_that_reaches_without_a_warning_on_screen_edits_nothing(self):
         bot = RecordingBot()
-        job = build_job([build_state(remaining_minutes=300)], build_schedule((12, 16)), bot=bot)
+        job = self.build_job([build_state(remaining_minutes=300)], build_schedule((12, 16)), bot=bot)
 
         await job()
 
@@ -314,7 +340,7 @@ class OutageForecastJobTestCase(unittest.IsolatedAsyncioTestCase):
         """A kettle is taken back; an oven switched on an hour later is a different, real shortfall."""
         bot = RecordingBot()
         short = build_state(remaining_minutes=100)
-        job = build_job([short, short, build_state(remaining_minutes=300), short, short], build_schedule((12, 16)))
+        job = self.build_job([short, short, build_state(remaining_minutes=300), short, short], build_schedule((12, 16)))
         job.bot = bot
 
         for _ in range(5):

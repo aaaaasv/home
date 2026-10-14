@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timezone
 
 from src.bot.handlers.power.formatting import render_mains_change
-from src.modules.power.domain import EcoFlowState, GridState, UpsState
+from src.modules.power.domain import DeclaredSupply, EcoFlowState, GridState, UpsState
 from src.modules.power.mains_monitor import MainsMonitor, classify_grid, classify_grid_from_station
 
 
@@ -99,6 +99,23 @@ class ClassifyGridTestCase(unittest.TestCase):
 
     def test_classify_without_a_hat_is_unknown_rather_than_guessed(self):
         grid = classify_grid(None)
+
+        self.assertEqual(grid, GridState.UNKNOWN)
+
+    def test_classify_a_live_socket_the_family_says_the_station_feeds_is_on_battery(self):
+        """The hat measures voltage, not which wire its socket is on — and only a person knows that."""
+        grid = classify_grid(hat(mains_present=True), DeclaredSupply.STATION)
+
+        self.assertEqual(grid, GridState.ON_BATTERY)
+
+    def test_classify_a_dead_socket_is_on_battery_whatever_the_family_last_said(self):
+        grid = classify_grid(hat(mains_present=False), DeclaredSupply.STATION)
+
+        self.assertEqual(grid, GridState.ON_BATTERY)
+
+    def test_classify_without_a_hat_stays_unknown_even_with_the_station_declared(self):
+        """A declaration is not a reading: with nothing measuring the socket there is still nothing to say."""
+        grid = classify_grid(None, DeclaredSupply.STATION)
 
         self.assertEqual(grid, GridState.UNKNOWN)
 

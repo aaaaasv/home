@@ -32,6 +32,7 @@ from src.infrastructure.repositories.room_climate import (
 )
 from src.infrastructure.repositories.sensor import SensorDayRepository, SensorReadingRepository
 from src.infrastructure.repositories.shopping_item import ShoppingItemRepository
+from src.infrastructure.repositories.supply_declaration import SupplyDeclarationRepository
 
 
 class UnitOfWork:
@@ -65,6 +66,7 @@ class UnitOfWork:
         self.presence_events: PresenceEventRepository | None = None
         self.model_usage: ModelUsageRepository | None = None
         self.grid_events: GridEventRepository | None = None
+        self.supply_declaration: SupplyDeclarationRepository | None = None
         self.outdoor_weather_days: OutdoorWeatherDayRepository | None = None
         self.plant_photo_reviews: PlantPhotoReviewRepository | None = None
 
@@ -97,6 +99,7 @@ class UnitOfWork:
         self.presence_events = PresenceEventRepository(session=self.session)
         self.model_usage = ModelUsageRepository(session=self.session)
         self.grid_events = GridEventRepository(session=self.session)
+        self.supply_declaration = SupplyDeclarationRepository(session=self.session)
         self.outdoor_weather_days = OutdoorWeatherDayRepository(session=self.session)
         self.plant_photo_reviews = PlantPhotoReviewRepository(session=self.session)
         return self

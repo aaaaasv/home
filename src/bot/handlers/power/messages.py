@@ -37,6 +37,22 @@ POWER_MAINS_RESTORED = "💡 <b>Світло є</b>"
 POWER_MAINS_LOST_AFTER = "🕯 <b>Світло зникло</b> (було {duration})"
 POWER_MAINS_RESTORED_AFTER = "💡 <b>Світло є</b> (не було {duration})"
 
+# the hat measures voltage at its own socket and cannot know which wire that socket is on. the one case
+# where the two part company is somebody moving the pi onto the station mid-outage — and the station itself
+# half-tells us: discharging while the hat sees mains is exactly the arrangement worth asking a person about
+POWER_SUPPLY_QUESTION = "Точно мережа? Delta 2 віддає {watts} Вт і не заряджається."
+POWER_SUPPLY_BUTTON_GRID = "Так, мережа"
+POWER_SUPPLY_BUTTON_STATION = "Ні, це Delta 2"
+# on the «світло зникло» card, for saying it before the bot has anything to ask about
+POWER_SUPPLY_BUTTON_MOVED_TO_STATION = "Перекинув на Delta 2"
+POWER_SUPPLY_BUTTON_GRID_IS_BACK = "Світло вже є"
+POWER_SUPPLY_ON_STATION = (
+    "🕯 <b>Світла немає</b>\n\nУ розетці Pi стоїть Delta 2 — напруга в ній нічого не каже про місто."
+)
+POWER_SUPPLY_BACK_ON_GRID = "🔌 <b>У розетці Pi — мережа</b>"
+POWER_SUPPLY_TOAST_STATION = "Записав: живить Delta 2"
+POWER_SUPPLY_TOAST_GRID = "Записав: живить мережа"
+
 # said once per outage, and only when the answer is bad: "you reach" is not worth a notification, and a
 # push that speaks every time gets the whole group muted
 POWER_OUTAGE_SHORTFALL = (

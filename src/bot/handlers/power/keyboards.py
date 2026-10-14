@@ -16,8 +16,12 @@ from src.bot.handlers.power.messages import (
     POWER_ECOFLOW_BUTTON_USB_OFF,
     POWER_ECOFLOW_BUTTON_USB_ON,
     POWER_SCHEDULE_BUTTON_REFRESH,
+    POWER_SUPPLY_BUTTON_GRID,
+    POWER_SUPPLY_BUTTON_GRID_IS_BACK,
+    POWER_SUPPLY_BUTTON_MOVED_TO_STATION,
+    POWER_SUPPLY_BUTTON_STATION,
 )
-from src.modules.power.domain import EcoFlowState
+from src.modules.power.domain import DeclaredSupply, EcoFlowState
 
 
 class EcoFlowAction(StrEnum):
@@ -75,5 +79,50 @@ def build_conservation_keyboard(is_conserved: bool) -> InlineKeyboardMarkup:
     builder.button(
         text=POWER_CONSERVATION_BUTTON_IN_USE if is_conserved else POWER_CONSERVATION_BUTTON_STORE,
         callback_data=ConservationCallback(turn_on=not is_conserved),
+    )
+    return builder.as_markup()
+
+
+class SupplyCallback(CallbackData, prefix="supply"):
+    """Who is feeding the pi's socket, which journal row the answer takes back (0 for none), and in answer to what."""
+
+    supply: DeclaredSupply
+    retract: int = 0
+    # set only on «так, мережа»: that card already says the right thing, so it keeps its own text
+    confirming: bool = False
+
+
+def build_supply_keyboard(declared_supply: DeclaredSupply, retract_grid_event_id: int = 0) -> InlineKeyboardMarkup:
+    """
+    The buttons that let a person answer the one question no sensor in the flat can.
+
+    three shapes, one per situation. a «світло є» the station contradicts gets the pair — and the «no» carries
+    the row it retracts, so the same tap on a week-old card cannot cut a hole in the middle of the journal.
+    a «світло зникло» gets the single button for saying it before there is anything to ask about. and once
+    the station is declared, the only button left is the way back.
+    """
+    builder = InlineKeyboardBuilder()
+    if declared_supply is DeclaredSupply.STATION:
+        builder.button(
+            text=POWER_SUPPLY_BUTTON_GRID_IS_BACK,
+            callback_data=SupplyCallback(supply=DeclaredSupply.GRID),
+            style="primary",
+        )
+        return builder.as_markup()
+
+    if retract_grid_event_id:
+        builder.button(
+            text=POWER_SUPPLY_BUTTON_GRID,
+            callback_data=SupplyCallback(supply=DeclaredSupply.GRID, confirming=True),
+        )
+        builder.button(
+            text=POWER_SUPPLY_BUTTON_STATION,
+            callback_data=SupplyCallback(supply=DeclaredSupply.STATION, retract=retract_grid_event_id),
+        )
+        builder.adjust(2)
+        return builder.as_markup()
+
+    builder.button(
+        text=POWER_SUPPLY_BUTTON_MOVED_TO_STATION, callback_data=SupplyCallback(supply=DeclaredSupply.STATION)
     )
     return builder.as_markup()
