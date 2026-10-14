@@ -16,6 +16,7 @@ from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.media_server_battery import MediaServerBattery
 from src.modules.power.services.pi_ups import PiUps
 from src.modules.power.services.router_link import RouterLink
+from src.modules.power.use_cases.retrieve_declared_supply import RetrieveDeclaredSupplyUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,9 @@ class ReserveBoard:
         media_server = await self.media_server_battery.read_state()
         now = datetime.now(self.timezone)
 
-        grid = classify_grid(ups)
+        # the heading says whether the flat is on the city, and while the pi hangs on the station that is a
+        # thing only the family knows — the hat reads mains either way
+        grid = classify_grid(ups, await RetrieveDeclaredSupplyUseCase(uow=self.uow_factory())())
         return build_reserve(
             grid=grid,
             station=station,

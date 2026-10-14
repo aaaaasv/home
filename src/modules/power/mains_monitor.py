@@ -1,8 +1,8 @@
 """Deciding whether the city grid is up, and noticing the moment it changes."""
-from src.modules.power.domain import EcoFlowState, GridState, UpsState
+from src.modules.power.domain import DeclaredSupply, EcoFlowState, GridState, UpsState
 
 
-def classify_grid(ups: UpsState | None) -> GridState:
+def classify_grid(ups: UpsState | None, declared_supply: DeclaredSupply = DeclaredSupply.GRID) -> GridState:
     """
     Answer from the pi's own hat, which is wired to the wall socket, and refuse to answer without it.
 
@@ -12,11 +12,15 @@ def classify_grid(ups: UpsState | None) -> GridState:
     down before the hat was fitted, and keeping the inference afterwards cost real announcements in both
     directions — a blackout reported as calm, and the light coming back never reported at all.
 
-    the hat is a measurement. it needs no second opinion, and there is no second opinion worth having.
+    the hat is a measurement, and the one thing it cannot measure is which wire its socket is on. while the
+    family says the station is feeding that socket, mains voltage there is the station's own output and says
+    nothing about the city — so it reads as battery, which is what the flat is actually running on.
     """
     if ups is None:
         return GridState.UNKNOWN
-    return GridState.ON_GRID if ups.mains_present else GridState.ON_BATTERY
+    if not ups.mains_present:
+        return GridState.ON_BATTERY
+    return GridState.ON_BATTERY if declared_supply is DeclaredSupply.STATION else GridState.ON_GRID
 
 
 def classify_grid_from_station(state: EcoFlowState | None) -> GridState:
@@ -60,9 +64,9 @@ class MainsMonitor:
         """Where the grid stood when this house last said something about it, so a restart repeats nothing."""
         self._announced = announced
 
-    def update(self, ups: UpsState | None) -> GridState | None:
+    def update(self, ups: UpsState | None, declared_supply: DeclaredSupply = DeclaredSupply.GRID) -> GridState | None:
         """Return the new grid state at the moment it is confirmed, and None every other time."""
-        grid = classify_grid(ups)
+        grid = classify_grid(ups, declared_supply)
         if grid is GridState.UNKNOWN:
             return None
 

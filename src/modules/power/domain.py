@@ -13,6 +13,27 @@ class GridState(StrEnum):
     UNKNOWN = "unknown"
 
 
+class GridChange(DomainModel):
+    """A row just written to the journal: which one it is, and how long the state before it lasted."""
+
+    event_id: int
+    lasted: timedelta | None
+
+
+class DeclaredSupply(StrEnum):
+    """
+    What the family says is feeding the socket the hat measures — the one fact no sensor in the flat can give.
+
+    the hat answers «there is mains voltage at my socket», which is the city only while the pi hangs on the
+    wall. move it onto the station during an outage and the same reading means «the station is carrying me»,
+    and the bot announces the light coming back in the middle of a blackout. nobody but a person knows which
+    it is, so a person says, and GRID is what we believe until told otherwise.
+    """
+
+    GRID = "grid"
+    STATION = "station"
+
+
 class EcoFlowState(DomainModel):
     """A Delta 2 snapshot read over local ble — as_of stamps when, since it may be a cached reading"""
 
