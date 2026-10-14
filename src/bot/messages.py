@@ -36,6 +36,7 @@ MODULE_HELP = {
         "/eco — EcoFlow Delta 2: заряд і керування\n"
         "/reserve — резерв живлення: скільки тримає кожен шар\n"
         "/conserve — режим зберігання станції\n"
+        "/light — стрічка на полиці: погасити або поставити рівень\n"
         "графік відключень зʼявляється сам, коли є"
     ),
     "transit": "/bus або /транспорт — коли наступний 3 / 9К / 69 з нашої зупинки",
@@ -54,7 +55,7 @@ MODULE_COMMANDS = {
     "places": ("list",),
     "chores": ("list",),
     "weather": ("climate", "ac"),
-    "power": ("eco", "reserve", "conserve"),
+    "power": ("eco", "reserve", "conserve", "light"),
     "transit": ("bus", "транспорт"),
     "system": ("pi",),
 }

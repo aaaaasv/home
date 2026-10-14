@@ -474,6 +474,7 @@ def build_workflow_data(
     outage_schedule_board: OutageScheduleBoard | None = None,
     conservation_board: ConservationBoard | None = None,
     reserve_board: ReserveBoard | None = None,
+    panel_light: PanelLight | None = None,
     transit_board: TransitBoard | None = None,
     answer_question: AnswerQuestionUseCase | None = None,
 ) -> dict[str, Any]:
@@ -493,6 +494,7 @@ def build_workflow_data(
         "outage_schedule_board": outage_schedule_board,
         "conservation_board": conservation_board,
         "reserve_board": reserve_board,
+        "panel_light": panel_light,
         "transit_board": transit_board,
         "answer_question": answer_question,
         "household_facts": HouseholdFacts(FACT_GATHERERS),
