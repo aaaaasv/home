@@ -190,6 +190,19 @@ async def run() -> None:
             settings=settings,
             household_calendar=HouseholdCalendar(timezone=settings.timezone),
         )
+    # one watcher for both the socket that raises the strip and the clock that puts it back out. two of them
+    # is what kept it burning: the socket's copy remembered the raise, the scheduler's copy knew of none, and
+    # the quarter of an hour never ran out for either — so the strip went out at the next change of level
+    # instead, one to two hours later, twice in the night of 13/14.10
+    alert_light_watcher = None
+    if settings.ALERT_LIGHT_ENABLED and panel_light is not None:
+        alert_light_watcher = AlertLightWatcher(
+            uow_factory=UnitOfWork,
+            source=air_alert_source,
+            panel_light=panel_light,
+            settings=settings,
+            household_calendar=HouseholdCalendar(timezone=settings.timezone),
+        )
     # the unit serves one client at a time, so the button handlers and the runtime poll must share one instance —
     # its lock only serialises binds that go through the same object
     air_conditioner = build_air_conditioner(settings)
@@ -311,9 +324,8 @@ async def run() -> None:
             chores_topic=chores_topic,
             room_climate_sensor=room_climate_sensor,
             air_threat_source=air_threat_source,
-            air_alert_source=air_alert_source,
-            panel_light=panel_light,
             arrival_light_watcher=arrival_light_watcher,
+            alert_light_watcher=alert_light_watcher,
             price_source=build_price_source(settings),
             weather_topic=weather_topic,
             weather_digest_board=weather_digest_board,
@@ -409,14 +421,7 @@ async def run() -> None:
     # the alert socket: the light must answer in seconds, and the job behind it only covers the case where
     # this connection is open, subscribed and silently dead
     alert_socket_task = None
-    if settings.ALERT_LIGHT_ENABLED and isinstance(air_alert_source, UkraineAlarmSource):
-        alert_light_watcher = AlertLightWatcher(
-            uow_factory=UnitOfWork,
-            source=air_alert_source,
-            panel_light=panel_light,
-            settings=settings,
-            household_calendar=HouseholdCalendar(timezone=settings.timezone),
-        )
+    if alert_light_watcher is not None and isinstance(air_alert_source, UkraineAlarmSource):
         alert_socket_task = asyncio.create_task(air_alert_source.run(on_change=alert_light_watcher))
 
     # the specimen sheets share this loop with polling and the scheduler, the way everything else here does
