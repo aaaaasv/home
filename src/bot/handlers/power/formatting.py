@@ -53,7 +53,12 @@ from src.bot.handlers.power.messages import (
     POWER_SCHEDULE_EMERGENCY_NOTE,
     POWER_SCHEDULE_INTERVAL,
     POWER_SCHEDULE_INTERVAL_NOW,
+    POWER_SCHEDULE_NOTHING_LEFT_TODAY,
+    POWER_SCHEDULE_NOTHING_TODAY,
+    POWER_SCHEDULE_NOTHING_TOMORROW,
     POWER_SCHEDULE_TITLE,
+    POWER_SCHEDULE_TOMORROW_UNPUBLISHED,
+    POWER_SCHEDULE_UNKNOWN,
 )
 from src.modules.power.domain import (
     DeclaredSupply,
@@ -123,7 +128,12 @@ RESERVE_LAYER_LABELS = {
 }
 
 
-def render_power_board(reserve: Reserve | None, outlook: OutageOutlook | None, generated_at: datetime) -> str:
+def render_power_board(
+    reserve: Reserve | None,
+    outlook: OutageOutlook | None,
+    generated_at: datetime,
+    schedule_expected: bool = False,
+) -> str:
     """
     The two questions this topic is opened with, on one card: what we run on, and when the light comes back.
 
@@ -137,8 +147,9 @@ def render_power_board(reserve: Reserve | None, outlook: OutageOutlook | None, g
     sections = []
     if reserve is not None:
         sections.append(_render_reserve_section(reserve))
-    if outlook is not None and outlook.has_anything_ahead(generated_at):
-        sections.append(_render_schedule_section(outlook, generated_at))
+    schedule = _render_schedule_section(outlook, generated_at, schedule_expected)
+    if schedule:
+        sections.append(schedule)
     if not sections:
         return ""
 
@@ -215,13 +226,20 @@ def render_outage_recovery(forecast: OutageForecast) -> str:
     return POWER_OUTAGE_SHORTFALL_OVER.format(returns=forecast.power_returns_at.strftime("%H:%M"))
 
 
-def _render_schedule_section(outlook: OutageOutlook, generated_at: datetime) -> list[str]:
+def _render_schedule_section(outlook: OutageOutlook | None, generated_at: datetime, expected: bool) -> list[str]:
     """
     Both published days, each interval marked for where the clock already is.
 
     an hour that has already passed must not read like a forecast — on 7 october yasno published the day's
     intervals at 21:10 and the board announced two outages that were over, which is worse than saying nothing
+
+    a day with nothing ahead still gets its heading and one line. it used to get silence, and silence
+    reads the same as a fetch that failed: «я думав чи не вийшло отримати, чи вже не буде відключень».
+    a flat that follows no schedule at all gets nothing, because there the silence means what it says.
     """
+    if outlook is None or not outlook.has_anything_ahead(generated_at):
+        return [POWER_SCHEDULE_TITLE, _render_quiet_day(outlook, generated_at)] if expected else []
+
     lines = [POWER_SCHEDULE_TITLE]
     # the banner belongs to the grid, not to a calendar day: when the schedule stops applying it stops
     # applying for whatever comes next, so it stands above both days rather than under one of them
@@ -233,6 +251,22 @@ def _render_schedule_section(outlook: OutageOutlook, generated_at: datetime) -> 
             lines.append("")
             lines.extend(section)
     return lines
+
+
+def _render_quiet_day(outlook: OutageOutlook | None, generated_at: datetime) -> str:
+    """
+    What a board says on a day it has nothing to warn about — and it says which kind of nothing.
+
+    yesterday's outlook is not an answer about today: yasno publishes a day whenever it likes, so a
+    remembered day that is not this one means the schedule has not been read yet, not that it is clear.
+    """
+    if outlook is None or outlook.today.day != generated_at.date():
+        return POWER_SCHEDULE_UNKNOWN
+
+    today = POWER_SCHEDULE_NOTHING_LEFT_TODAY if outlook.today.off_intervals else POWER_SCHEDULE_NOTHING_TODAY
+    # tomorrow is here and still reached this branch, so it has no hours of its own
+    tomorrow = POWER_SCHEDULE_NOTHING_TOMORROW if outlook.tomorrow is not None else POWER_SCHEDULE_TOMORROW_UNPUBLISHED
+    return f"{today} · {tomorrow}"
 
 
 def _render_day_section(schedule: OutageSchedule, generated_at: datetime) -> list[str]:

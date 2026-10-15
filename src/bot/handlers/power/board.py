@@ -83,7 +83,7 @@ class PowerBoard:
         """Move the board to the bottom of the topic, where whoever asked for it is already looking."""
         reserve = reserve if reserve is not None else await self.read_reserve()
         now = datetime.now(self.timezone)
-        text = render_power_board(reserve, self._outlook, now)
+        text = render_power_board(reserve, self._outlook, now, self.schedule_provider is not None)
         if not text:
             # nothing to say at all → make sure no stale board lingers from earlier, then stay silent
             await self.tracker.clear(POWER_BOARD_KIND)
@@ -110,7 +110,7 @@ class PowerBoard:
 
         reserve = reserve if reserve is not None else await self.read_reserve()
         now = datetime.now(self.timezone)
-        text = render_power_board(reserve, self._outlook, now)
+        text = render_power_board(reserve, self._outlook, now, self.schedule_provider is not None)
         if not text:
             await self.tracker.clear(POWER_BOARD_KIND)
             return True
