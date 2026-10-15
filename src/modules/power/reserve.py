@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 
 from src.modules.power.domain import (
+    DeclaredSupply,
     EcoFlowState,
     GridState,
     MediaServerState,
@@ -25,6 +26,7 @@ def build_reserve(
     media_server: MediaServerState | None,
     on_battery_for: timedelta | None,
     socket_dead_for: timedelta | None,
+    declared_supply: DeclaredSupply = DeclaredSupply.GRID,
 ) -> Reserve:
     """
     Assemble the board from whatever each layer can currently say, without letting any of them speak for another.
@@ -45,6 +47,7 @@ def build_reserve(
             _media_server_row(media_server, socket_dead_for),
         ),
         on_battery_for=on_battery_for if grid is GridState.ON_BATTERY else None,
+        declared_supply=declared_supply,
     )
 
 

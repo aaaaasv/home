@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from src.bot.formatting import GENITIVE_MONTH_NAMES, format_duration, format_runtime, format_span
 from src.bot.handlers.power.messages import (
     POWER_BOARD_AS_OF,
+    POWER_BOARD_ON_THE_STATION,
     POWER_CONSERVATION_CYCLE_DUE,
     POWER_CONSERVATION_CYCLE_SOON,
     POWER_CONSERVATION_IN_USE,
@@ -55,6 +56,7 @@ from src.bot.handlers.power.messages import (
     POWER_SCHEDULE_TITLE,
 )
 from src.modules.power.domain import (
+    DeclaredSupply,
     EcoFlowState,
     GridState,
     OutageForecast,
@@ -150,8 +152,15 @@ def _render_reserve_section(reserve: Reserve) -> list[str]:
 
     the heading carries the grid because it is one fact about the flat rather than four about the devices —
     which is what lets every row below it be about time and nothing else.
+
+    while the family has said the pi hangs on the station, a line says so under the heading: the heading
+    is then their word rather than a reading, and a card that reads as certain while it is guessing is
+    worse than one that admits it.
     """
-    lines = [_render_reserve_title(reserve), ""]
+    lines = [_render_reserve_title(reserve)]
+    if reserve.declared_supply is DeclaredSupply.STATION:
+        lines.append(POWER_BOARD_ON_THE_STATION)
+    lines.append("")
     lines.extend(_render_reserve_row(row) for row in reserve.rows)
     return lines
 

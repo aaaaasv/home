@@ -6,6 +6,8 @@ from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from src.bot.handlers.power.messages import (
+    POWER_BOARD_BUTTON_TO_GRID,
+    POWER_BOARD_BUTTON_TO_STATION,
     POWER_CONSERVATION_BUTTON_IN_USE,
     POWER_CONSERVATION_BUTTON_STORE,
     POWER_ECOFLOW_BUTTON_AC_OFF,
@@ -18,7 +20,6 @@ from src.bot.handlers.power.messages import (
     POWER_SCHEDULE_BUTTON_REFRESH,
     POWER_SUPPLY_BUTTON_GRID,
     POWER_SUPPLY_BUTTON_GRID_IS_BACK,
-    POWER_SUPPLY_BUTTON_MOVED_TO_STATION,
     POWER_SUPPLY_BUTTON_STATION,
 )
 from src.modules.power.domain import DeclaredSupply, EcoFlowState
@@ -46,9 +47,29 @@ class OutageScheduleCallback(CallbackData, prefix="outage"):
     action: str = "refresh"
 
 
-def build_outage_schedule_keyboard() -> InlineKeyboardMarkup:
+def build_power_board_keyboard(declared_supply: DeclaredSupply) -> InlineKeyboardMarkup:
+    """
+    Refresh, and the one control that cannot live on a push: who is feeding the pi's socket.
+
+    it belongs here because the board is the newest message in this topic at any moment — edited every
+    minute while the flat is on battery and reposted every morning. the card that announced «світло є»
+    carries the same correction, but only until the next message buries it, and «я перемкнувся назад» is
+    said ten minutes later, not nineteen seconds later.
+    """
     builder = InlineKeyboardBuilder()
     builder.button(text=POWER_SCHEDULE_BUTTON_REFRESH, callback_data=OutageScheduleCallback())
+    if declared_supply is DeclaredSupply.STATION:
+        builder.button(
+            text=POWER_BOARD_BUTTON_TO_GRID,
+            callback_data=SupplyCallback(supply=DeclaredSupply.GRID, board=True),
+            style="primary",
+        )
+    else:
+        builder.button(
+            text=POWER_BOARD_BUTTON_TO_STATION,
+            callback_data=SupplyCallback(supply=DeclaredSupply.STATION, board=True),
+        )
+    builder.adjust(2)
     return builder.as_markup()
 
 
@@ -90,16 +111,28 @@ class SupplyCallback(CallbackData, prefix="supply"):
     retract: int = 0
     # set only on «так, мережа»: that card already says the right thing, so it keeps its own text
     confirming: bool = False
+    # tapped on the board rather than on a push: the board redraws itself and must not be overwritten
+    board: bool = False
 
 
-def build_supply_keyboard(declared_supply: DeclaredSupply, retract_grid_event_id: int = 0) -> InlineKeyboardMarkup:
+def build_supply_keyboard(
+    declared_supply: DeclaredSupply, retract_grid_event_id: int = 0, asking: bool = False
+) -> InlineKeyboardMarkup:
     """
     The buttons that let a person answer the one question no sensor in the flat can.
 
-    three shapes, one per situation. a «світло є» the station contradicts gets the pair — and the «no» carries
-    the row it retracts, so the same tap on a week-old card cannot cut a hole in the middle of the journal.
-    a «світло зникло» gets the single button for saying it before there is anything to ask about. and once
-    the station is declared, the only button left is the way back.
+    **«світло є» always carries the correction**, whether or not the station is in a state to contradict it:
+    that message is the only one that can be wrong, and the station is asleep or out of bluetooth range often
+    enough that «only when it contradicts» left the card with nothing to tap. the question above it, and the
+    «так, мережа» beside it, appear only when the station does contradict — asking under every restored light
+    teaches everybody to ignore the asking.
+
+    the «no» carries the row it retracts, so the same tap on a week-old card cannot cut a hole in the middle
+    of the journal. once the station is declared, the only button left is the way back.
+
+    «світло зникло» carries nothing at all any more: it fires before anything has happened, and what has to
+    be said ten minutes later — «я перемкнувся назад» — belongs where it can still be found, which is the
+    board (`build_power_board_keyboard`).
     """
     builder = InlineKeyboardBuilder()
     if declared_supply is DeclaredSupply.STATION:
@@ -110,19 +143,14 @@ def build_supply_keyboard(declared_supply: DeclaredSupply, retract_grid_event_id
         )
         return builder.as_markup()
 
-    if retract_grid_event_id:
+    if asking:
         builder.button(
             text=POWER_SUPPLY_BUTTON_GRID,
             callback_data=SupplyCallback(supply=DeclaredSupply.GRID, confirming=True),
         )
-        builder.button(
-            text=POWER_SUPPLY_BUTTON_STATION,
-            callback_data=SupplyCallback(supply=DeclaredSupply.STATION, retract=retract_grid_event_id),
-        )
-        builder.adjust(2)
-        return builder.as_markup()
-
     builder.button(
-        text=POWER_SUPPLY_BUTTON_MOVED_TO_STATION, callback_data=SupplyCallback(supply=DeclaredSupply.STATION)
+        text=POWER_SUPPLY_BUTTON_STATION,
+        callback_data=SupplyCallback(supply=DeclaredSupply.STATION, retract=retract_grid_event_id),
     )
+    builder.adjust(2)
     return builder.as_markup()

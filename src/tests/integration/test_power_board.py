@@ -5,6 +5,7 @@ from src.bot.handlers.power.board import PowerBoard
 from src.bot.services.posted_message_tracker import POWER_BOARD_KIND
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.domain import (
+    DeclaredSupply,
     GridState,
     OutageInterval,
     OutageOutlook,
@@ -27,11 +28,13 @@ class RecordingBoardBot:
 
     def __init__(self):
         self.sent: list[str] = []
+        self.markups: list = []
         self.edited: list[tuple[int, str]] = []
         self.deleted: list[int] = []
 
     async def send_message(self, chat_id, message_thread_id, text, reply_markup, disable_notification):
         self.sent.append(text)
+        self.markups.append(reply_markup)
 
         class Chat:
             id = chat_id
@@ -319,3 +322,60 @@ class PowerBoardBothHalvesTestCase(BaseIntegrationTestCase):
         self.assertTrue(refreshed)
         self.assertEqual(bot.deleted, [])
         self.assertEqual(await self.remembered_message_ids(), [701])
+
+
+ON_THE_STATION = Reserve(
+    grid=GridState.ON_BATTERY,
+    rows=(ReserveRow(layer=ReserveLayer.PI, standing=ReserveStanding.HOLDING_UNMEASURED, charge_percent=70),),
+    on_battery_for=timedelta(hours=2),
+    declared_supply=DeclaredSupply.STATION,
+)
+
+
+class PowerBoardSupplyTestCase(BaseIntegrationTestCase):
+    """
+    The board is the one place the family can always reach, so it is where the station mark lives.
+
+    the card that announced «світло є» carries the same correction, but only until the next message
+    buries it — and «я перемкнувся назад» is said ten minutes later, not nineteen seconds later.
+    """
+
+    def uow_factory(self) -> UnitOfWork:
+        return UnitOfWork(session_factory=self.session_factory)
+
+    async def build_board(self, bot, reserve: Reserve) -> PowerBoard:
+        return PowerBoard(
+            bot=bot,
+            chat_id=CHAT_ID,
+            power_topic=StubForumTopic(),
+            uow_factory=self.uow_factory,
+            timezone=KYIV,
+            reserve_readout=StubReserveReadout(reserve),
+        )
+
+    async def test_post_while_the_station_is_declared_says_so_in_words(self):
+        bot = RecordingBoardBot()
+
+        await (await self.build_board(bot, ON_THE_STATION)).post()
+
+        self.assertIn("У розетці Pi — Delta 2, тому про місто тут нічого немає", bot.sent[0])
+
+    async def test_post_while_the_station_is_declared_offers_the_way_back(self):
+        bot = RecordingBoardBot()
+        board = await self.build_board(bot, ON_THE_STATION)
+
+        await board.post()
+
+        self.assertEqual(
+            [button.text for button in bot.markups[0].inline_keyboard[0]], ["Оновити", "Pi знову в мережі"]
+        )
+
+    async def test_post_on_the_grid_offers_the_mark_instead(self):
+        bot = RecordingBoardBot()
+        board = await self.build_board(bot, ON_BATTERY)
+
+        await board.post()
+
+        self.assertEqual(
+            [button.text for button in bot.markups[0].inline_keyboard[0]], ["Оновити", "Перекинув на Delta 2"]
+        )
