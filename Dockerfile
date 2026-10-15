@@ -12,10 +12,13 @@ WORKDIR /app
 # requirements.lock pins every transitive version, so two builds a month apart install the same tree.
 # without it a fresh `pip install .` resolves whatever PyPI is serving that minute, on the machine that is
 # hardest to debug. regenerate with: pip-compile --output-file=requirements.lock pyproject.toml
+# fonts-dejavu-core stays: the climate chart is drawn with pillow, which ships no font of its own, and a
+# slim image has none either — without it the morning picture is simply never drawn
 COPY pyproject.toml requirements.lock ./
 RUN mkdir -p src \
     && touch src/__init__.py \
     && apt-get update \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core \
     && apt-get install -y --no-install-recommends gcc python3-dev \
     && pip install --no-cache-dir -r requirements.lock \
     && pip install --no-cache-dir --no-deps . \

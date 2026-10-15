@@ -93,3 +93,17 @@ POLLEN_THRESHOLDS: dict[PollenSpecies, tuple[float, float]] = {
 }
 POLLEN_LEVEL_MODERATE = "помірно"
 POLLEN_LEVEL_HIGH = "високо"
+
+# 📈 the monthly climate picture — one photo a morning, drawn rather than written. everything on it has to
+# read without a caption, because a photo in a chat is often all that gets looked at
+WEATHER_CHART_TITLE = "Вдома і на вулиці"
+WEATHER_CHART_SUBTITLE = "{first} — {last}"
+WEATHER_CHART_SUBTITLE_WITH_DRIFT = "{first} — {last} · за тиждень {drift}"
+WEATHER_CHART_DRIFT_PART = "{name} {change:+.1f}°"
+WEATHER_CHART_INDOOR = "вдома"
+WEATHER_CHART_OUTDOOR = "вулиця"
+WEATHER_CHART_HUMIDITY = "ВОЛОГІСТЬ"
+WEATHER_CHART_FOOTNOTE = "товста лінія — середня за тиждень, тонка — за добу, смуга — від ночі до дня"
+WEATHER_CHART_INDOOR_FOOTNOTE = "вдома — медіана кімнат"
+WEATHER_CHART_DEGREES = "{value:.0f}°"
+WEATHER_CHART_PERCENT = "{value:.0f}%"
