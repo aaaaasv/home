@@ -102,6 +102,7 @@ WEATHER_CHART_SUBTITLE_WITH_DRIFT = "{first} — {last} · за тиждень {
 WEATHER_CHART_DRIFT_PART = "{name} {change:+.1f}°"
 WEATHER_CHART_INDOOR = "вдома"
 WEATHER_CHART_OUTDOOR = "вулиця"
+WEATHER_CHART_TEMPERATURE = "ТЕМПЕРАТУРА"
 WEATHER_CHART_HUMIDITY = "ВОЛОГІСТЬ"
 WEATHER_CHART_FOOTNOTE = "товста лінія — середня за тиждень, тонка — за добу, смуга — від ночі до дня"
 WEATHER_CHART_INDOOR_FOOTNOTE = "вдома — медіана кімнат"
