@@ -21,6 +21,7 @@ class SchedulerJobsAreAwaitableTestCase(unittest.TestCase):
         weather_enabled: bool = False,
         newspaper_enabled: bool = False,
         rooms_mapped: bool = False,
+        chart_enabled: bool = False,
     ):
         settings = Settings(
             TELEGRAM_BOT_TOKEN="123:abc",
@@ -28,6 +29,9 @@ class SchedulerJobsAreAwaitableTestCase(unittest.TestCase):
             WEATHER_DIGEST_ENABLED=weather_enabled,
             NEWSPAPER_ENABLED=newspaper_enabled,
             SENSOR_ROOMS=json.dumps({"temp-bedroom": "спальня"}) if rooms_mapped else "",
+            # off here on purpose: the chart registers only where the machine has a font, and the count
+            # below is about which modules schedule work, not about what is installed on this laptop
+            WEATHER_CHART_ENABLED=chart_enabled,
         )
         weather_digest_board = None
         if weather_enabled:

@@ -85,6 +85,10 @@ class Settings(BaseSettings):
     WEATHER_DIGEST_ENABLED: bool = False
     TELEGRAM_WEATHER_TOPIC_ID: int = 0
     WEATHER_TOPIC_TITLE: str = "❄️ клімат"
+    # 📈 the month of air as one picture under the morning digest. a photo rather than text because the
+    # shape of a month is what it is for, and pillow is already in the image — only a font has to be added
+    WEATHER_CHART_ENABLED: bool = True
+    WEATHER_CHART_DAYS: int = 30
     # deliberately not 08:00. open-meteo sheds load exactly on the hour, and the digest's own fetch is the one
     # that decides whether the day has weather at all — firing it on the boundary lost the forecast repeatedly
     WEATHER_DIGEST_TIME: str = "08:03"

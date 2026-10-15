@@ -1,3 +1,4 @@
+from datetime import date
 from enum import StrEnum
 
 from src.common.domain import DomainModel
@@ -65,3 +66,31 @@ class LocalAirQuality(DomainModel):
 
     pm2_5_micrograms: float
     sensor_count: int
+
+
+class ClimateDay(DomainModel):
+    """One finished day of air, indoors or out, in the shape a chart can draw without knowing which."""
+
+    day: date
+    minimum_celsius: float
+    maximum_celsius: float
+    average_celsius: float
+    # the sensors in the rooms carry it and the sky usually does; a day without it still has a temperature
+    average_humidity_percent: float | None = None
+
+
+class ClimateHistory(DomainModel):
+    """
+    The two records side by side, each as long as it happens to be.
+
+    they do not start on the same day and are not made to: the sky has been written down since the weather
+    module learned to keep it, the rooms since their sensors went in, and a chart that waited for the shorter
+    one would show nothing for weeks. so each series carries its own days and the drawing lines them up.
+    """
+
+    indoor: tuple[ClimateDay, ...] = ()
+    outdoor: tuple[ClimateDay, ...] = ()
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.indoor and not self.outdoor
