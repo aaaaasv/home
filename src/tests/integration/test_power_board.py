@@ -160,25 +160,26 @@ class PowerBoardScheduleHalfTestCase(BaseIntegrationTestCase):
         self.assertIn("🚨 <b>Аварійні відключення</b>", bot.sent[0])
         self.assertEqual(await self.remembered_message_ids(), [701])
 
-    async def test_post_with_every_interval_spent_and_no_tomorrow_says_nothing(self):
+    async def test_post_with_every_interval_spent_says_so_instead_of_disappearing(self):
+        """The board used to vanish, and a vanished board reads the same as a bot that stopped working."""
         bot = RecordingBoardBot()
 
         board = await self.build_board_knowing(bot, self.spent_day_outlook())
 
         await board.post()
 
-        self.assertEqual(bot.sent, [])
-        self.assertEqual(await self.remembered_message_ids(), [])
+        self.assertEqual(len(bot.sent), 1)
+        self.assertIn("Графік не вдалось прочитати", bot.sent[0])
 
-    async def test_post_with_nothing_published_and_no_reserve_to_draw_says_nothing(self):
+    async def test_post_with_nothing_read_yet_says_it_could_not_read(self):
+        """«Не вдалось прочитати» and «відключень не буде» are different answers and must look different."""
         bot = RecordingBoardBot()
 
         board = await self.build_board_knowing(bot, None)
 
         await board.post()
 
-        self.assertEqual(bot.sent, [])
-        self.assertEqual(await self.remembered_message_ids(), [])
+        self.assertIn("Графік не вдалось прочитати", bot.sent[0])
 
     async def test_refresh_with_no_board_yet_returns_false_and_sends_nothing(self):
         bot = RecordingBoardBot()
@@ -202,7 +203,8 @@ class PowerBoardScheduleHalfTestCase(BaseIntegrationTestCase):
         self.assertEqual(bot.edited[0][0], 701)
         self.assertIn("<b>Завтра</b>", bot.edited[0][1])
 
-    async def test_refresh_once_the_day_is_spent_takes_the_board_down(self):
+    async def test_refresh_once_the_day_is_spent_keeps_the_board_and_rewrites_it(self):
+        """A board that deletes itself answers «чи вже не буде відключень» by disappearing."""
         bot = RecordingBoardBot()
         board = await self.build_board_knowing(bot, self.tomorrow_only_outlook())
         await board.post()
@@ -210,8 +212,8 @@ class PowerBoardScheduleHalfTestCase(BaseIntegrationTestCase):
         refreshed = await (await self.build_board_knowing(bot, self.spent_day_outlook())).refresh()
 
         self.assertTrue(refreshed)
-        self.assertEqual(bot.deleted, [701])
-        self.assertEqual(await self.remembered_message_ids(), [])
+        self.assertEqual(bot.deleted, [])
+        self.assertEqual(await self.remembered_message_ids(), [701])
 
 
 class StubReserveReadout:
@@ -299,7 +301,7 @@ class PowerBoardBothHalvesTestCase(BaseIntegrationTestCase):
             ],
         )
 
-    async def test_post_on_a_day_with_nothing_published_still_puts_the_reserve_up(self):
+    async def test_post_on_a_day_with_nothing_published_puts_the_reserve_up_and_says_why(self):
         """The half the family opens the topic for during a blackout is the one yasno knows nothing about."""
         bot = RecordingBoardBot()
         board = await self.build_board(bot, ON_BATTERY, None)
@@ -308,7 +310,7 @@ class PowerBoardBothHalvesTestCase(BaseIntegrationTestCase):
 
         self.assertEqual(len(bot.sent), 1)
         self.assertIn("🕯 <b>Резерв</b> — на батареї 40 хв", bot.sent[0])
-        self.assertNotIn("🗓", bot.sent[0])
+        self.assertIn("Графік не вдалось прочитати", bot.sent[0])
 
     async def test_refresh_once_the_published_hours_are_spent_keeps_the_board_standing(self):
         bot = RecordingBoardBot()
@@ -379,3 +381,66 @@ class PowerBoardSupplyTestCase(BaseIntegrationTestCase):
         self.assertEqual(
             [button.text for button in bot.markups[0].inline_keyboard[0]], ["Оновити", "Перекинув на Delta 2"]
         )
+
+
+class PowerBoardQuietDayTestCase(BaseIntegrationTestCase):
+    """
+    A day with nothing planned still says so. Silence used to mean both «нічого не буде» and «не
+    зміг прочитати», and the family could not tell which — «я думав чи не вийшло отримати».
+    """
+
+    def uow_factory(self) -> UnitOfWork:
+        return UnitOfWork(session_factory=self.session_factory)
+
+    async def build_board(self, bot, outlook) -> PowerBoard:
+        board = PowerBoard(
+            bot=bot,
+            chat_id=CHAT_ID,
+            power_topic=StubForumTopic(),
+            uow_factory=self.uow_factory,
+            timezone=KYIV,
+            schedule_provider=StubScheduleProvider(outlook),
+        )
+        await board.read_outlook()
+        return board
+
+    def today_spent(self) -> OutageOutlook:
+        """Today's hours are behind us and tomorrow has not been published — the commonest evening."""
+        return OutageOutlook(today=build_schedule(datetime.now(KYIV).date(), OutageInterval(0, 1)), tomorrow=None)
+
+    async def test_post_with_todays_hours_behind_us_says_so_rather_than_vanishing(self):
+        bot = RecordingBoardBot()
+        board = await self.build_board(bot, self.today_spent())
+
+        await board.post()
+
+        self.assertIn("Сьогодні відключень більше немає · на завтра графіка ще немає", bot.sent[0])
+
+    async def test_post_with_tomorrow_published_and_clear_says_tomorrow_is_clear_too(self):
+        today = datetime.now(KYIV).date()
+        outlook = OutageOutlook(
+            today=build_schedule(today, OutageInterval(0, 1)), tomorrow=build_schedule(today + timedelta(days=1))
+        )
+        bot = RecordingBoardBot()
+        board = await self.build_board(bot, outlook)
+
+        await board.post()
+
+        self.assertIn("Сьогодні відключень більше немає · завтра теж", bot.sent[0])
+
+    async def test_post_with_nothing_read_yet_says_it_could_not_read_rather_than_nothing_planned(self):
+        bot = RecordingBoardBot()
+        board = await self.build_board(bot, None)
+
+        await board.post()
+
+        self.assertIn("Графік не вдалось прочитати", bot.sent[0])
+
+    async def test_post_with_yesterdays_outlook_is_not_an_answer_about_today(self):
+        """Yasno publishes a day whenever it likes; a remembered day that is not this one knows nothing."""
+        bot = RecordingBoardBot()
+        board = await self.build_board(bot, OutageOutlook(today=build_schedule(date(2026, 1, 2)), tomorrow=None))
+
+        await board.post()
+
+        self.assertIn("Графік не вдалось прочитати", bot.sent[0])

@@ -95,6 +95,13 @@ POWER_SCHEDULE_EMERGENCY_NOTE = (
     "Графік не діє — світло можуть вимкнути будь-коли й повернути без попередження.</blockquote>"
 )
 POWER_SCHEDULE_BUTTON_REFRESH = "Оновити"
+# a quiet day used to show nothing at all, and nothing looks exactly like a failed fetch — «я думав чи не
+# вийшло отримати, чи вже не буде відключень». the half-card costs two lines and answers that
+POWER_SCHEDULE_NOTHING_TODAY = "Сьогодні відключень не планували"
+POWER_SCHEDULE_NOTHING_LEFT_TODAY = "Сьогодні відключень більше немає"
+POWER_SCHEDULE_NOTHING_TOMORROW = "завтра теж"
+POWER_SCHEDULE_TOMORROW_UNPUBLISHED = "на завтра графіка ще немає"
+POWER_SCHEDULE_UNKNOWN = "Графік не вдалось прочитати — покажу, щойно відповість"
 POWER_SCHEDULE_REFRESHED = "Оновлено"
 POWER_SCHEDULE_REFRESHING = "🔄 оновлюю…"
 # a bare fact, no nudge — the design forbids "charge your phone" style advice
