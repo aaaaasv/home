@@ -50,9 +50,11 @@ class ReserveReadout:
 
         # the heading says whether the flat is on the city, and while the pi hangs on the station that is a
         # thing only the family knows — the hat reads mains either way
-        grid = classify_grid(ups, await RetrieveDeclaredSupplyUseCase(uow=self.uow_factory())())
+        declared_supply = await RetrieveDeclaredSupplyUseCase(uow=self.uow_factory())()
+        grid = classify_grid(ups, declared_supply)
         return build_reserve(
             grid=grid,
+            declared_supply=declared_supply,
             station=station,
             ups=ups,
             router_alive=router_alive,

@@ -39,6 +39,7 @@ from src.modules.power.services.pi_ups import PiUps
 from src.modules.power.use_cases.declare_supply import DeclareSupplyUseCase
 from src.modules.power.use_cases.record_grid_change import RecordGridChangeUseCase
 from src.modules.power.use_cases.retrieve_declared_supply import RetrieveDeclaredSupplyUseCase
+from src.modules.power.use_cases.revise_declared_supply import ReviseDeclaredSupplyUseCase
 from src.modules.power.use_cases.track_conservation import TrackConservationUseCase
 
 logger = logging.getLogger(__name__)
@@ -133,13 +134,18 @@ class MainsWatchJob:
         self._declared_supply: DeclaredSupply | None = None
 
     async def __call__(self) -> None:
-        declared_supply = await RetrieveDeclaredSupplyUseCase(uow=self.uow_factory())()
-        # «світло вже є» tapped on the station's card is already the answer to the question below, so the
-        # announcement it brings about must not turn around and ask it
+        # the hat is read before the declaration is asked for, because the reading is what can end it:
+        # a station feeding the pi cannot leave its socket without mains
+        ups = await self.pi_ups.read_state()
+        declared_supply = await ReviseDeclaredSupplyUseCase(
+            uow=self.uow_factory(), household_calendar=self.household_calendar
+        )(ups)
+        # the station's card going back to the grid — by hand, or because the hat contradicted it — is
+        # already the answer to the question below, so the announcement it brings must not ask it again
         answered_by_hand = self._declared_supply is DeclaredSupply.STATION and declared_supply is DeclaredSupply.GRID
         self._declared_supply = declared_supply
         await self._seed_from_the_journal()
-        grid = self.monitor.update(await self.pi_ups.read_state(), declared_supply)
+        grid = self.monitor.update(ups, declared_supply)
         if grid is None:
             return
 
@@ -162,19 +168,23 @@ class MainsWatchJob:
         """
         The announcement, and the buttons that let a person correct the one thing the hat cannot measure.
 
-        «світло зникло» carries the single button for saying the pi has been moved onto the station, because
-        that is when somebody does it. «світло є» carries the pair only when the station contradicts it —
-        asking under every restored light would teach the family to ignore the question.
+        «світло є» always carries «ні, це Delta 2»: it is the only message that can be wrong, and the
+        station is asleep or out of bluetooth range too often for «only when it contradicts» to be
+        enough. the question above it appears only when the station really does contradict the hat.
+        «світло зникло» carries nothing — the mark belongs on the board, where it is still reachable an
+        hour later, which is when somebody switches back.
         """
         text = render_mains_change(grid, change.lasted)
         if grid is GridState.ON_BATTERY:
-            return text, build_supply_keyboard(DeclaredSupply.GRID)
+            # nothing to correct yet: the light really has gone, and the mark lives on the board now
+            return text, None
 
+        keyboard = build_supply_keyboard(DeclaredSupply.GRID, change.event_id)
         contradicting = await self._station_contradicting() if may_ask else None
         if contradicting is None:
-            return text, None
+            return text, keyboard
         question = POWER_SUPPLY_QUESTION.format(watts=contradicting.ac_output_power)
-        return f"{text}\n\n{question}", build_supply_keyboard(DeclaredSupply.GRID, change.event_id)
+        return f"{text}\n\n{question}", build_supply_keyboard(DeclaredSupply.GRID, change.event_id, asking=True)
 
     async def _station_contradicting(self) -> EcoFlowState | None:
         """

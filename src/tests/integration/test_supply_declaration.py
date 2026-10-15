@@ -2,7 +2,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 from src.bot.handlers.power.jobs import EcoFlowPollJob, MainsWatchJob
-from src.bot.handlers.power.messages import POWER_SUPPLY_BUTTON_MOVED_TO_STATION, POWER_SUPPLY_BUTTON_STATION
+from src.bot.handlers.power.messages import POWER_SUPPLY_BUTTON_STATION
 from src.infrastructure.db.uow import UnitOfWork
 from src.modules.power.domain import DeclaredSupply
 from src.modules.power.use_cases.declare_supply import DeclareSupplyUseCase
@@ -117,32 +117,35 @@ class SupplyDeclarationTestCase(BaseIntegrationTestCase):
 
         await self.go_dark_then_see_mains(bot, station=on_grid())
 
-        self.assertEqual(bot.sent[-1], ("💡 <b>Світло є</b> (не було 2 год)", None))
+        text, keyboard = bot.sent[-1]
+        self.assertEqual(text, "💡 <b>Світло є</b> (не було 2 год)")
+        self.assertEqual([button.text for button in keyboard.inline_keyboard[0]], ["Ні, це Delta 2"])
 
     async def test_a_light_an_idle_station_cannot_speak_about_is_announced_without_a_question(self):
         bot = RecordingBot()
 
         await self.go_dark_then_see_mains(bot, station=idle_and_full())
 
-        self.assertEqual(bot.sent[-1], ("💡 <b>Світло є</b> (не було 2 год)", None))
+        text, keyboard = bot.sent[-1]
+        self.assertEqual(text, "💡 <b>Світло є</b> (не було 2 год)")
+        self.assertEqual([button.text for button in keyboard.inline_keyboard[0]], ["Ні, це Delta 2"])
 
     async def test_a_light_with_the_station_off_bluetooth_is_announced_without_a_question(self):
         bot = RecordingBot()
 
         await self.go_dark_then_see_mains(bot, station=None)
 
-        self.assertEqual(bot.sent[-1], ("💡 <b>Світло є</b> (не було 2 год)", None))
+        text, keyboard = bot.sent[-1]
+        self.assertEqual(text, "💡 <b>Світло є</b> (не було 2 год)")
+        self.assertEqual([button.text for button in keyboard.inline_keyboard[0]], ["Ні, це Delta 2"])
 
-    async def test_the_outage_push_carries_the_button_for_saying_it_before_being_asked(self):
+    async def test_the_outage_push_carries_no_buttons_at_all(self):
+        """Nothing has happened yet to correct; the mark lives on the board, which is still there later."""
         bot = RecordingBot()
 
         await self.build_watch(bot, mains_present=False)()
 
-        text, keyboard = bot.sent[-1]
-        self.assertEqual(text, "🕯 <b>Світло зникло</b>")
-        self.assertEqual(
-            [button.text for button in keyboard.inline_keyboard[0]], [POWER_SUPPLY_BUTTON_MOVED_TO_STATION]
-        )
+        self.assertEqual(bot.sent[-1], ("🕯 <b>Світло зникло</b>", None))
 
     async def test_declaring_the_station_retracts_the_announcement_the_button_names(self):
         bot = RecordingBot()
@@ -200,7 +203,9 @@ class SupplyDeclarationTestCase(BaseIntegrationTestCase):
 
         await watch()
 
-        self.assertEqual(bot.sent[-1], ("💡 <b>Світло є</b> (не було 3 год)", None))
+        text, keyboard = bot.sent[-1]
+        self.assertEqual(text, "💡 <b>Світло є</b> (не було 3 год)")
+        self.assertEqual([button.text for button in keyboard.inline_keyboard[0]], ["Ні, це Delta 2"])
 
     async def test_the_light_the_family_declared_back_is_not_questioned_in_return(self):
         """They have just answered the question; asking it again under their own answer reads as deaf."""
@@ -213,7 +218,10 @@ class SupplyDeclarationTestCase(BaseIntegrationTestCase):
 
         await watch()
 
-        self.assertIsNone(bot.sent[-1][1])
+        # the correction is still there, because the station may be asleep the next time it matters —
+        # what must not come back is the question, and the «так, мережа» that answers it
+        self.assertEqual([button.text for button in bot.sent[-1][1].inline_keyboard[0]], ["Ні, це Delta 2"])
+        self.assertNotIn("Точно мережа?", bot.sent[-1][0])
 
     async def test_a_station_charging_from_the_wall_releases_the_declaration(self):
         """Otherwise «ні, це Delta 2» silences «світло є» until somebody remembers to take it back."""
@@ -246,4 +254,47 @@ class SupplyDeclarationTestCase(BaseIntegrationTestCase):
         station_button = next(
             button for button in keyboard.inline_keyboard[0] if button.text == POWER_SUPPLY_BUTTON_STATION
         )
-        self.assertEqual(station_button.callback_data, f"supply:station:{await self.latest_event_id()}:0")
+        self.assertEqual(station_button.callback_data, f"supply:station:{await self.latest_event_id()}:0:0")
+
+    async def test_the_hat_losing_mains_releases_a_station_declaration_that_has_had_its_grace(self):
+        """«Я перемкнувся назад» without a button: the pi's socket going dark is the proof."""
+        bot = RecordingBot()
+        await self.declare(DeclaredSupply.STATION)
+        self.household_calendar.frozen_now += timedelta(minutes=11)
+
+        await self.build_watch(bot, mains_present=False)()
+
+        self.assertEqual(await self.declared(), DeclaredSupply.GRID)
+
+    async def test_the_hat_losing_mains_within_the_grace_leaves_the_declaration_alone(self):
+        """The mark and the plug do not move in the same second, and the tap often comes first."""
+        bot = RecordingBot()
+        await self.declare(DeclaredSupply.STATION)
+        self.household_calendar.frozen_now += timedelta(minutes=2)
+
+        await self.build_watch(bot, mains_present=False)()
+
+        self.assertEqual(await self.declared(), DeclaredSupply.STATION)
+
+    async def test_a_station_declaration_survives_while_the_hat_still_reads_mains(self):
+        """Mains at the hat is exactly what a station feeding it predicts — it contradicts nothing."""
+        bot = RecordingBot()
+        await self.declare(DeclaredSupply.STATION)
+        self.household_calendar.frozen_now += timedelta(hours=2)
+
+        await self.build_watch(bot, mains_present=True, station=on_battery())()
+
+        self.assertEqual(await self.declared(), DeclaredSupply.STATION)
+
+    async def test_the_light_coming_back_after_a_released_declaration_is_announced(self):
+        """The whole point: nobody has to remember the mark for «світло є» to arrive."""
+        bot = RecordingBot()
+        await self.build_watch(bot, mains_present=False)()
+        await self.declare(DeclaredSupply.STATION)
+        self.household_calendar.frozen_now += timedelta(minutes=11)
+        await self.build_watch(bot, mains_present=False)()
+        self.household_calendar.frozen_now += timedelta(hours=1)
+
+        await self.build_watch(bot, mains_present=True, station=idle_and_full())()
+
+        self.assertEqual(bot.sent[-1][0], "💡 <b>Світло є</b> (не було 1 год 11 хв)")
