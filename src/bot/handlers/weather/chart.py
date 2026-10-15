@@ -24,6 +24,7 @@ from src.bot.handlers.weather.messages import (
     WEATHER_CHART_PERCENT,
     WEATHER_CHART_SUBTITLE,
     WEATHER_CHART_SUBTITLE_WITH_DRIFT,
+    WEATHER_CHART_TEMPERATURE,
     WEATHER_CHART_TITLE,
 )
 from src.modules.weather.domain import ClimateDay, ClimateHistory
@@ -41,7 +42,7 @@ FONT_CANDIDATES = (
 # one-pixel line on a phone screen looks like a dotted one
 SCALE = 3
 WIDTH, HEIGHT = 1000, 780
-LEFT, RIGHT, TOP, BOTTOM = 86, 150, 104, 86
+LEFT, RIGHT, TOP, BOTTOM = 86, 150, 118, 86
 TEMPERATURE_FLOOR = 410
 HUMIDITY_CEILING = 510
 
@@ -151,6 +152,7 @@ class _Chart:
             for value in (day.minimum_celsius, day.maximum_celsius)
         ]
         panel = _Panel(self, min(readings) - 1.5, max(readings) + 1.5, TOP, TEMPERATURE_FLOOR)
+        self._panel_label(WEATHER_CHART_TEMPERATURE, TOP)
         panel.grid(5, WEATHER_CHART_DEGREES)
         for series, line, pale, band in (
             (self.history.outdoor, OUTDOOR, OUTDOOR_PALE, OUTDOOR_BAND),
@@ -178,7 +180,7 @@ class _Chart:
         panel = _Panel(self, min(readings) - 6, max(readings) + 6, HUMIDITY_CEILING, HEIGHT - BOTTOM)
         panel.grid(20, WEATHER_CHART_PERCENT)
         panel.dates()
-        self._text((LEFT - 18, HUMIDITY_CEILING - 26), WEATHER_CHART_HUMIDITY, 12, bold=True, fill=MUTED)
+        self._panel_label(WEATHER_CHART_HUMIDITY, HUMIDITY_CEILING)
         for name, line, pale in (("outdoor", OUTDOOR, OUTDOOR_PALE), ("indoor", INDOOR, INDOOR_PALE)):
             days = series[name]
             if not days:
@@ -191,6 +193,10 @@ class _Chart:
     # ── the pen ─────────────────────────────────────────────────────────────
     def _font(self, size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         return ImageFont.truetype(str(self.bold if bold else self.regular), size * SCALE)
+
+    def _panel_label(self, caption: str, panel_top: float) -> None:
+        """Which of the two this panel is. The axis says ° or %, but a title alone left people guessing."""
+        self._text((LEFT - 18, panel_top - 26), caption, 12, bold=True, fill=MUTED)
 
     def _text(self, position, value, size=15, bold=False, fill=INK, anchor="la") -> None:
         self.pen.text(
