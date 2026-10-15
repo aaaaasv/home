@@ -142,6 +142,9 @@ class Reserve:
     # how long the flat has been on battery, counted from the first reading that saw it — None on the grid, and
     # None through an outage the bot woke up inside, where the honest answer is that nobody watched the start
     on_battery_for: timedelta | None = None
+    # what the family last said is feeding the pi's socket. the board shows it, because while it is the
+    # station the heading is their word rather than a reading — and because the board is where it is undone
+    declared_supply: DeclaredSupply = DeclaredSupply.GRID
 
 
 MINUTES_PER_DAY = 24 * 60

@@ -43,8 +43,6 @@ POWER_MAINS_RESTORED_AFTER = "💡 <b>Світло є</b> (не було {durati
 POWER_SUPPLY_QUESTION = "Точно мережа? Delta 2 віддає {watts} Вт і не заряджається."
 POWER_SUPPLY_BUTTON_GRID = "Так, мережа"
 POWER_SUPPLY_BUTTON_STATION = "Ні, це Delta 2"
-# on the «світло зникло» card, for saying it before the bot has anything to ask about
-POWER_SUPPLY_BUTTON_MOVED_TO_STATION = "Перекинув на Delta 2"
 POWER_SUPPLY_BUTTON_GRID_IS_BACK = "Світло вже є"
 POWER_SUPPLY_ON_STATION = (
     "🕯 <b>Світла немає</b>\n\nУ розетці Pi стоїть Delta 2 — напруга в ній нічого не каже про місто."
@@ -52,6 +50,13 @@ POWER_SUPPLY_ON_STATION = (
 POWER_SUPPLY_BACK_ON_GRID = "🔌 <b>У розетці Pi — мережа</b>"
 POWER_SUPPLY_TOAST_STATION = "Записав: живить Delta 2"
 POWER_SUPPLY_TOAST_GRID = "Записав: живить мережа"
+# the same correction, but on the board — which is always the newest message in the topic, so it is the
+# one place that can be found without scrolling. a push card is right for the moment it fires and wrong
+# ten minutes later, when the thing that has to be said is «я перемкнувся назад»
+POWER_BOARD_ON_THE_STATION = "<i>У розетці Pi — Delta 2, тому про місто тут нічого немає</i>"
+POWER_BOARD_BUTTON_TO_STATION = "Перекинув на Delta 2"
+POWER_BOARD_BUTTON_TO_GRID = "Pi знову в мережі"
+POWER_SUPPLY_TOAST_STATION_RETRACTED = "Записав: живить Delta 2 · прибрав «Світло є»"
 
 # said once per outage, and only when the answer is bad: "you reach" is not worth a notification, and a
 # push that speaks every time gets the whole group muted

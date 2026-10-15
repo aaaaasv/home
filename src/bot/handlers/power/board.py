@@ -8,12 +8,12 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message
 
 from src.bot.handlers.power.formatting import render_power_board
-from src.bot.handlers.power.keyboards import build_outage_schedule_keyboard
+from src.bot.handlers.power.keyboards import build_power_board_keyboard
 from src.bot.handlers.power.reserve_readout import ReserveReadout
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
 from src.bot.services.posted_message_tracker import POWER_BOARD_KIND, PostedMessageTracker
 from src.infrastructure.db.uow import UnitOfWork
-from src.modules.power.domain import OutageOutlook, Reserve
+from src.modules.power.domain import DeclaredSupply, OutageOutlook, Reserve
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 
 logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ class PowerBoard:
             chat_id=self.chat_id,
             message_thread_id=await self.power_topic.resolve(),
             text=text,
-            reply_markup=build_outage_schedule_keyboard(),
+            reply_markup=build_power_board_keyboard(_declared(reserve)),
             # a glance, not a call to action — the board is delivered and refreshed without a ping
             disable_notification=not notify,
         )
@@ -120,7 +120,7 @@ class PowerBoard:
                 chat_id=self.chat_id,
                 message_id=message_id,
                 text=text,
-                reply_markup=build_outage_schedule_keyboard(),
+                reply_markup=build_power_board_keyboard(_declared(reserve)),
             )
         except TelegramBadRequest as error:
             reason = str(error).lower()
@@ -144,3 +144,8 @@ class PowerBoard:
         async with self.uow_factory() as uow:
             posted = await uow.posted_messages.list_by_kind(POWER_BOARD_KIND)
         return posted[-1].message_id if posted else None
+
+
+def _declared(reserve: Reserve | None) -> DeclaredSupply:
+    """A flat with no reserve half to read is a flat with nothing to declare about."""
+    return reserve.declared_supply if reserve is not None else DeclaredSupply.GRID
