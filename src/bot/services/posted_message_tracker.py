@@ -23,6 +23,8 @@ STRIP_CARD_KIND = "strip_card"
 # record of that night — so this lane is forgotten rather than cleared
 AIR_ALERT_CARD_KIND = "air_alert_card"
 WEATHER_DIGEST_KIND = "weather_digest"
+# the month of air as one picture, redrawn and reposted each morning — only the newest one may stand
+CLIMATE_CHART_KIND = "climate_chart"
 CLIMATE_CARD_KIND = "climate_card"
 # one standing card per uncomfortable plant, referenced by plant id, deleted the moment the plant is comfortable
 PLANT_DISCOMFORT_KIND = "plant_discomfort"
