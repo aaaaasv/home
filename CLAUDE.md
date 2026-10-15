@@ -3,6 +3,21 @@
 Guidance for Claude Code working in this repository. `README.md` carries the same architecture as prose for
 a human reader; this file is the authority on what you must do.
 
+# The household's context
+
+Everything true about **this home** — what hardware exists, what feeds what, what was decided and why,
+what is still open — lives in `../home-docs`, which has its own `CLAUDE.md` with two rules that apply
+whenever this repository is touched:
+
+- **Read before you assert.** A claim about hardware, power, network or the household's routine comes
+  from `../home-docs/inventory/stack.yml` and `../home-docs/reference/`, never from memory. On
+  15.10.2026 an invented claim about which battery feeds the router reached the family as a feature
+  proposal; the measured answer had been written down a month earlier.
+- **Write as you learn, in the same turn.** A fact, a decision, a question or a measurement that comes
+  up while working here is written into `../home-docs` before the turn ends — decisions into
+  `architecture/decisions.md`, unknowns into `questions/open-questions.md`, work into
+  `tasks/` and `worklogs/`.
+
 # Task tracking
 
 Bugs, features and improvements live in **Linear** (workspace `rii`, team `homeserver`, prefix `HOM-`) —

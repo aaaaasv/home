@@ -206,7 +206,7 @@ three and no history can leak between them:
 
 | | |
 |---|---|
-| `home-docs/` | Floor plan, network layout, hardware research, the household reference. **Private, permanently** |
+| `../home-docs/` | The household's memory: inventory, decisions, open questions, tasks, the Irpin flat. **Private, permanently** |
 | `home-infrastructure/` | Compose stacks, Caddy, backup scripts and systemd units for both machines. **Private** — it is checked out on the servers |
 
 This repository hardcodes no address, credential, coordinate, device MAC or chat id; every setting that
