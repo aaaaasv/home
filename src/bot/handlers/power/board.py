@@ -18,7 +18,8 @@ from src.modules.power.services.outage_schedule_provider import OutageSchedulePr
 
 logger = logging.getLogger(__name__)
 
-# a bot may edit its own message for 48h; past that the board is reposted rather than left stale
+# editing does not expire — measured at 61 days, 16.10.2026 — so these mean the card is gone rather
+# than old: deleted by hand, or a chat the bot can no longer reach. either way it is reposted
 UNEDITABLE_MESSAGE_ERRORS = ("message to edit not found", "message can't be edited", "message_id_invalid")
 
 
@@ -128,7 +129,7 @@ class PowerBoard:
                 return True
             if not any(uneditable in reason for uneditable in UNEDITABLE_MESSAGE_ERRORS):
                 raise
-            # older than 48h — repost fresh so the topic keeps a live board
+            # the card is gone rather than old — repost fresh so the topic keeps a live board
             await self.post(reserve)
         return True
 

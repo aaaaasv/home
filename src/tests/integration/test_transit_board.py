@@ -30,7 +30,7 @@ class StubComposeTransitReport:
 
 
 class ExpiredEditBot(RecordingBot):
-    """Raises "message can't be edited" on its first edit, mimicking a card that has aged past the 48h window"""
+    """Raises "message can't be edited" on its first edit, mimicking a card that is no longer there"""
 
     def __init__(self, first_message_id: int = 500):
         super().__init__(first_message_id=first_message_id)

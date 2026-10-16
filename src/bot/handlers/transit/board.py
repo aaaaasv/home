@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 TRANSIT_MODULE_NAME = "transit"
 
-# a bot may edit its own message for 48h; past that the card is reposted rather than left stale
+# editing does not expire (measured at 61 days, 16.10.2026): these mean the card is gone, not old
 UNEDITABLE_MESSAGE_ERRORS = ("message to edit not found", "message can't be edited", "message_id_invalid")
 
 
@@ -79,7 +79,7 @@ class TransitBoard:
 
         await self._cancel_refresh_window()
         if await self._refresh_once():
-            # the card had aged past 48h; _refresh_once reposted it, and post reopened its own window
+            # the card was gone; _refresh_once reposted it, and post remembered the new one
             return
         self._start_refresh_window()
 
@@ -107,7 +107,7 @@ class TransitBoard:
                 return False
             if not any(uneditable in reason for uneditable in UNEDITABLE_MESSAGE_ERRORS):
                 raise
-            # older than 48h — repost fresh so the topic keeps a live card (never reached mid-window: it is minutes old)
+            # the card is gone rather than old — repost fresh so the topic keeps a live card
             await self.post()
             return True
         return False

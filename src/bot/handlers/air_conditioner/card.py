@@ -87,7 +87,7 @@ async def stop_air_conditioner_and_dismiss_alert(
     try:
         await callback.message.delete()
     except TelegramBadRequest:
-        # older than 48h or already gone — nothing to remove
+        # already gone, or too old for telegram to delete — nothing more to remove
         pass
 
 
@@ -158,7 +158,7 @@ async def _apply_temperature(
 
 async def _mark_working(callback: CallbackQuery) -> None:
     # replace the card with a brief note and drop its buttons, so a slow or flaky command reads as in-progress; the
-    # result edit restores the full card. an un-editable card (older than 48h) just falls through
+    # result edit restores the full card. a card that has been deleted by hand just falls through
     try:
         await callback.message.edit_text(AIR_CONDITIONER_WORKING)
     except TelegramBadRequest:
@@ -190,7 +190,7 @@ async def _show(
             reply_markup=build_air_conditioner_keyboard(state),
         )
     except TelegramBadRequest as error:
-        # a bot may edit its own message for 48 hours only; past that the unit still obeyed, so say so in a fresh
+        # the card may have been deleted by hand; the unit obeyed either way, so say so in a fresh
         # message. an unchanged card (an absolute button tapped while already in that state) also lands here — no-op
         if "message is not modified" not in str(error):
             await callback.message.answer(AIR_CONDITIONER_CARD_EXPIRED, disable_notification=True)

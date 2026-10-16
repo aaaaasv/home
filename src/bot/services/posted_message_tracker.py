@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 
 from aiogram import Bot
@@ -5,6 +6,8 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message
 
 from src.infrastructure.db.uow import UnitOfWork
+
+logger = logging.getLogger(__name__)
 
 CARE_DIGEST_KIND = "care_digest"
 AIR_CONDITIONER_CARD_KIND = "ac_card"
@@ -86,8 +89,26 @@ class PostedMessageTracker:
             )
 
     async def _delete_quietly(self, chat_id: int, message_id: int) -> None:
+        """
+        Take the card away — and where telegram will not let us, at least take its buttons away.
+
+        the two limits are not the same length, measured 16.10.2026: an edit went through on a message 61
+        days old, while a delete is refused past 48 hours («message can't be deleted for everyone»). so a
+        card that outlived its lane stays in the topic for good — and it stays there holding buttons, which
+        is the part worth fixing: a control that cannot do anything any more should not look like one. the
+        text is left exactly as it was, because by then that is all the card is: a record of that day.
+        """
         try:
             await self.bot.delete_message(chat_id=chat_id, message_id=message_id)
+            return
+        except TelegramBadRequest as error:
+            if "message to delete not found" in str(error):
+                # already gone — somebody recorded the care, or deleted it by hand
+                return
+            logger.info("Could not delete message %s, taking its buttons off instead: %s", message_id, error)
+
+        try:
+            await self.bot.edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=None)
         except TelegramBadRequest:
-            # already gone (someone recorded the care) or older than 48h — nothing to clean up
+            # it had no buttons to begin with, which is the outcome we wanted anyway
             pass

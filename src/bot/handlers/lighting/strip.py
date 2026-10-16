@@ -55,6 +55,6 @@ async def set_strip(callback: CallbackQuery, callback_data: StripCallback, panel
     try:
         await callback.message.edit_text(render_strip(asked_for), reply_markup=build_strip_keyboard(asked_for))
     except TelegramBadRequest as error:
-        # a bot may edit its own message for 48 hours only; past that the strip still obeyed, so say so
+        # the card may have been deleted by hand; the strip obeyed either way, so say so
         if "message is not modified" not in str(error):
             await callback.message.answer(LIGHT_STRIP_CARD_EXPIRED)

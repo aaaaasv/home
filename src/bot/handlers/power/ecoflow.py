@@ -82,7 +82,7 @@ async def _redraw(callback: CallbackQuery, state: EcoFlowState) -> None:
     try:
         await callback.message.edit_text(render_ecoflow(state), reply_markup=build_ecoflow_keyboard(state))
     except TelegramBadRequest as error:
-        # a bot may edit its own message for 48 hours only; past that the station still obeyed, so say so
+        # the card may have been deleted by hand; the station obeyed either way, so say so
         if "message is not modified" not in str(error):
             await _note(callback, POWER_ECOFLOW_CARD_EXPIRED)
 
