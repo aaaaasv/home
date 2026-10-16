@@ -8,13 +8,14 @@ station is briefly powered and visible — watch its charge trace for a complete
 Thresholds come from the Delta 2 manual and LiFePO4 storage guidance (see docs/power-topic-design.md). Ukrainian
 never appears here: evaluate() returns a structured advisory (level + kind + numbers) and the bot layer renders it.
 
-Consolidation bands read the charge at the moment of storage. The design fixes four points — ≤5 red, <30 yellow,
-50–80 green, >90 blue — and leaves two gaps (30–50, 80–90); both are resolved toward silence, this module's ethos:
+Consolidation bands read the charge at the moment of storage, and only a charge too low earns a card — a
+station sitting above the healthy band is simply fine. Nobody deliberately discharges a shelved station to
+hit a storage target, so "charged a bit high" is not advice, it is noise, and it says nothing:
 
     p ≤ 5          RED     charge to ~60 now
     5 < p < 30     YELLOW  top up toward ~60
-    30 ≤ p ≤ 90    GREEN   healthy enough — say nothing loud
-    p > 90         BLUE    discharge toward ~60
+    30 ≤ p ≤ 90    GREEN   healthy enough — a calm acknowledgement, no push
+    p > 90         (none)  nothing to do about a high charge — stay silent
 """
 
 from collections.abc import Sequence
@@ -31,9 +32,8 @@ class ConservationMode(StrEnum):
 
 
 class ConservationLevel(StrEnum):
-    # green is card-only (no push); blue is an informational "discharge a bit"; yellow/red are the ones that ping
+    # green is card-only (no push); yellow/red are the ones that ping
     GREEN = "green"
-    BLUE = "blue"
     YELLOW = "yellow"
     RED = "red"
 
@@ -173,14 +173,16 @@ def evaluate(state: ConservationState, now: datetime) -> ConservationAdvisory | 
     return None
 
 
-def _consolidation_advisory(state: ConservationState, estimated: float) -> ConservationAdvisory:
+def _consolidation_advisory(state: ConservationState, estimated: float) -> ConservationAdvisory | None:
+    """The storage-moment charge against the target — None above the healthy band, where there is nothing to do."""
     percent = state.stored_percent
     if percent <= CONSOLIDATION_URGENT_PERCENT:
         level = ConservationLevel.RED
     elif percent < CONSOLIDATION_LOW_PERCENT:
         level = ConservationLevel.YELLOW
     elif percent > CONSOLIDATION_HIGH_PERCENT:
-        level = ConservationLevel.BLUE
+        # charged above the healthy band: discharging a shelved station to hit 60% is not a thing anyone does
+        return None
     else:
         level = ConservationLevel.GREEN
     return ConservationAdvisory(

@@ -9,7 +9,6 @@ from src.bot.handlers.power.messages import (
     POWER_CONSERVATION_CYCLE_SOON,
     POWER_CONSERVATION_IN_USE,
     POWER_CONSERVATION_IN_USE_PERCENT,
-    POWER_CONSERVATION_STORE_BLUE,
     POWER_CONSERVATION_STORE_GREEN,
     POWER_CONSERVATION_STORE_RED,
     POWER_CONSERVATION_STORE_YELLOW,
@@ -334,7 +333,6 @@ def render_conservation_card(advisory: ConservationAdvisory) -> str:
     store_templates = {
         ConservationLevel.RED: POWER_CONSERVATION_STORE_RED,
         ConservationLevel.YELLOW: POWER_CONSERVATION_STORE_YELLOW,
-        ConservationLevel.BLUE: POWER_CONSERVATION_STORE_BLUE,
         ConservationLevel.GREEN: POWER_CONSERVATION_STORE_GREEN,
     }
     return store_templates[advisory.level].format(estimated=advisory.estimated_percent, target=advisory.target_percent)
