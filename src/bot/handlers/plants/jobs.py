@@ -293,7 +293,7 @@ class PlantComfortJob:
         try:
             await self.bot.edit_message_text(chat_id=self.chat_id, message_id=posted[-1].message_id, text=text)
         except TelegramBadRequest as error:
-            # unchanged text needs no rewrite; anything else (gone, older than 48h) falls back to a fresh card
+            # unchanged text needs no rewrite; a card that is gone falls back to a fresh one
             return "message is not modified" in str(error).lower()
         return True
 

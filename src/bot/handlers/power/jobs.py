@@ -321,7 +321,7 @@ class PiPackWatchJob:
         try:
             await self.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=POWER_PACK_RECOVERED)
         except TelegramBadRequest as error:
-            # a bot may edit its own message for 48 hours; past that the warning simply stays as it is
+            # the card may have been deleted by hand; the warning simply stays as it was
             logger.info("Could not write over the low-pack warning: %s", error)
 
 
@@ -658,7 +658,7 @@ def _register_power_board(scheduler: AsyncIOScheduler, context: SchedulerContext
     """
     A fresh board each morning, and the cadence that keeps it current while the flat is on battery.
 
-    the morning repost is what keeps the card inside the 48 hours a bot may edit its own message for, and it
+    the morning repost is what keeps the standing card inside the two days it can still be deleted in, and it
     is also why nothing has to repost the reserve separately — the two halves are one card now.
     """
     settings = context.settings

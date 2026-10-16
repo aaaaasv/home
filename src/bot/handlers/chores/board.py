@@ -15,7 +15,7 @@ CHORES_MODULE_NAME = "chores"
 
 
 class ChoresBoard(SingleMessageBoard):
-    """The single self-editing message the chores list lives in, reposted once Telegram's 48h window closes."""
+    """The single self-editing message the chores list lives in, reposted only when that message is gone."""
 
     kind = CHORES_LIST_KIND
 

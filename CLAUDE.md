@@ -147,10 +147,21 @@ it is already unambiguous; filtering by topic would break every button posted ou
 Callbacks pass only `HasAccessibleMessage`, because Telegram replaces the message of a callback it can no
 longer reach with an `InaccessibleMessage` that has no `message_thread_id` and cannot be edited.
 
-**4. Nothing may depend on one long-lived message.** A bot may edit its own message for 48 hours, then
-`MESSAGE_EDIT_TIME_EXPIRED`. A self-editing card is safe only if it is reposted more often than that — the
-weather digest may carry a refresh button because it is reposted daily; air-conditioner controls may not,
-so `/ac` lives on its own card.
+**4. A message can be edited for as long as it exists, and deleted for 48 hours.** Measured on this bot on
+16.10.2026, in its own chats: a text edit succeeded on a message **61 days** old (16.08 → 16.10, restored
+to its original text afterwards), while `deleteMessage` on that same message failed with «message can't be
+deleted for everyone» — and succeeded on one 33 hours old. This file said the opposite for months — that
+*editing* expires after 48 hours — and «repost it often enough» was built on that sentence.
+
+So a self-editing card may stand for months, and **what must not be depended on is being able to take a
+message away later**. Anything a lane will have to clear has to be replaced within two days, or the old
+copy is permanent: message 567 in the group is such an orphan, and the bot cannot remove it. Where a
+delete does fail, `PostedMessageTracker` strips the card's buttons instead, so what it cannot remove can
+at least no longer act.
+
+The other reasons to repost are real and unchanged: a card is read at the bottom of a topic rather than in
+last week's scroll, and a button acts on the state at the moment it is tapped — which is why
+air-conditioner controls live on their own short-lived `/ac` card and not on the weather digest.
 
 **5. Text the family reads must be actionable on its own.** A care card is read in a group with no other card
 in view, and a herbarium sheet is opened by a guest who has never heard of this bot. So no relative quantity

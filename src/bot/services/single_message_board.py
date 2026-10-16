@@ -10,7 +10,8 @@ from src.infrastructure.db.uow import UnitOfWork
 
 logger = logging.getLogger(__name__)
 
-# a bot may edit its own message for 48 hours, after which telegram refuses and the list must be reposted.
+# editing does not expire (measured at 61 days, 16.10.2026), so these mean the message is gone and the
+# list must be reposted.
 # "message is not modified" is deliberately absent: it means the message already says the right thing, which
 # is success. treating it as uneditable made every no-op refresh delete the board and repost it at the
 # bottom of the topic — visible to the family as the list jumping for no reason
@@ -19,7 +20,7 @@ UNEDITABLE_MESSAGE_ERRORS = ("message can't be edited", "message to edit not fou
 
 class SingleMessageBoard:
     """
-    One list living in one message: edited in place while Telegram allows it, reposted once it does not.
+    One list living in one message: edited in place for as long as it exists, reposted once it does not.
 
     subclasses supply a kind, a renderer and a keyboard builder — everything else is identical, which is why
     the shopping, places and chores boards used to be three copies of the same ninety lines.

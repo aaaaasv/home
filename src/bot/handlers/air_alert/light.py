@@ -1,8 +1,14 @@
-"""Raising the strip when a red alert starts, and putting it back after a fixed while.
+"""Raising the strip when a red alert starts, and letting the host put it back after a fixed while.
 
 **The light goes out on a clock, not on the all-clear.** It exists for the few minutes of putting shoes on and
 getting out; after that it is just a light burning through an alert that may run for hours. Waiting for the
 all-clear also tied it to the feed being right twice instead of once.
+
+**That clock is not kept here.** It used to be: the raise moment lived in this object and a sweep on the
+alert poll put the strip out, so a deploy or a reboot mid-alert lost it and the strip burned till morning —
+twice, and the second time somebody ended up on a wardrobe unplugging it. The raise now names its own
+minutes and the host service holds the deadline on disk, which is the one place a restart cannot reach.
+What is left here is bookkeeping for the card's button, and nothing the light depends on.
 
 The rule that matters most here is the one about not touching a light somebody is already using. At three in
 the morning the person may have switched it on themselves, or left it at a level they chose; overriding that
@@ -39,8 +45,7 @@ class AlertLight:
         """Whether the strip is standing at the alert level by our hand — which is what the card's button needs."""
         if transition == AlertTransition.RAISED:
             await self._raise(alert)
-        await self._sweep()
-        return self._raised_at is not None
+        return self._is_ours()
 
     async def _raise(self, alert: AirAlert | None) -> None:
         standing = await self.panel_light.read()
@@ -52,28 +57,29 @@ class AlertLight:
             logger.info("Red alert: the light is already on at %.0f%%, leaving it", standing.brightness_percent)
             return
 
-        await self.panel_light.set_brightness(self.settings.ALERT_LIGHT_PERCENT)
+        await self.panel_light.set_brightness(
+            self.settings.ALERT_LIGHT_PERCENT, minutes=self.settings.ALERT_LIGHT_MINUTES
+        )
         self._raised_at = self.household_calendar.now()
         logger.info(
-            "Red alert (%s): light raised to %.0f%%",
+            "Red alert (%s): light raised to %.0f%% for %d min",
             alert.reason if alert else "без причини",
             self.settings.ALERT_LIGHT_PERCENT,
+            self.settings.ALERT_LIGHT_MINUTES,
         )
 
-    async def _sweep(self) -> None:
-        """Put it out once the minutes it was raised for have passed, whatever the alert is doing by then."""
+    def _is_ours(self) -> bool:
+        """
+        Whether the light we raised is still standing — which is all «Погасити стрічку» needs to know.
+
+        it is a count of minutes and not a reading, for two reasons. the strip standing at the alert level
+        tells nobody whose hand put it there — and the host publishes its state on its own poll, so a read
+        taken in the same tick as the raise still says «off» and would drop the button off every card.
+        once the minutes are up the host has taken the light down, so the claim lapses here at the same
+        moment. a hand that moves the strip meanwhile takes the lease with it, which is the host's affair.
+        """
         if self._raised_at is None:
-            return
-        if self.household_calendar.now() - self._raised_at < timedelta(minutes=self.settings.ALERT_LIGHT_MINUTES):
-            return
-
-        standing = await self.panel_light.read()
-        if standing is not None and abs(standing.brightness_percent - self.settings.ALERT_LIGHT_PERCENT) > 1:
-            # it moved since we set it, so a hand has been on it — leave it where that hand put it
-            logger.info("The alert light was changed by hand; leaving it")
+            return False
+        if self.household_calendar.now() - self._raised_at >= timedelta(minutes=self.settings.ALERT_LIGHT_MINUTES):
             self._raised_at = None
-            return
-
-        await self.panel_light.set_brightness(0)
-        self._raised_at = None
-        logger.info("Alert light back out after %d minutes", self.settings.ALERT_LIGHT_MINUTES)
+        return self._raised_at is not None

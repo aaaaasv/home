@@ -69,9 +69,8 @@ class SchedulerContext:
     newspaper_print_queue: PrintQueue | None = None
     newspaper_word_sources: tuple[WordSource, ...] = ()
     air_threat_source: AirThreatSource | None = None
-    # both light watchers are built by the composition root and handed over whole, never rebuilt here: each
-    # one remembers what it raised and when, and a second copy of it remembers nothing
-    arrival_light_watcher: object | None = None
+    # built by the composition root and handed over whole, never rebuilt here: it remembers which alerts it
+    # has already spoken about, and a second copy of it remembers nothing
     air_alert_watcher: object | None = None
 
     def build_posted_message_tracker(self) -> PostedMessageTracker:

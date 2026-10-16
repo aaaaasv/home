@@ -45,9 +45,19 @@ class FilePanelLight:
             self._was_readable = True
         return PanelLightState(is_on=bool(published.get("on")), brightness_percent=float(published.get("percent", 0)))
 
-    async def set_brightness(self, brightness_percent: float) -> None:
+    async def set_brightness(self, brightness_percent: float, minutes: float | None = None) -> None:
+        """
+        Ask the host for a level, and for how long it may hold it.
+
+        the file is rewritten even when nothing in it changed: the host tells a new request from the
+        standing one by when the file was written, because two alerts in an evening ask for the same
+        percent and the second one still has to start its own clock.
+        """
         brightness_percent = max(0.0, min(100.0, brightness_percent))
+        asked = {"percent": round(brightness_percent, 1)}
+        if minutes is not None:
+            asked["minutes"] = round(minutes, 1)
         try:
-            self.command_path.write_text(json.dumps({"percent": round(brightness_percent, 1)}))
+            self.command_path.write_text(json.dumps(asked))
         except OSError as error:
             logger.warning("cannot write the panel light command: %s", error)

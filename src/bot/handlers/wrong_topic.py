@@ -45,5 +45,10 @@ async def point_to_the_right_place(
 
 @router.callback_query()
 async def answer_a_stale_button(callback: CallbackQuery) -> None:
-    """A button older than 48 hours arrives without its topic, so no module can claim it — say so instead of hanging."""
+    """
+    A button whose message telegram will not hand over arrives without a topic, so no module can claim it.
+
+    the bot api documents that for a callback older than 48 hours. unlike the edit and delete limits in
+    rule 4, which were measured on 16.10.2026, this one is taken on the documentation's word.
+    """
     await callback.answer(messages.STALE_BUTTON, show_alert=True)

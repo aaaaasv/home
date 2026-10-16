@@ -28,7 +28,7 @@ WEATHER_MODULE_NAME = "weather"
 # a morning digest that boots late is still worth sending, but a stale one hours later is not
 WEATHER_DIGEST_MISFIRE_GRACE_SECONDS = 2 * 60 * 60
 
-# a bot may edit its own message for 48h; past that the morning digest is reposted rather than left stale
+# editing does not expire (measured at 61 days, 16.10.2026): these mean the card is gone, not old
 UNEDITABLE_MESSAGE_ERRORS = ("message to edit not found", "message can't be edited", "message_id_invalid")
 
 
@@ -102,7 +102,7 @@ class WeatherDigestBoard:
                 return True
             if not any(uneditable in reason for uneditable in UNEDITABLE_MESSAGE_ERRORS):
                 raise
-            # older than 48h — repost fresh so the topic keeps a live board
+            # the card is gone rather than old — repost fresh so the topic keeps a live board
             await self.post()
         return True
 

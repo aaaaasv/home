@@ -18,7 +18,7 @@ class ReserveReadout:
     What the flat is running on at this moment, with the two clocks that make it a span rather than a state.
 
     the clocks live here rather than in the job or the card, because they are what the reading knows and the
-    job is only its cadence — and because a card reposted after 48h has to keep counting from the same
+    job is only its cadence — and because a card that gets reposted has to keep counting from the same
     moment. they are two and not one on purpose: `build_reserve` explains why the city and the wall socket
     part company.
     """

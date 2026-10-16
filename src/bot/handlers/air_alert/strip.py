@@ -30,5 +30,5 @@ async def put_the_strip_out(callback: CallbackQuery, panel_light: PanelLight) ->
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
     except TelegramBadRequest:
-        # a bot may edit its own message for 48 hours only, and the strip obeyed either way
+        # the card may have been deleted by hand, and the strip obeyed either way
         pass

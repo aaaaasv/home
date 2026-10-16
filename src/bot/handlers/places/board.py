@@ -8,7 +8,7 @@ PLACES_MODULE_NAME = "places"
 
 
 class PlacesBoard(SingleMessageBoard):
-    """The single self-editing message the places list lives in, reposted once Telegram's 48h window closes."""
+    """The single self-editing message the places list lives in, reposted only when that message is gone."""
 
     kind = PLACES_LIST_KIND
 

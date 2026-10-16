@@ -47,9 +47,13 @@ included first.
 **3. Buttons are never filtered by topic.** A `CallbackData` payload names its own module in its prefix, so
 it is already unambiguous. Filtering it by topic would break every button posted outside its own topic.
 
-**4. Nothing may depend on one long-lived message.** A bot may edit its own message for 48 hours, then
-`MESSAGE_EDIT_TIME_EXPIRED`. A self-editing card is only safe if it is reposted more often than that —
-which is why the weather digest may carry a refresh button and the air-conditioner controls may not.
+**4. A message can be edited for as long as it exists, and deleted for 48 hours.** Measured on 16.10.2026:
+an edit went through on a message 61 days old, while deleting that same message was refused and deleting a
+33-hour-old one worked. So a self-editing card may stand for months — what may not be depended on is
+taking a message away later, and a card that was not replaced within two days is permanent. The reasons a
+card is still reposted are that it is read at the bottom of a topic rather than in last week's scroll, and
+that a button acts on the state at the moment it is tapped — which is why the air-conditioner controls
+live on their own short-lived card and the weather digest may carry a refresh button.
 
 **5. Ukrainian lives only in the delivery layer.** Domain errors carry English detail for logs;
 `src/bot/errors.py` maps the exception to what a person reads.
