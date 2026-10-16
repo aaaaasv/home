@@ -80,12 +80,12 @@ class ConsolidationBandTestCase(unittest.TestCase):
 
         self.assertEqual(advisory.level, ConservationLevel.GREEN)
 
-    def test_evaluate_fresh_storage_above_ninety_percent_is_blue_consolidation(self):
+    def test_evaluate_fresh_storage_above_ninety_percent_says_nothing(self):
+        # discharging a shelved station to hit the 60% target is not a thing anyone does, so a high
+        # charge earns no card at all
         advisory = self.evaluate_fresh(95)
 
-        self.assertEqual(advisory.level, ConservationLevel.BLUE)
-        self.assertEqual(advisory.kind, ConservationKind.CONSOLIDATION)
-        self.assertEqual(advisory.target_percent, 60)
+        self.assertIsNone(advisory)
 
     def test_evaluate_past_the_consolidation_window_stops_reporting_the_storage_band(self):
         # three days after storage at a healthy 60%, with no cycle or drift concern, nothing needs saying
