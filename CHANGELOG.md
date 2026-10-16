@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-10-16
+
 ### Змінено
 
 - **Delta 2, що стоїть зарядженою високо, більше не показує картку.** Раніше свіжо відкладена станція з
