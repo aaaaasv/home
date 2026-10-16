@@ -21,9 +21,8 @@ logger = logging.getLogger(__name__)
 
 CONSERVATION_LEVEL_RANK = {
     ConservationLevel.GREEN: 0,
-    ConservationLevel.BLUE: 1,
-    ConservationLevel.YELLOW: 2,
-    ConservationLevel.RED: 3,
+    ConservationLevel.YELLOW: 1,
+    ConservationLevel.RED: 2,
 }
 
 

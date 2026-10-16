@@ -136,7 +136,6 @@ POWER_OUTAGE_SOON = "⚡ За {minutes} хв планове відключенн
 # needed; the warranty line nags daily. the pure logic returns a structured advisory, mapped to these here
 POWER_CONSERVATION_STORE_RED = "🔴 <b>Delta 2</b> — на зберіганні, ~{estimated}% · ціль {target}%"
 POWER_CONSERVATION_STORE_YELLOW = "🟡 <b>Delta 2</b> — на зберіганні, ~{estimated}% · ціль {target}%"
-POWER_CONSERVATION_STORE_BLUE = "🔵 <b>Delta 2</b> — на зберіганні, ~{estimated}% · ціль {target}%"
 POWER_CONSERVATION_STORE_GREEN = "🟢 <b>Delta 2</b> — на зберіганні, ~{estimated}% · ціль {target}%"
 POWER_CONSERVATION_CYCLE_SOON = "🟢 <b>Delta 2</b> — калібрувальний цикл за ~{days} дн"
 POWER_CONSERVATION_CYCLE_DUE = "🟡 <b>Delta 2</b> — час калібрувального циклу (60→0→100→60)"
