@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-10-16
+
 ### Виправлено
 
 - **Стара картка, яку бот уже не може видалити, тепер хоча б лишається без кнопок.** Телеграм дозволяє
