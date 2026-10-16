@@ -102,7 +102,7 @@ async def _rewrite(callback: CallbackQuery, supply: DeclaredSupply, confirming: 
     try:
         await callback.message.edit_text(text, reply_markup=keyboard)
     except TelegramBadRequest as error:
-        # a bot may edit its own message for 48 hours only; the declaration is written either way
+        # the card may have been deleted by hand; the declaration is written either way
         if "message is not modified" not in str(error):
             logger.info("The supply card could not be rewritten: %s", error)
 

@@ -90,7 +90,7 @@ class ChoreDeadlineJob:
             )
             return
         except TelegramBadRequest as error:
-            # unchanged text needs no rewrite; anything else (gone, older than 48h) falls back to a fresh card
+            # unchanged text needs no rewrite; a card that is gone falls back to a fresh one
             if "message is not modified" in str(error).lower():
                 return
 

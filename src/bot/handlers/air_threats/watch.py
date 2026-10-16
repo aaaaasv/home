@@ -102,7 +102,7 @@ class AirThreatWatcher:
         try:
             await self.bot.edit_message_text(chat_id=self.chat_id, message_id=message_id, text=text)
         except TelegramBadRequest:
-            # older than 48 hours, or deleted by hand — either way the card is not ours to keep updating
+            # deleted by hand, or a chat we cannot reach — either way the card is not ours to keep updating
             return
         await self._remember(approaching.threat.tracker_id, message_id, text)
 

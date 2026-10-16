@@ -349,7 +349,6 @@ async def run() -> None:
             chores_topic=chores_topic,
             room_climate_sensor=room_climate_sensor,
             air_threat_source=air_threat_source,
-            arrival_light_watcher=arrival_light_watcher,
             air_alert_watcher=air_alert_watcher,
             price_source=build_price_source(settings),
             weather_topic=weather_topic,

@@ -19,6 +19,7 @@ OTHER_PHONE = "AA:BB:CC:DD:EE:02"
 ROTATED_PHONE = "AA:BB:CC:DD:EE:0A"
 LAPTOP = "AA:BB:CC:DD:EE:F0"
 ARRIVAL_PERCENT = 20.0
+ARRIVAL_MINUTES = 10
 AWAY_MINUTES = 5
 
 
@@ -26,11 +27,13 @@ class RecordingPanelLight:
     def __init__(self, state: PanelLightState | None = None):
         self.state = state if state is not None else PanelLightState(is_on=False, brightness_percent=0.0)
         self.asked_for: list[float] = []
+        self.leases: list[tuple[float, float | None]] = []
 
     async def read(self):
         return self.state
 
-    async def set_brightness(self, brightness_percent: float) -> None:
+    async def set_brightness(self, brightness_percent: float, minutes: float | None = None) -> None:
+        self.leases.append((brightness_percent, minutes))
         self.asked_for.append(brightness_percent)
         self.state = PanelLightState(is_on=brightness_percent > 0, brightness_percent=brightness_percent)
 
@@ -76,7 +79,7 @@ class ArrivalLightTestCase(BaseIntegrationTestCase):
             PRESENCE_LONGITUDE=30.52,
             ARRIVAL_LIGHT_PERCENT=ARRIVAL_PERCENT,
             ARRIVAL_AWAY_MINUTES=AWAY_MINUTES,
-            ARRIVAL_LIGHT_MINUTES=10,
+            ARRIVAL_LIGHT_MINUTES=ARRIVAL_MINUTES,
         )
         return ArrivalLightWatcher(
             uow_factory=lambda: self.uow,
@@ -247,37 +250,19 @@ class ArrivalLightTestCase(BaseIntegrationTestCase):
             events = await uow.presence_events.list_since(datetime(2000, 1, 1, tzinfo=timezone.utc))
         self.assertEqual([event.rssi for event in events], [-75])
 
-    async def test_the_sweep_puts_the_light_out_once_the_welcome_has_expired(self):
+    async def test_the_welcome_asks_the_host_to_hold_the_light_for_its_own_minutes(self):
+        """
+        The welcome goes out on the host's clock, not on a sweep here.
+
+        a minute-by-minute job in this module used to do it, reading a moment kept in a python attribute —
+        so every deploy left whatever was burning to burn. the request now carries its own deadline.
+        """
         light = RecordingPanelLight()
         watcher = self.build_watcher(light)
+
         await self.leave_then_return(watcher, away_minutes=120)
 
-        watcher.household_calendar.frozen_now += timedelta(minutes=11)
-        await watcher.sweep()
-
-        self.assertEqual(light.asked_for, [ARRIVAL_PERCENT, 0])
-
-    async def test_the_sweep_leaves_the_light_alone_before_the_welcome_expires(self):
-        light = RecordingPanelLight()
-        watcher = self.build_watcher(light)
-        await self.leave_then_return(watcher, away_minutes=120)
-
-        watcher.household_calendar.frozen_now += timedelta(minutes=3)
-        await watcher.sweep()
-
-        self.assertEqual(light.asked_for, [ARRIVAL_PERCENT])
-
-    async def test_the_sweep_leaves_a_light_somebody_turned_up_themselves(self):
-        light = RecordingPanelLight()
-        watcher = self.build_watcher(light)
-        await self.leave_then_return(watcher, away_minutes=120)
-        light.state = PanelLightState(is_on=True, brightness_percent=80.0)
-
-        watcher.household_calendar.frozen_now += timedelta(minutes=11)
-        await watcher.sweep()
-
-        self.assertEqual(light.asked_for, [ARRIVAL_PERCENT])
-        self.assertEqual(light.state.brightness_percent, 80.0)
+        self.assertEqual(light.leases, [(ARRIVAL_PERCENT, ARRIVAL_MINUTES)])
 
     async def test_two_phones_arriving_together_still_get_the_light(self):
         """Both walk in from an empty flat, so the first must not read the second as somebody already home."""
