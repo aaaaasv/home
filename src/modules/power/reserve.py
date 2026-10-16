@@ -12,6 +12,7 @@ from src.modules.power.domain import (
     ReserveStanding,
     UpsState,
 )
+from src.modules.power.pack_runtime import estimate_pack_runtime
 
 # a 1S 18650 resting above this has finished charging. the gauge's own percent decides nothing here: it re-learns
 # the pack after a cell swap and reads nonsense meanwhile — 4% at 3.78 V on 08.09, which was really about 45%
@@ -42,7 +43,7 @@ def build_reserve(
         grid=grid,
         rows=(
             _station_row(station),
-            _pi_row(ups, socket_dead_for),
+            _pi_row(ups),
             _router_row(router_alive, socket_live, socket_dead_for),
             _media_server_row(media_server, socket_dead_for),
         ),
@@ -77,27 +78,27 @@ def _station_row(station: EcoFlowState | None) -> ReserveRow:
     )
 
 
-def _pi_row(ups: UpsState | None, socket_dead_for: timedelta | None) -> ReserveRow:
+def _pi_row(ups: UpsState | None) -> ReserveRow:
     """
-    The hat knows whether its socket is live and how full its pack is, but nothing about how long it lasts.
+    The hat answers in volts, and two full discharges turned those volts into the one thing anyone asks for.
 
-    which of the two the standing rests on matters: volts, never the gauge's percent. the percent is shown
-    because it is the number a reader understands, and once the gauge has settled it is right within a few
-    points — but it is also the one that read 4% at 3.78 V, so no decision is ever taken on it.
+    everything here rests on the voltage and nothing on the gauge's percent — the gauge read 4% at 3.78 V
+    after a cell swap, and even settled it reports 0.1% with half an hour of running left. so the row shows
+    a charge only while the socket is live, where the number is both honest and the one a reader wants; on
+    battery it shows the time from `PACK_RUNTIME_CURVE` and nothing else, because «4% · лишилось ~1 год»
+    reads as a broken card rather than as a careful one.
     """
     if ups is None:
         return ReserveRow(layer=ReserveLayer.PI, standing=ReserveStanding.UNREACHABLE)
 
-    charge_percent = _as_percent(ups.battery_percent)
     if not ups.mains_present:
         return ReserveRow(
             layer=ReserveLayer.PI,
-            standing=ReserveStanding.HOLDING_UNMEASURED,
-            charge_percent=charge_percent,
-            holding_for=socket_dead_for,
+            standing=ReserveStanding.HOLDING,
+            remaining=estimate_pack_runtime(ups.battery_volts),
         )
     standing = ReserveStanding.FULL if ups.battery_volts >= PACK_FULL_VOLTS else ReserveStanding.CHARGING
-    return ReserveRow(layer=ReserveLayer.PI, standing=standing, charge_percent=charge_percent)
+    return ReserveRow(layer=ReserveLayer.PI, standing=standing, charge_percent=_as_percent(ups.battery_percent))
 
 
 def _router_row(router_alive: bool, socket_live: bool | None, socket_dead_for: timedelta | None) -> ReserveRow:

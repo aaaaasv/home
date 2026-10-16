@@ -70,6 +70,19 @@ class UpsState(DomainModel):
     as_of: datetime
 
 
+class PackWarning(StrEnum):
+    """
+    The two moments in a discharge worth interrupting the family for — and there are deliberately only two.
+
+    LOW is the one with something to do about it: an hour is enough to throw the changeover or find a power
+    bank. HALTING is the pi's last word, which costs nothing to send and saves the family guessing why the
+    house went quiet — on 14/15.10 the only sign was that nothing had been posted since 23:44.
+    """
+
+    LOW = "low"
+    HALTING = "halting"
+
+
 class MediaServerState(DomainModel):
     """
     What the media server's own battery says about itself, as its agent publishes it.

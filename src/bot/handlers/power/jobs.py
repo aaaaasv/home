@@ -10,12 +10,22 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.handlers.power.board import PowerBoard
-from src.bot.handlers.power.formatting import render_mains_change, render_outage_forecast, render_outage_recovery
+from src.bot.handlers.power.formatting import (
+    render_mains_change,
+    render_outage_forecast,
+    render_outage_recovery,
+    render_pack_warning,
+)
 from src.bot.handlers.power.keyboards import build_supply_keyboard
-from src.bot.handlers.power.messages import POWER_OUTAGE_SOON, POWER_SUPPLY_QUESTION
+from src.bot.handlers.power.messages import POWER_OUTAGE_SOON, POWER_PACK_RECOVERED, POWER_SUPPLY_QUESTION
 from src.bot.scheduling import SchedulerContext
 from src.bot.services.forum_topic_registry import ForumTopicRegistry
-from src.bot.services.posted_message_tracker import OUTAGE_EMERGENCY_KIND, OUTAGE_PING_KIND, PostedMessageTracker
+from src.bot.services.posted_message_tracker import (
+    OUTAGE_EMERGENCY_KIND,
+    OUTAGE_PING_KIND,
+    PI_PACK_WARNING_KIND,
+    PostedMessageTracker,
+)
 from src.common.config import Settings
 from src.common.household_calendar import HouseholdCalendar
 from src.common.time import current_time
@@ -29,10 +39,12 @@ from src.modules.power.domain import (
     OutageOutlook,
     OutageSchedule,
     OutageScheduleStatus,
+    PackWarning,
     Reserve,
 )
 from src.modules.power.mains_monitor import MainsMonitor, classify_grid
 from src.modules.power.outage_forecast import forecast_outage
+from src.modules.power.pack_runtime import classify_pack, estimate_pack_runtime
 from src.modules.power.services.ecoflow_station import EcoFlowStation
 from src.modules.power.services.outage_schedule_provider import OutageScheduleProvider
 from src.modules.power.services.pi_ups import PiUps
@@ -211,6 +223,106 @@ class MainsWatchJob:
         async with self.uow_factory() as uow:
             latest = await uow.grid_events.retrieve_latest()
         self.monitor.seed(GridState(latest.state) if latest is not None else None)
+
+
+class PiPackWatchJob:
+    """
+    The two things the pi says about its own pack: an hour's warning, and goodbye — each once per outage.
+
+    the house has had exactly one «running out» message until now, and it is about the station and needs a
+    published schedule to compare against — so through the emergency-shutdown regime, which is the present
+    one, nothing warned about anything at all. on the night of 14/15.10 the pi's pack emptied at 23:44 and
+    the only signal was that the bot stopped posting.
+
+    **both messages ping, and that is why there are only two of them.** rule one in this house is that a
+    push must normally be silent; these are, because the socket is normally live. what decides them is time
+    and never charge — `PACK_RUNTIME_CURVE` explains why the gauge cannot be used for this.
+
+    which stage has been said is kept in the tracker rather than in memory, because a deploy mid-outage
+    would otherwise warn all over again — and the one night this has to work is the night the bot is
+    restarted least carefully.
+    """
+
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        power_topic: ForumTopicRegistry,
+        pi_ups: PiUps,
+        uow_factory: Callable[[], UnitOfWork],
+        warning_at: timedelta,
+        goodbye_at: timedelta,
+    ):
+        self.bot = bot
+        self.chat_id = chat_id
+        self.power_topic = power_topic
+        self.pi_ups = pi_ups
+        self.uow_factory = uow_factory
+        self.warning_at = warning_at
+        self.goodbye_at = goodbye_at
+        self.tracker = PostedMessageTracker(bot=bot, uow_factory=uow_factory)
+        self._said_goodbye = False
+
+    async def __call__(self) -> None:
+        ups = await self.pi_ups.read_state()
+        if ups is None:
+            return
+        if ups.mains_present:
+            await self._stand_down()
+            return
+
+        warning = classify_pack(ups, self.warning_at, self.goodbye_at)
+        if warning is not None:
+            await self._warn(warning, estimate_pack_runtime(ups.battery_volts))
+
+    async def _warn(self, warning: PackWarning, remaining: timedelta) -> None:
+        async with self.uow_factory() as uow:
+            if await uow.posted_messages.list_by_reference(PI_PACK_WARNING_KIND, warning.value):
+                return
+
+        message = await self.bot.send_message(
+            chat_id=self.chat_id,
+            message_thread_id=await self.power_topic.resolve(),
+            text=render_pack_warning(warning, remaining),
+            # there is a deadline in both of these, and the second one is the last thing the pi gets to say
+            disable_notification=False,
+        )
+        await self.tracker.remember(PI_PACK_WARNING_KIND, message, reference=warning.value)
+        self._said_goodbye = self._said_goodbye or warning is PackWarning.HALTING
+        logger.info("Said the pack is %s, with %s left on the curve", warning.value, remaining)
+
+    async def _stand_down(self) -> None:
+        """
+        The socket is live again: clear the lane so the next outage speaks, and take back what is now untrue.
+
+        a goodbye this process sent and then outlived is simply wrong — the pi never went — so it is written
+        over. one from a process that is no longer here was true, and stays where it is: it is the only record
+        in the topic of the house having gone quiet that night, which is the thing nobody could see before.
+        """
+        async with self.uow_factory() as uow:
+            posted = await uow.posted_messages.list_by_kind(PI_PACK_WARNING_KIND)
+        if not posted:
+            return
+
+        said = {row.reference: row for row in posted}
+        goodbye = said.get(PackWarning.HALTING.value)
+        if goodbye is not None and not self._said_goodbye:
+            standing = None
+        else:
+            standing = goodbye if goodbye is not None else said.get(PackWarning.LOW.value)
+        if standing is not None:
+            await self._write_over(standing.chat_id, standing.message_id)
+
+        self._said_goodbye = False
+        await self.tracker.forget(PI_PACK_WARNING_KIND)
+        logger.info("The pi's socket is live again; the next outage may warn afresh")
+
+    async def _write_over(self, chat_id: int, message_id: int) -> None:
+        try:
+            await self.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=POWER_PACK_RECOVERED)
+        except TelegramBadRequest as error:
+            # a bot may edit its own message for 48 hours; past that the warning simply stays as it is
+            logger.info("Could not write over the low-pack warning: %s", error)
 
 
 class PowerBoardJob:
@@ -485,6 +597,7 @@ def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> Non
     """Poll the station on its own cadence and follow the outage schedule on its — each switched on separately."""
     _register_station_jobs(scheduler, context)
     _register_mains_watch(scheduler, context)
+    _register_pack_watch(scheduler, context)
     _register_power_board(scheduler, context)
     _register_outage_schedule_jobs(scheduler, context)
 
@@ -514,6 +627,29 @@ def _register_mains_watch(scheduler: AsyncIOScheduler, context: SchedulerContext
         mains_watch_job.__call__,
         trigger=IntervalTrigger(minutes=settings.ECOFLOW_MAINS_CHECK_MINUTES),
         id="mains_watch",
+        replace_existing=True,
+    )
+
+
+def _register_pack_watch(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
+    """The pack's own cadence, which is slow: the hour it warns about is an hour long."""
+    settings = context.settings
+    if context.power_topic is None or not settings.PI_UPS_ENABLED or context.pi_ups is None:
+        return
+
+    pack_watch_job = PiPackWatchJob(
+        bot=context.bot,
+        chat_id=settings.TELEGRAM_REMINDER_CHAT_ID,
+        power_topic=context.power_topic,
+        pi_ups=context.pi_ups,
+        uow_factory=context.uow_factory,
+        warning_at=timedelta(minutes=settings.PI_UPS_WARNING_MINUTES_LEFT),
+        goodbye_at=timedelta(minutes=settings.PI_UPS_GOODBYE_MINUTES_LEFT),
+    )
+    scheduler.add_job(
+        pack_watch_job.__call__,
+        trigger=IntervalTrigger(minutes=settings.PI_UPS_WATCH_MINUTES),
+        id="pi_pack_watch",
         replace_existing=True,
     )
 
