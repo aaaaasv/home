@@ -140,10 +140,11 @@ class BuildReserveStationRowTestCase(unittest.TestCase):
 
 class BuildReservePiRowTestCase(unittest.TestCase):
     """
-    The hat knows whether its socket is live and how full its pack is, and nothing at all about how long it lasts.
+    Everything about this row is decided on volts, and nothing at all on the gauge's percent.
 
-    the fullness question is settled on volts, never on the gauge's percent: the gauge re-learns the pack after
-    a cell swap and reads nonsense meanwhile — 4% at 3.78 V on 08.09, which was really about 45%.
+    the gauge re-learns the pack after a cell swap and reads nonsense meanwhile — 4% at 3.78 V on 08.09,
+    which was really about 45% — and even settled it reports 0.1% with half an hour of running left. the
+    runtime comes from two measured discharges instead, and the percent is shown only while charging.
     """
 
     def test_build_reserve_with_a_rested_pack_on_a_live_socket_shows_the_pi_full(self):
@@ -176,11 +177,11 @@ class BuildReservePiRowTestCase(unittest.TestCase):
 
         self.assertEqual(row.standing, ReserveStanding.CHARGING)
 
-    def test_build_reserve_with_a_dead_socket_shows_how_long_the_pi_has_been_on_its_pack(self):
+    def test_build_reserve_with_a_dead_socket_reads_the_runtime_off_the_measured_curve(self):
         reserve = build_reserve(
             grid=GridState.ON_BATTERY,
             station=discharging_station(),
-            ups=hat(mains_present=False),
+            ups=hat(mains_present=False, battery_volts=3.70, battery_percent=41.6),
             router_alive=True,
             media_server=laptop(),
             on_battery_for=timedelta(minutes=40),
@@ -189,7 +190,23 @@ class BuildReservePiRowTestCase(unittest.TestCase):
 
         row = row_of(reserve, ReserveLayer.PI)
 
-        self.assertEqual((row.standing, row.holding_for), (ReserveStanding.HOLDING_UNMEASURED, timedelta(minutes=40)))
+        self.assertEqual((row.standing, row.remaining), (ReserveStanding.HOLDING, timedelta(minutes=132)))
+
+    def test_build_reserve_with_a_dead_socket_leaves_the_pi_charge_off_the_row(self):
+        """The gauge reads 3% where the curve says an hour: one row cannot carry both and stay readable."""
+        reserve = build_reserve(
+            grid=GridState.ON_BATTERY,
+            station=discharging_station(),
+            ups=hat(mains_present=False, battery_volts=3.55, battery_percent=3.0),
+            router_alive=True,
+            media_server=laptop(),
+            on_battery_for=timedelta(minutes=300),
+            socket_dead_for=timedelta(minutes=300),
+        )
+
+        row = row_of(reserve, ReserveLayer.PI)
+
+        self.assertEqual((row.charge_percent, row.remaining), (None, timedelta(minutes=62)))
 
     def test_build_reserve_with_a_silent_agent_shows_the_pi_unreachable(self):
         reserve = build_reserve(
@@ -494,7 +511,7 @@ class RenderTheReserveHalfTestCase(unittest.TestCase):
             "🕯 <b>Резерв</b> — на батареї 40 хв\n"
             "\n"
             "⚡ Delta 2 — 82% · лишилось ~2 год 10 хв\n"
-            "🖥 Pi — 99% · на батареї 40 хв\n"
+            "🖥 Pi — лишилось ~5 год 45 хв\n"
             "📡 Роутер — на батареї 40 хв\n"
             "💻 Медіасервер — 64% · лишилось ~2 год\n"
             "\n"
@@ -569,7 +586,7 @@ class RenderTheReserveHalfTestCase(unittest.TestCase):
             "🕯 <b>Резерв</b> — на батареї\n"
             "\n"
             "⚡ Delta 2 — 82% · на батареї\n"
-            "🖥 Pi — 99% · на батареї\n"
+            "🖥 Pi — лишилось ~5 год 45 хв\n"
             "📡 Роутер — на батареї\n"
             "💻 Медіасервер — 64% · на батареї\n"
             "\n"

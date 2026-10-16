@@ -17,6 +17,9 @@ CONSERVATION_CARD_KIND = "conservation_card"
 # the one standing board in ⚡ світло: every backup layer and the outage schedule on one screen, posted fresh
 # each morning, edited in place between, and never notifying
 POWER_BOARD_KIND = "power_board"
+# the pi's two low-pack pushes, one lane with the stage as its reference: one tracker row per stage keeps
+# each to once per outage, and the whole lane is dropped the moment the socket is live again
+PI_PACK_WARNING_KIND = "pi_pack_warning"
 # the strip's control card: only the newest one may stand, because its buttons name levels
 STRIP_CARD_KIND = "strip_card"
 # one card per red alert: pinged at the raise, written over when it is lifted, and then left standing as the
