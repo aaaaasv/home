@@ -62,24 +62,14 @@ class PresenceJob:
         logger.info("Everyone left with the air conditioner still on")
 
 
-def register_arrival_sweep(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
-    """Only puts the welcome light back out; turning it on is the socket's job and needs no clock."""
-    if context.arrival_light_watcher is None:
-        return
-
-    scheduler.add_job(
-        context.arrival_light_watcher.sweep,
-        trigger=IntervalTrigger(minutes=1),
-        id="arrival_light_sweep",
-        replace_existing=True,
-    )
-
-
 def register_jobs(scheduler: AsyncIOScheduler, context: SchedulerContext) -> None:
-    """Watch the roster of phones on the wi-fi — pointless without a unit to catch running in an empty flat."""
-    # the welcome light is switched on by the socket, so its sweep must register even
-    # when the presence digest itself is off
-    register_arrival_sweep(scheduler, context)
+    """
+    Watch the roster of phones on the wi-fi — pointless without a unit to catch running in an empty flat.
+
+    the welcome light needs nothing here: it is switched on by the socket and put out by the host service,
+    which holds the deadline on disk. there used to be a minute-by-minute sweep in this file for that, and
+    the clock it read lived in a python attribute that every deploy reset.
+    """
     settings = context.settings
     if (
         not settings.PRESENCE_ENABLED

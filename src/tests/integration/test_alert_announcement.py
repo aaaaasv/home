@@ -32,11 +32,13 @@ class RecordingPanelLight:
     def __init__(self, state: PanelLightState | None = None):
         self.state = state if state is not None else PanelLightState(is_on=False, brightness_percent=0.0)
         self.asked_for: list[float] = []
+        self.leases: list[tuple[float, float | None]] = []
 
     async def read(self) -> PanelLightState | None:
         return self.state
 
-    async def set_brightness(self, brightness_percent: float) -> None:
+    async def set_brightness(self, brightness_percent: float, minutes: float | None = None) -> None:
+        self.leases.append((brightness_percent, minutes))
         self.asked_for.append(brightness_percent)
         self.state = PanelLightState(is_on=brightness_percent > 0, brightness_percent=brightness_percent)
 

@@ -77,7 +77,6 @@ class ArrivalLightWatcher:
         self.family_phones = family_phones
         self.settings = settings
         self.household_calendar = household_calendar
-        self._raised_at = None
 
     async def handle(self, payload: str) -> None:
         """One event from the router's log, already turned into json by the host service."""
@@ -144,23 +143,9 @@ class ArrivalLightWatcher:
         if standing is None or standing.is_on:
             return REFUSED_LIGHT_ON
 
-        await self.panel_light.set_brightness(self.settings.ARRIVAL_LIGHT_PERCENT)
-        self._raised_at = moment
+        # the welcome names the minutes it is worth, and the host puts it out — a sweep on this side used
+        # to do it, and lost the moment it was counting from at every restart
+        await self.panel_light.set_brightness(
+            self.settings.ARRIVAL_LIGHT_PERCENT, minutes=self.settings.ARRIVAL_LIGHT_MINUTES
+        )
         return RAISED
-
-    async def sweep(self) -> None:
-        """Put the light back out once the welcome has outlived its purpose."""
-        if self._raised_at is None:
-            return
-        if self.household_calendar.now() - self._raised_at < timedelta(minutes=self.settings.ARRIVAL_LIGHT_MINUTES):
-            return
-
-        standing = await self.panel_light.read()
-        if standing is not None and abs(standing.brightness_percent - self.settings.ARRIVAL_LIGHT_PERCENT) > 1:
-            # a hand has been on it since — leave it where that hand put it
-            self._raised_at = None
-            return
-
-        await self.panel_light.set_brightness(0)
-        self._raised_at = None
-        logger.info("Arrival light back out")
