@@ -29,6 +29,8 @@ from src.bot.handlers.power.messages import (
     POWER_MAINS_RESTORED_AFTER,
     POWER_OUTAGE_SHORTFALL,
     POWER_OUTAGE_SHORTFALL_OVER,
+    POWER_PACK_HALTING,
+    POWER_PACK_LOW,
     POWER_RESERVE_ALIVE,
     POWER_RESERVE_CHARGING,
     POWER_RESERVE_CHARGING_UNTIMED,
@@ -69,6 +71,7 @@ from src.modules.power.domain import (
     OutageOutlook,
     OutageSchedule,
     OutageScheduleStatus,
+    PackWarning,
     Reserve,
     ReserveLayer,
     ReserveRow,
@@ -210,6 +213,18 @@ def _render_reserve_standing(row: ReserveRow) -> str:
         ReserveStanding.ALIVE: POWER_RESERVE_ALIVE,
         ReserveStanding.UNREACHABLE: POWER_RESERVE_UNREACHABLE,
     }[row.standing]
+
+
+def render_pack_warning(warning: PackWarning, remaining: timedelta) -> str:
+    """
+    The pi's low pack, in the only unit anyone can act on — and the halting message carries no number at all.
+
+    ten minutes rounded off a measured curve is precision nobody can use, and «вимикається» is already the
+    whole of it.
+    """
+    if warning is PackWarning.HALTING:
+        return POWER_PACK_HALTING
+    return POWER_PACK_LOW.format(duration=format_duration(remaining))
 
 
 def render_outage_forecast(forecast: OutageForecast) -> str:

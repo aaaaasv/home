@@ -222,6 +222,15 @@ class Settings(BaseSettings):
     # the agent republishes every few seconds — a reading older than this means it stopped, and a stale
     # "mains present" would announce the light coming back in the middle of an outage
     PI_UPS_STALE_AFTER_SECONDS: int = 120
+    # the pack is watched on its own slow cadence: the stretch between "an hour left" and the halt lasts an
+    # hour, so two minutes is early enough, and the goodbye still has eight of its ten minutes to spare
+    PI_UPS_WATCH_MINUTES: int = 2
+    # how much running time is left when the family is told. an hour is what the warning is for: long enough
+    # to throw the changeover or fetch a power bank, short enough that it is not news twice in an evening
+    PI_UPS_WARNING_MINUTES_LEFT: int = 60
+    # and the pi's last word, said while there is still margin — at 3.42 V the two measured discharges both
+    # had ten minutes left, and the agent halts at 3.40 V
+    PI_UPS_GOODBYE_MINUTES_LEFT: int = 10
     # the led strip on the server shelf, aimed at the switchboard: it comes on by itself when the grid drops and
     # goes off when the changeover is thrown, and that half runs on the host (home-infrastructure/pi/panel-light)
     # whether or not this container is up. the bot only offers the hand on it — a lamp tile in apple home

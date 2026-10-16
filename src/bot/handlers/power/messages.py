@@ -58,6 +58,31 @@ POWER_BOARD_BUTTON_TO_STATION = "Перекинув на Delta 2"
 POWER_BOARD_BUTTON_TO_GRID = "Pi знову в мережі"
 POWER_SUPPLY_TOAST_STATION_RETRACTED = "Записав: живить Delta 2 · прибрав «Світло є»"
 
+# the pi's own pack, said twice per outage at most: once while an hour of it is left, and once as it goes.
+# both name what stops and what does not, because the question that follows either of them is «а інтернет?»
+# — and the answer is that the router has its own battery and keeps the flat online without the pi.
+#
+# no percent anywhere in them on purpose: the gauge reports 3% where the measured curve says an hour, and a
+# push carrying both numbers argues with itself
+POWER_PACK_LOW = (
+    "🖥 <b>Pi сяде за ~{duration}</b>\n\n"
+    "Своє живлення в нього закінчується. Коли вимкнеться — не буде бота, датчиків, Apple Home і робочого "
+    "тунелю.\n"
+    "Інтернет і Wi-Fi лишаться: роутер живиться окремо."
+)
+# «має піднятись» and not «підніметься»: the two-second power pulse that makes that true was fixed on
+# 15.10.2026 and has not yet been through a real outage, and the family losing an evening of the house
+# because a message promised too much is the worse of the two mistakes
+POWER_PACK_HALTING = (
+    "🖥 <b>Pi вимикається</b>\n\n"
+    "Пак сів — бот, датчики, Apple Home і робочий тунель зникають до світла. Інтернет і Wi-Fi лишаються.\n"
+    "Щойно в розетці зʼявиться струм, Pi має піднятись сам — якщо за кілька хвилин тихо, натисни кнопку на "
+    "корпусі."
+)
+# written over whichever of the two is standing once the socket comes back: «сяде за ~1 год» left above a
+# charging pack is read as a live warning, and the family has no way to tell which it is
+POWER_PACK_RECOVERED = "🔋 <b>Pi знову живиться</b>\n\nПак заряджається."
+
 # said once per outage, and only when the answer is bad: "you reach" is not worth a notification, and a
 # push that speaks every time gets the whole group muted
 POWER_OUTAGE_SHORTFALL = (
